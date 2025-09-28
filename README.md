@@ -45,6 +45,23 @@ Visit: https://search.lingogram.app
 > [!TIP]
 > All environment variables are optional. The application will work with default settings, but you can customize behavior by setting these variables.
 
+### Start with Docker Image
+
+> [!IMPORTANT]
+> The simplest way to get started is to run the Docker image without any configuration. All features will work with sensible defaults.
+
+1. Run docker image default without any environment variables:
+
+```bash
+docker run -d --name telegram-search \
+  -p 3333:3333 \
+  -v telegram-search-data:/app/data \
+  ghcr.io/groupultra/telegram-search:latest
+```
+
+<details>
+<summary>Example with environment variables</summary>
+
 Set the following environment variables before starting the containerized services:
 
 | Variable | Required | Description |
@@ -59,25 +76,10 @@ Set the following environment variables before starting the containerized servic
 | `EMBEDDING_MODEL` | optional | Override embedding model name. |
 | `EMBEDDING_DIMENSION` | optional | Override embedding dimension (e.g. `1536`, `1024`, `768`). |
 
-### Start with Docker Image
-
-> [!IMPORTANT]
-> The simplest way to get started is to run the Docker image without any configuration. All features will work with sensible defaults.
-
-1. Run docker image default without any environment variables:
-
 ```bash
 docker run -d --name telegram-search \
   -p 3333:3333 \
-  ghcr.io/groupultra/telegram-search:latest
-```
-
-<details>
-<summary>Example with environment variables</summary>
-
-```bash
-docker run -d --name telegram-search \
-  -p 3333:3333 \
+  -v telegram-search-data:/app/data \
   -e TELEGRAM_API_ID=611335 \
   -e TELEGRAM_API_HASH=d524b414d21f4d37f08684c1df41ac9c \
   -e DATABASE_TYPE=postgres \

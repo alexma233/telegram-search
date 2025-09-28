@@ -46,6 +46,23 @@
 > [!TIP]
 > すべての環境変数は任意です。アプリケーションはデフォルト設定で動作しますが、これらの変数を設定することで動作をカスタマイズできます。
 
+### Docker イメージから起動
+
+> [!IMPORTANT]
+> 最も簡単な始め方は、設定なしで Docker イメージを実行することです。すべての機能が合理的なデフォルト設定で動作します。
+
+1. 環境変数なしでデフォルトイメージを実行します。
+
+```bash
+docker run -d --name telegram-search \
+  -p 3333:3333 \
+  -v telegram-search-data:/app/data \
+  ghcr.io/groupultra/telegram-search:latest
+```
+
+<details>
+<summary>環境変数ありの例</summary>
+
 コンテナを起動する前に、以下の環境変数を設定してください。
 
 | 変数 | 必須 | 説明 |
@@ -60,25 +77,10 @@
 | `EMBEDDING_MODEL` | 任意 | 使用する埋め込みモデル名を上書き。 |
 | `EMBEDDING_DIMENSION` | 任意 | 埋め込みベクトルの次元数を上書き（`1536`、`1024`、`768` など）。 |
 
-### Docker イメージから起動
-
-> [!IMPORTANT]
-> 最も簡単な始め方は、設定なしで Docker イメージを実行することです。すべての機能が合理的なデフォルト設定で動作します。
-
-1. 環境変数なしでデフォルトイメージを実行します。
-
 ```bash
 docker run -d --name telegram-search \
   -p 3333:3333 \
-  ghcr.io/groupultra/telegram-search:latest
-```
-
-<details>
-<summary>環境変数ありの例</summary>
-
-```bash
-docker run -d --name telegram-search \
-  -p 3333:3333 \
+  -v telegram-search-data:/app/data \
   -e TELEGRAM_API_ID=611335 \
   -e TELEGRAM_API_HASH=d524b414d21f4d37f08684c1df41ac9c \
   -e DATABASE_TYPE=postgres \

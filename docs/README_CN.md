@@ -46,6 +46,23 @@
 > [!TIP]
 > 所有环境变量都是可选的。应用程序将使用默认设置运行，但您可以通过设置这些变量来自定义行为。
 
+### 使用 Docker 镜像
+
+> [!IMPORTANT]
+> 最简单的开始方式是不带任何配置运行 Docker 镜像。所有功能都将使用合理的默认设置。
+
+1. 不带任何环境变量运行默认镜像：
+
+```bash
+docker run -d --name telegram-search \
+  -p 3333:3333 \
+  -v telegram-search-data:/app/data \
+  ghcr.io/groupultra/telegram-search:latest
+```
+
+<details>
+<summary>带环境变量的示例</summary>
+
 启动容器前请准备以下环境变量：
 
 | 变量 | 是否必填 | 说明 |
@@ -60,25 +77,10 @@
 | `EMBEDDING_MODEL` | 选填 | 覆盖默认的嵌入模型名称。 |
 | `EMBEDDING_DIMENSION` | 选填 | 覆盖嵌入向量维度（如 `1536`、`1024`、`768`）。 |
 
-### 使用 Docker 镜像
-
-> [!IMPORTANT]
-> 最简单的开始方式是不带任何配置运行 Docker 镜像。所有功能都将使用合理的默认设置。
-
-1. 不带任何环境变量运行默认镜像：
-
 ```bash
 docker run -d --name telegram-search \
   -p 3333:3333 \
-  ghcr.io/groupultra/telegram-search:latest
-```
-
-<details>
-<summary>带环境变量的示例</summary>
-
-```bash
-docker run -d --name telegram-search \
-  -p 3333:3333 \
+  -v telegram-search-data:/app/data \
   -e TELEGRAM_API_ID=611335 \
   -e TELEGRAM_API_HASH=d524b414d21f4d37f08684c1df41ac9c \
   -e DATABASE_TYPE=postgres \
