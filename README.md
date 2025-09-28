@@ -36,22 +36,58 @@ Visit: https://search.lingogram.app
 
 ## 🚀 Quick Start
 
+### Runtime environment variables
+
+Set the following environment variables before starting the containerized services:
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `TELEGRAM_API_ID` | optional | Telegram app ID from [my.telegram.org](https://my.telegram.org/apps). |
+| `TELEGRAM_API_HASH` | optional | Telegram app hash from the same page. |
+| `DATABASE_TYPE` | optional | Database type (`postgres` or `pglite`). |
+| `DATABASE_URL` | optional | Database connection string used by the server and migrations (Only support when `DATABASE_TYPE` is `postgres`). |
+| `EMBEDDING_API_KEY` | optional | API key for the embedding provider (OpenAI key, Ollama token, etc.). |
+| `EMBEDDING_BASE_URL` | optional | Custom base URL for self-hosted or compatible embedding providers. |
+| `EMBEDDING_PROVIDER` | optional | Override embedding provider (`openai` or `ollama`). |
+| `EMBEDDING_MODEL` | optional | Override embedding model name. |
+| `EMBEDDING_DIMENSION` | optional | Override embedding dimension (e.g. `1536`, `1024`, `768`). |
+
 ### Start with Docker Image
 
-1. Run docker image
+1. Run docker image default without any environment variables:
 
 ```bash
-docker run ghcr.io/groupultra/telegram-search:latest -d
+docker run -d --name telegram-search \
+  -p 3333:3333 \
+  ghcr.io/groupultra/telegram-search:latest
 ```
+
+<details>
+<summary>Example with environment variables</summary>
+
+```bash
+docker run -d --name telegram-search \
+  -p 3333:3333 \
+  -e TELEGRAM_API_ID=611335 \
+  -e TELEGRAM_API_HASH=d524b414d21f4d37f08684c1df41ac9c \
+  -e DATABASE_TYPE=postgres \
+  -e DATABASE_URL=postgresql://<postgres-host>:5432/postgres \
+  -e EMBEDDING_API_KEY=sk-xxxx \
+  -e EMBEDDING_BASE_URL=https://api.openai.com/v1 \
+  ghcr.io/groupultra/telegram-search:latest
+```
+
+Replace `<postgres-host>` with the hostname or IP address of the PostgreSQL instance you want to use.
+
+</details>
 
 2. Access `http://localhost:3333` to open the search interface.
 
-
 ### Start with Docker Compose
 
-1. Clone repository
+1. Clone repository.
 
-2. Run docker compose to start all services including database
+2. Run docker compose to start all services including the database:
 
 ```bash
 docker compose up -d
@@ -100,13 +136,7 @@ cp config/config.example.yaml config/config.yaml
 docker compose up -d pgvector
 ```
 
-5. Sync database schema:
-
-```bash
-pnpm run db:migrate
-```
-
-6. Start services:
+5. Start services:
 
 ```bash
 # Start backend
