@@ -18,8 +18,10 @@
   <a href="https://t.me/+Gs3SH2qAPeFhYmU9"><img src="https://img.shields.io/badge/Telegram-%235AA9E6?logo=telegram&labelColor=FFFFFF"></a>
 </p>
 
+> [!WARNING]
 > We have not issued any virtual currency, please do not be deceived.
->
+
+> [!CAUTION]
 > This software can only export your own chat records for search, please do not use it for illegal purposes.
 
 A powerful Telegram chat history search tool that supports vector search and semantic matching. Based on OpenAI's semantic vector technology, it makes your Telegram message retrieval smarter and more precise.
@@ -30,6 +32,8 @@ A powerful Telegram chat history search tool that supports vector search and sem
 ## 🌐 Try it Now
 
 We provide an online version where you can experience all features of Telegram Search without self-deployment.
+
+> [!NOTE]
 > We promise not to collect any user privacy data, you can use it with confidence
 
 Visit: https://search.lingogram.app
@@ -37,6 +41,9 @@ Visit: https://search.lingogram.app
 ## 🚀 Quick Start
 
 ### Runtime environment variables
+
+> [!TIP]
+> All environment variables are optional. The application will work with default settings, but you can customize behavior by setting these variables.
 
 Set the following environment variables before starting the containerized services:
 
@@ -53,6 +60,9 @@ Set the following environment variables before starting the containerized servic
 | `EMBEDDING_DIMENSION` | optional | Override embedding dimension (e.g. `1536`, `1024`, `768`). |
 
 ### Start with Docker Image
+
+> [!IMPORTANT]
+> The simplest way to get started is to run the Docker image without any configuration. All features will work with sensible defaults.
 
 1. Run docker image default without any environment variables:
 
@@ -96,6 +106,9 @@ docker compose up -d
 3. Access `http://localhost:3333` to open the search interface.
 
 ## 💻 Development Guide
+
+> [!CAUTION]
+> Development mode requires Node.js >= 22.18 and pnpm. Make sure you have the correct versions installed before proceeding.
 
 ### Browser Only
 

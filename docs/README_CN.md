@@ -18,8 +18,10 @@
   <a href="https://t.me/+Gs3SH2qAPeFhYmU9"><img src="https://img.shields.io/badge/Telegram-%235AA9E6?logo=telegram&labelColor=FFFFFF"></a>
 </p>
 
+> [!WARNING]
 > 我们未发行任何虚拟货币，请勿上当受骗。
->
+
+> [!CAUTION]
 > 本软件仅可导出您自己的聊天记录以便搜索，请勿用于非法用途。
 
 一个功能强大的 Telegram 聊天记录搜索工具，支持向量搜索和语义匹配。基于 OpenAI 的语义向量技术，让你的 Telegram 消息检索更智能、更精准。
@@ -32,6 +34,7 @@
 
 我们提供了一个在线版本，无需自行部署，即可体验 Telegram Search 的全部功能。
 
+> [!NOTE]
 > 我们承诺不会收集任何用户隐私数据，您可以放心使用
 
 访问以下网址开始使用: https://search.lingogram.app
@@ -39,6 +42,9 @@
 ## 🚀 快速开始
 
 ### 运行时环境变量
+
+> [!TIP]
+> 所有环境变量都是可选的。应用程序将使用默认设置运行，但您可以通过设置这些变量来自定义行为。
 
 启动容器前请准备以下环境变量：
 
@@ -55,6 +61,9 @@
 | `EMBEDDING_DIMENSION` | 选填 | 覆盖嵌入向量维度（如 `1536`、`1024`、`768`）。 |
 
 ### 使用 Docker 镜像
+
+> [!IMPORTANT]
+> 最简单的开始方式是不带任何配置运行 Docker 镜像。所有功能都将使用合理的默认设置。
 
 1. 不带任何环境变量运行默认镜像：
 
@@ -98,6 +107,9 @@ docker compose up -d
 3. 浏览器访问 `http://localhost:3333` 打开搜索界面。
 
 ## 💻 开发教程
+
+> [!CAUTION]
+> 开发模式需要 Node.js >= 22.18 和 pnpm。请确保在继续之前安装了正确的版本。
 
 ### 网页模式
 
