@@ -108,6 +108,7 @@
     "selectChats": "选择聊天",
     "selectedChats": "已选择 {count} 个聊天",
     "startSync": "开始同步",
+    "startSyncPrompt": "首次同步需要在 Telegram 客户端中授权 Data Export 数据导出，并且刷新页面之后再尝试一次。",
     "sync": "同步",
     "syncCompleted": "同步完成",
     "syncPrompt": "同步对话之后才能搜索全部的聊天记录",

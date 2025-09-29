@@ -108,6 +108,7 @@
     "selectChats": "Select Chats",
     "selectedChats": "{count} chats selected",
     "startSync": "Start Sync",
+    "startSyncPrompt": "The first synchronization requires authorization of Data Export in the Telegram client, and then refresh the page and try again.",
     "sync": "Sync",
     "syncCompleted": "Sync completed",
     "syncPrompt": "After a synchronized conversation, you can search all chat records.",
