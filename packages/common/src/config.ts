@@ -1,4 +1,4 @@
-import type { Config } from './config-schema'
+import type { Config, ProxyConfig } from './config-schema'
 import type { RuntimeFlags } from './flags'
 
 import { useLogger } from '@unbird/logg'
@@ -8,6 +8,7 @@ import defu from 'defu'
 import { safeParse } from 'valibot'
 
 import { configSchema, generateDefaultConfig } from './config-schema'
+import { parseProxyUrl } from './proxy-url-parser'
 
 let config: Config
 const logger = useLogger('common:config')
@@ -59,6 +60,56 @@ function applyEmbeddingOverrides(config: Config, flags?: RuntimeFlags): void {
       ...(flags.embeddingDimension && { dimension: flags.embeddingDimension }),
       ...(flags.embeddingApiKey && { apiKey: flags.embeddingApiKey }),
       ...(flags.embeddingApiBase && { apiBase: flags.embeddingApiBase }),
+    }
+  }
+}
+
+function applyProxyOverrides(config: Config, flags?: RuntimeFlags): void {
+  config.api = config.api || {}
+  const currentTelegram = config.api.telegram || {}
+  let proxyConfig = currentTelegram.proxy
+
+  // First, try to parse proxyUrl from flags (environment variable)
+  if (flags?.proxyUrl) {
+    const parsedFromUrl = parseProxyUrl(flags.proxyUrl)
+    if (parsedFromUrl) {
+      proxyConfig = parsedFromUrl
+    }
+  }
+  // Then, try to parse proxyUrl from config file
+  else if (currentTelegram.proxy?.proxyUrl) {
+    const parsedFromUrl = parseProxyUrl(currentTelegram.proxy.proxyUrl)
+    if (parsedFromUrl) {
+      proxyConfig = parsedFromUrl
+    }
+  }
+  // Finally, apply individual proxy flags (legacy support)
+  else {
+    const proxyFlags = {
+      ip: flags?.proxyIp,
+      port: flags?.proxyPort,
+      MTProxy: flags?.proxyMTProxy,
+      secret: flags?.proxySecret,
+      socksType: flags?.proxySocksType,
+      timeout: flags?.proxyTimeout,
+      username: flags?.proxyUsername,
+      password: flags?.proxyPassword,
+    }
+
+    const definedProxyFlags = Object.fromEntries(
+      Object.entries(proxyFlags).filter(([, value]) => value !== undefined),
+    )
+
+    if (Object.keys(definedProxyFlags).length > 0) {
+      proxyConfig = defu(definedProxyFlags, currentTelegram.proxy) as ProxyConfig
+    }
+  }
+
+  // Both ip and port must be valid for the proxy to work
+  if (proxyConfig && proxyConfig.ip && proxyConfig.port) {
+    config.api.telegram = {
+      ...currentTelegram,
+      proxy: proxyConfig,
     }
   }
 }
@@ -115,6 +166,7 @@ function applyRuntimeOverrides(baseConfig: Config, flags?: RuntimeFlags): Config
   // Apply API overrides
   applyTelegramOverrides(runtimeConfig, flags)
   applyEmbeddingOverrides(runtimeConfig, flags)
+  applyProxyOverrides(runtimeConfig, flags)
 
   return runtimeConfig
 }

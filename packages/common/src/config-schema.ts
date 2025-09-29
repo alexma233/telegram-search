@@ -32,6 +32,8 @@ export const proxyConfigSchema = object({
   timeout: optional(number()),
   username: optional(string()),
   password: optional(string()),
+  // ProxyUrl for convenient configuration, takes precedence over individual fields
+  proxyUrl: optional(string()),
 })
 
 export const databaseConfigSchema = object({
