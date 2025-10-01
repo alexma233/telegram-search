@@ -81,7 +81,6 @@ export function initStage(
     ctx.emitter.emit('core:initialized', { stage: 'basic' })
   })()
 
-
   return () => {}
 }
 
