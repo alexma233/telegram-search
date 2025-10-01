@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // https://github.com/moeru-ai/airi/blob/bd497051fe7090dc021888f127ae7b0d78095210/apps/stage-web/src/App.vue
 
-import { useAuthStore, useBridgeStore, useSettingsStore } from '@tg-search/client'
+import { useAuthStore, useBridgeStore, useChatStore, useSettingsStore } from '@tg-search/client'
 import { storeToRefs } from 'pinia'
 import { onMounted, watch } from 'vue'
 import { RouterView } from 'vue-router'
@@ -9,10 +9,18 @@ import { Toaster } from 'vue-sonner'
 
 const settings = storeToRefs(useSettingsStore())
 
-onMounted(() => {
+onMounted(async () => {
+  // eslint-disable-next-line no-console
+  console.log('[App] onMounted')
+
   useSettingsStore().init()
-  useBridgeStore().init()
-  useAuthStore().init()
+  await useBridgeStore().init()
+
+  // FIXME: is there a better way?
+  setTimeout(() => {
+    useAuthStore().init()
+    useChatStore().init()
+  }, 1000)
 })
 
 // const isDark = useDark()

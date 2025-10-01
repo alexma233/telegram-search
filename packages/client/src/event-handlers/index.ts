@@ -4,6 +4,7 @@ import type { ClientSendEventFn } from '../composables/useBridge'
 
 import { registerBasicEventHandlers } from './auth'
 import { registerConfigEventHandlers } from './config'
+import { registerCoreEventHandlers } from './core'
 import { registerDialogEventHandlers } from './dialog'
 import { registerEntityEventHandlers } from './entity'
 import { registerMessageEventHandlers } from './message'
@@ -34,6 +35,7 @@ export type ClientRegisterEventHandlerFn = ReturnType<typeof getRegisterEventHan
 export function registerAllEventHandlers(
   registerEventHandler: ClientRegisterEventHandlerFn,
 ) {
+  registerCoreEventHandlers(registerEventHandler)
   registerServerEventHandlers(registerEventHandler)
   registerBasicEventHandlers(registerEventHandler)
   registerEntityEventHandlers(registerEventHandler)

@@ -211,8 +211,8 @@ graph TB
 ### Event-Driven Architecture Overview
 
 - **🎯 CoreContext - Central Event Bus**: The heart of the system using EventEmitter3 for managing all events
-  - **ToCoreEvent**: Events sent to the core system (auth:login, message:query, etc.)
-  - **FromCoreEvent**: Events emitted from core system (message:data, auth:status, etc.)
+  - **ToCoreEvent**: Events sent inbound system (auth:login, message:query, etc.)
+  - **FromCoreEvent**: Events emitted outbound system (message:data, auth:status, etc.)
   - **Event Wrapping**: Automatic error handling and logging for all events
   - **Session Management**: Each client session gets its own CoreContext instance
 

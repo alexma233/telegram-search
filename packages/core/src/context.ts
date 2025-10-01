@@ -103,7 +103,7 @@ export function createCoreContext() {
         return onFn
       }
 
-      useLogger().withFields({ event }).debug('Register to core event')
+      useLogger().withFields({ event }).debug('Register inbound event')
       toCoreEvents.add(event as keyof ToCoreEvent)
       return onFn
     }
@@ -117,7 +117,7 @@ export function createCoreContext() {
         return _emit(event, ...args)
       }
 
-      useLogger().withFields({ event }).debug('Register from core event')
+      useLogger().withFields({ event }).debug('Register outbound event')
 
       fromCoreEvents.add(event as keyof FromCoreEvent)
       fn?.(event as keyof FromCoreEvent)
@@ -160,6 +160,6 @@ export function createCoreContext() {
 }
 
 export function useService<T>(ctx: CoreContext, fn: Service<T>) {
-  useLogger().withFields({ fn: fn.name }).log('Register service')
+  useLogger().withFields({ fn: fn.name }).verbose('Register service')
   return fn(ctx)
 }

@@ -38,21 +38,27 @@ export const useCoreBridgeStore = defineStore('core-bridge', () => {
     }
   }
 
+  async function init() {
+    const config = await initConfig()
+    config.api.telegram.apiId ||= import.meta.env.VITE_TELEGRAM_APP_ID
+    config.api.telegram.apiHash ||= import.meta.env.VITE_TELEGRAM_APP_HASH
+
+    // TODO: use flags
+    const isDebug = !!import.meta.env.VITE_DEBUG
+    initLogger(isDebug ? LoggerLevel.Debug : LoggerLevel.Verbose)
+
+    await initDrizzle(logger, config, {
+      debuggerWebSocketUrl: import.meta.env.VITE_DB_DEBUGGER_WS_URL as string,
+      isDatabaseDebugMode: import.meta.env.VITE_DB_DEBUG === 'true',
+    })
+
+    sendWsEvent({ type: 'server:connected', data: { sessionId: storageActiveSessionId.value, connected: false } })
+    registerAllEventHandlers(registerEventHandler)
+  }
+
   function ensureCtx() {
     if (!ctx) {
-      // TODO: use flags
-      const isDebug = !!import.meta.env.VITE_DEBUG
-      initLogger(isDebug ? LoggerLevel.Debug : LoggerLevel.Verbose)
-
-      const config = useConfig()
-      config.api.telegram.apiId ||= import.meta.env.VITE_TELEGRAM_APP_ID
-      config.api.telegram.apiHash ||= import.meta.env.VITE_TELEGRAM_APP_HASH
-
-      ctx = createCoreInstance(config)
-      initDrizzle(logger, config, {
-        debuggerWebSocketUrl: import.meta.env.VITE_DB_DEBUGGER_WS_URL as string,
-        isDatabaseDebugMode: import.meta.env.VITE_DB_DEBUG === 'true',
-      })
+      ctx = createCoreInstance(useConfig())
     }
 
     return ctx
@@ -75,7 +81,7 @@ export const useCoreBridgeStore = defineStore('core-bridge', () => {
   }
 
   /**
-   * Send event to core
+   * Send event inbound
    */
   function sendEvent<T extends keyof WsEventToServer>(event: T, data?: WsEventToServerData<T>) {
     const ctx = ensureCtx()
@@ -96,24 +102,17 @@ export const useCoreBridgeStore = defineStore('core-bridge', () => {
         }
       }
       else {
-        logger.withFields({ event, data }).debug('Emit event to core')
+        logger.withFields({ event, data }).debug('Emit event inbound')
         ctx.emitter.emit(event, deepClone(data) as CoreEventData<keyof ToCoreEvent>)
       }
     }
     catch (error) {
-      logger.withError(error).error('Failed to send event to core')
+      logger.withError(error).error('Failed to send event inbound')
     }
   }
 
-  function init() {
-    initConfig().then(() => {
-      registerAllEventHandlers(registerEventHandler)
-      sendWsEvent({ type: 'server:connected', data: { sessionId: storageActiveSessionId.value, connected: false } })
-    })
-  }
-
   function waitForEvent<T extends keyof WsEventToClient>(event: T) {
-    logger.withFields({ event }).debug('Waiting for event from core')
+    logger.withFields({ event }).debug('Waiting for event outbound')
 
     return new Promise<WsEventToClientData<T>>((resolve) => {
       const handlers = eventHandlersQueue.get(event) ?? []

@@ -72,6 +72,9 @@ export const useAuthStore = defineStore('session', () => {
   }
 
   function init() {
+    // eslint-disable-next-line no-console
+    console.log('[AuthStore] Init')
+
     // Auto login
     // useConfig().api.telegram.autoReconnect && attemptLogin()
   }

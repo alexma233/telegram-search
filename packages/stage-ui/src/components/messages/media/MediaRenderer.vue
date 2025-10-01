@@ -43,7 +43,7 @@ const processedMedia = computed<ProcessedMedia>(() => {
     for (const mediaItem of props.message.media!) {
       switch (mediaItem.type) {
         case 'webpage': {
-          // TODO: add webpage to core media
+          // TODO: add webpage inbound media
           const webpage = (mediaItem.apiMedia as any)?.webpage
           if (!webpage)
             continue

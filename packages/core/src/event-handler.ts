@@ -32,12 +32,17 @@ import { createMessageService } from './services/message'
 import { createMessageResolverService } from './services/message-resolver'
 import { createTakeoutService } from './services/takeout'
 
-type EventHandler<T = void> = (ctx: CoreContext, config: Config) => T
+type Stage<T = void> = (ctx: CoreContext, config: Config) => T
 
-export function basicEventHandler(
+export function useEventHandler<T>(ctx: CoreContext, fn: (ctx: CoreContext) => T) {
+  useLogger().withFields({ fn: fn.name }).verbose('Register event handler')
+  return fn(ctx)
+}
+
+export function initStage(
   ctx: CoreContext,
   config: Config,
-): EventHandler {
+): Stage {
   const registry = useMessageResolverRegistry()
 
   const connectionService = useService(ctx, createConnectionService)({
@@ -54,9 +59,9 @@ export function basicEventHandler(
   registry.register('embedding', createEmbeddingResolver())
   registry.register('jieba', createJiebaResolver())
 
-  registerStorageEventHandlers(ctx)
-  registerConfigEventHandlers(ctx)(configService)
-  registerMessageResolverEventHandlers(ctx)(messageResolverService)
+  useEventHandler(ctx, registerStorageEventHandlers)
+  useEventHandler(ctx, registerConfigEventHandlers)(configService)
+  useEventHandler(ctx, registerMessageResolverEventHandlers)(messageResolverService)
 
   ;(async () => {
     let sessionService: SessionService
@@ -70,17 +75,20 @@ export function basicEventHandler(
       sessionService = useService(ctx, createSessionService)
     }
 
-    registerBasicEventHandlers(ctx)(connectionService, sessionService)
-    registerSessionEventHandlers(ctx)(sessionService)
+    useEventHandler(ctx, registerBasicEventHandlers)(connectionService, sessionService)
+    useEventHandler(ctx, registerSessionEventHandlers)(sessionService)
+
+    ctx.emitter.emit('core:initialized', { stage: 'basic' })
   })()
+
 
   return () => {}
 }
 
-export function afterConnectedEventHandler(
+export function afterConnectedStage(
   ctx: CoreContext,
   _config: Config,
-): EventHandler {
+): Stage {
   const { emitter } = ctx
 
   emitter.on('auth:connected', () => {
@@ -90,28 +98,29 @@ export function afterConnectedEventHandler(
     const entityService = useService(ctx, createEntityService)
     const gramEventsService = useService(ctx, createGramEventsService)
 
-    registerMessageEventHandlers(ctx)(messageService)
-    registerDialogEventHandlers(ctx)(dialogService)
-    registerTakeoutEventHandlers(ctx)(takeoutService)
-    registerEntityEventHandlers(ctx)(entityService)
-    registerGramEventsEventHandlers(ctx)(gramEventsService)
+    useEventHandler(ctx, registerMessageEventHandlers)(messageService)
+    useEventHandler(ctx, registerDialogEventHandlers)(dialogService)
+    useEventHandler(ctx, registerTakeoutEventHandlers)(takeoutService)
+    useEventHandler(ctx, registerEntityEventHandlers)(entityService)
+    useEventHandler(ctx, registerGramEventsEventHandlers)(gramEventsService)
 
     // Init all entities
     emitter.emit('dialog:fetch')
-    gramEventsService.registerGramEvents()
+    useEventHandler(ctx, registerGramEventsEventHandlers)(gramEventsService)
+    ctx.emitter.emit('core:initialized', { stage: 'after-connected' })
   })
 
   return () => {}
 }
 
-export function useEventHandler(
+export function useEventHandlers(
   ctx: CoreContext,
   config: Config,
 ) {
   const logger = useLogger()
 
-  function register(fn: EventHandler) {
-    logger.withFields({ fn: fn.name }).log('Register event handler')
+  function register(fn: Stage) {
+    logger.withFields({ fn: fn.name }).verbose('Register event handlers stage')
     fn(ctx, config)
   }
 

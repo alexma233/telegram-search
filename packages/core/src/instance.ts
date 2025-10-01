@@ -3,13 +3,14 @@ import type { Config } from '@tg-search/common'
 import type { CoreContext } from './context'
 
 import { createCoreContext } from './context'
-import { afterConnectedEventHandler, basicEventHandler, useEventHandler } from './event-handler'
+import { afterConnectedStage, initStage, useEventHandlers } from './event-handler'
 
 export interface ClientInstanceEventToCore {
   'core:cleanup': () => void
 }
 
 export interface ClientInstanceEventFromCore {
+  'core:initialized': (data: { stage: 'basic' | 'after-connected' }) => void
   'core:error': (data: { error?: string | Error | unknown }) => void
 }
 
@@ -18,9 +19,9 @@ export type ClientInstanceEvent = ClientInstanceEventFromCore & ClientInstanceEv
 export function createCoreInstance(config: Config): CoreContext {
   const ctx = createCoreContext()
 
-  const { register: registerEventHandler } = useEventHandler(ctx, config)
-  registerEventHandler(basicEventHandler)
-  registerEventHandler(afterConnectedEventHandler)
+  const { register: registerEventHandler } = useEventHandlers(ctx, config)
+  registerEventHandler(initStage)
+  registerEventHandler(afterConnectedStage)
 
   return ctx
 }

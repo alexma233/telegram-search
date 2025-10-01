@@ -62,6 +62,9 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   function init() {
+    // eslint-disable-next-line no-console
+    console.log('[SettingsStore] Init')
+
     // Merge with default config
     storageConfig.value = defu({}, storageConfig.value, generateDefaultConfig())
   }
