@@ -105,7 +105,7 @@ export function afterConnectedStage(
 
     // Init all entities
     emitter.emit('dialog:fetch')
-    useEventHandler(ctx, registerGramEventsEventHandlers)(gramEventsService)
+    gramEventsService.registerGramEvents()
     ctx.emitter.emit('core:initialized', { stage: 'after-connected' })
   })
 
