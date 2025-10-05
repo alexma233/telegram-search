@@ -102,6 +102,28 @@ function closeMobileDrawer() {
     mobileDrawerOpen.value = false
   }
 }
+
+function getSessionStorageKey(phoneNumber: string): string {
+  return `tg-session-${phoneNumber.replace(/\+/g, '')}`
+}
+
+function handleLoginPromptClick(): void {
+  const activeSession = websocketStore.getActiveSession()
+  const normalizedPhoneNumber = activeSession?.phoneNumber?.trim()
+
+  if (normalizedPhoneNumber && typeof window !== 'undefined') {
+    const storageKey = getSessionStorageKey(normalizedPhoneNumber)
+    const storedSession = window.localStorage.getItem(storageKey)
+
+    if (storedSession) {
+      // Trigger a login attempt immediately when we already have a cached session string.
+      authStore.attemptLogin()
+      return
+    }
+  }
+
+  router.push('/login')
+}
 </script>
 
 <template>
@@ -262,7 +284,7 @@ function closeMobileDrawer() {
             size="sm"
             icon="i-lucide-user"
             class="ml-2 border border-yellow-700 bg-yellow-600 text-yellow-100 hover:bg-yellow-700"
-            @click="router.push('/login')"
+            @click="handleLoginPromptClick"
           >
             {{ t('loginPromptBanner.login') }}
           </Button>

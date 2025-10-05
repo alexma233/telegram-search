@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useAuthStore, useBridgeStore } from '@tg-search/client'
 import { storeToRefs } from 'pinia'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -24,6 +24,9 @@ const state = ref({
   verificationCode: '',
   twoFactorPassword: '',
 })
+const isSessionSettingsOpen = ref<boolean>(false)
+const sessionStringInput = ref<string>('')
+const hasPersistedSession = computed<boolean>(() => sessionStringInput.value.trim().length > 0)
 authStore.auth.needCode = false
 authStore.auth.needPassword = false
 authStore.auth.isLoading = false
@@ -33,6 +36,71 @@ const {
   submitCode,
   submitPassword,
 } = authStore.handleAuth()
+
+function getSessionStorageKey(phoneNumber: string): string {
+  return `tg-session-${phoneNumber.replace(/\+/g, '')}`
+}
+
+function readStoredSession(phoneNumber: string): string {
+  if (typeof window === 'undefined')
+    return ''
+
+  const storageKey = getSessionStorageKey(phoneNumber)
+  return window.localStorage.getItem(storageKey) ?? ''
+}
+
+function persistSessionString(phoneNumber: string, sessionValue: string): void {
+  if (typeof window === 'undefined')
+    return
+
+  const storageKey = getSessionStorageKey(phoneNumber)
+  const trimmedSession = sessionValue.trim()
+
+  if (!trimmedSession) {
+    window.localStorage.removeItem(storageKey)
+    return
+  }
+
+  // We keep the latest session string locally so the core can reuse it on the next login attempt.
+  window.localStorage.setItem(storageKey, trimmedSession)
+}
+
+watch(
+  () => state.value.phoneNumber,
+  (rawPhoneNumber) => {
+    const normalizedPhoneNumber = rawPhoneNumber.trim()
+
+    if (!normalizedPhoneNumber) {
+      sessionStringInput.value = ''
+      return
+    }
+
+    sessionStringInput.value = readStoredSession(normalizedPhoneNumber)
+  },
+  { immediate: true },
+)
+
+watch(
+  [() => state.value.phoneNumber, sessionStringInput],
+  ([rawPhoneNumber, rawSessionString]) => {
+    const normalizedPhoneNumber = rawPhoneNumber.trim()
+
+    if (!normalizedPhoneNumber)
+      return
+
+    persistSessionString(normalizedPhoneNumber, rawSessionString)
+  },
+)
+
+function clearStoredSessionString(): void {
+  const normalizedPhoneNumber = state.value.phoneNumber.trim()
+
+  if (!normalizedPhoneNumber)
+    return
+
+  sessionStringInput.value = ''
+  persistSessionString(normalizedPhoneNumber, '')
+}
 
 watch(() => authStore.auth.needCode, (value) => {
   if (value) {
@@ -113,6 +181,50 @@ async function handleLogin() {
             required
             :disabled="authStore.auth.isLoading"
           >
+        </div>
+        <div class="border border-neutral-300 rounded-xl border-dashed bg-neutral-50 dark:border-gray-600 dark:bg-gray-800/50">
+          <button
+            type="button"
+            class="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-700 font-medium transition dark:text-gray-200"
+            @click="isSessionSettingsOpen = !isSessionSettingsOpen"
+          >
+            <span>{{ t('login.sessionStringSectionTitle') }}</span>
+            <span
+              class="i-lucide-chevron-down transition-transform"
+              :class="{ 'rotate-180': isSessionSettingsOpen }"
+            />
+          </button>
+          <transition name="fade">
+            <div
+              v-if="isSessionSettingsOpen"
+              class="border-t border-neutral-200 border-dashed px-4 py-4 text-sm text-gray-600 space-y-3 dark:border-gray-600 dark:text-gray-300"
+            >
+              <p>{{ t('login.sessionStringSectionDescription') }}</p>
+              <textarea
+                v-model="sessionStringInput"
+                rows="4"
+                :placeholder="t('login.sessionStringPlaceholder')"
+                class="w-full border border-neutral-200 rounded-lg bg-white px-3 py-2 text-sm text-gray-900 transition disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                :disabled="authStore.auth.isLoading"
+              />
+              <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                <span>
+                  {{ hasPersistedSession
+                    ? t('login.sessionStringStoredHint')
+                    : t('login.sessionStringEmptyHint')
+                  }}
+                </span>
+                <button
+                  type="button"
+                  class="text-xs text-red-500 font-semibold transition disabled:text-gray-400 hover:text-red-600"
+                  :disabled="!hasPersistedSession"
+                  @click="clearStoredSessionString"
+                >
+                  {{ t('login.sessionStringClear') }}
+                </button>
+              </div>
+            </div>
+          </transition>
         </div>
         <button
           type="submit"
