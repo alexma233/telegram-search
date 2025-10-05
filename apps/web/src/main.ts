@@ -1,5 +1,6 @@
 import { autoAnimatePlugin } from '@formkit/auto-animate/vue'
 import { VueQueryPlugin } from '@tanstack/vue-query'
+import { useTimeoutFn } from '@vueuse/core'
 import { createPinia } from 'pinia'
 import { setupLayouts } from 'virtual:generated-layouts'
 import { createApp } from 'vue'
@@ -8,12 +9,15 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { routes as generatedRoutes } from 'vue-router/auto-routes'
 
 import App from './App.vue'
+import { mountSplashScreen } from './composables/useSplashScreen'
 import { en, zhCN } from './locales'
 
 import '@unocss/reset/tailwind.css'
 import 'uno.css'
 import 'vue-sonner/style.css'
 import './styles/main.css'
+
+const splash = mountSplashScreen()
 
 const app = createApp(App)
 
@@ -47,3 +51,17 @@ app.use(VueQueryPlugin)
 app.use(pinia)
 app.use(autoAnimatePlugin)
 app.mount('#app')
+
+const { stop: stopFallback } = useTimeoutFn(() => {
+  splash.hide()
+}, 4000)
+
+router
+  .isReady()
+  .catch(() => {
+    // Keeping the splash visible is safer than flashing an error immediately.
+  })
+  .finally(() => {
+    stopFallback()
+    splash.hide()
+  })
