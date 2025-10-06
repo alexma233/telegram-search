@@ -1,6 +1,7 @@
-import config from '@unbird/eslint-config'
+import unbird from '@unbird/eslint-config'
+import importPlugin from 'eslint-plugin-import-x'
 
-export default await config({
+export default await unbird({
   vue: true,
   unocss: true,
   ignores: [
@@ -8,4 +9,10 @@ export default await config({
     '**/drizzle/**/*.json',
     '**/*.md',
   ],
+  plugins: {
+    'import-x': importPlugin,
+  },
+  rules: {
+    'import-x/no-cycle': 'error',
+  },
 })
