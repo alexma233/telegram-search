@@ -2,6 +2,7 @@ import type { CoreContext } from '../context'
 import type { DBRetrievalMessages } from '../models'
 import type { CoreDialog } from '../services'
 
+import { useConfig } from '@tg-search/common'
 import { useLogger } from '@unbird/logg'
 
 import { convertToCoreRetrievalMessages, fetchChats, fetchMessageContextWithPhotos, fetchMessagesWithPhotos, getChatMessagesStats, recordChats, recordMessagesWithMedia, retrieveMessages } from '../models'
@@ -84,16 +85,17 @@ export function registerStorageEventHandlers(ctx: CoreContext) {
     }
 
     let dbMessages: DBRetrievalMessages[] = []
+    const embeddingConfig = useConfig().api.embedding
     if (params.useVector) {
       let embedding: number[] = []
-      const embeddingResult = (await embedContents([params.content])).orUndefined()
+      const embeddingResult = (await embedContents([params.content], embeddingConfig)).orUndefined()
       if (embeddingResult)
         embedding = embeddingResult.embeddings[0]
 
-      dbMessages = (await retrieveMessages(params.chatId, { embedding, text: params.content }, params.pagination)).expect('Failed to retrieve messages')
+      dbMessages = (await retrieveMessages(params.chatId, { embedding, text: params.content }, params.pagination, embeddingConfig.dimension)).expect('Failed to retrieve messages')
     }
     else {
-      dbMessages = (await retrieveMessages(params.chatId, { text: params.content }, params.pagination)).expect('Failed to retrieve messages')
+      dbMessages = (await retrieveMessages(params.chatId, { text: params.content }, params.pagination, embeddingConfig.dimension)).expect('Failed to retrieve messages')
     }
 
     logger.withFields({ messages: dbMessages.length }).verbose('Retrieved messages')

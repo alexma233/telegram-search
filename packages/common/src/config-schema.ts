@@ -79,6 +79,7 @@ export const configSchema = object({
 
 export type Config = InferOutput<typeof configSchema>
 export type ProxyConfig = InferOutput<typeof proxyConfigSchema>
+export type EmbeddingConfig = InferOutput<typeof embeddingConfigSchema>
 
 export function generateDefaultConfig(): Config {
   const defaultConfig = safeParse(configSchema, {})

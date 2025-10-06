@@ -1,6 +1,6 @@
 // https://github.com/moeru-ai/airi/blob/main/services/telegram-bot/src/models/chat-message.ts
 
-import type { CorePagination } from '@tg-search/common'
+import type { CorePagination, EmbeddingDimension } from '@tg-search/common'
 
 import type { CoreMessage, CoreMessageMediaPhoto, CoreMessageMediaSticker, StorageMessageContextParams } from '../index'
 import type { DBRetrievalMessages } from './utils/message'
@@ -208,6 +208,7 @@ export async function retrieveMessages(
     embedding?: number[]
   },
   pagination?: CorePagination,
+  dimension?: EmbeddingDimension,
 ) {
   const logger = useLogger('models:chat-message:retrieveMessages')
 
@@ -220,7 +221,7 @@ export async function retrieveMessages(
   }
 
   if (content.embedding && content.embedding.length !== 0) {
-    const relevantMessages = await retrieveVector(chatId, content.embedding, pagination)
+    const relevantMessages = await retrieveVector(chatId, content.embedding, pagination, dimension)
     logger.withFields({ relevantMessages: relevantMessages.length }).verbose('Retrieved vector messages')
     retrievalMessages.push(...relevantMessages)
   }

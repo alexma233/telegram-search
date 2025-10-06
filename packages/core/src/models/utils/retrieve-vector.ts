@@ -2,16 +2,16 @@ import type { CorePagination } from '@tg-search/common'
 
 import type { DBRetrievalMessages } from './message'
 
-import { EmbeddingDimension, useConfig } from '@tg-search/common'
+import { EmbeddingDimension } from '@tg-search/common'
 import { and, desc, eq, gt, sql } from 'drizzle-orm'
 
 import { withDb } from '../../db'
 import { chatMessagesTable } from '../../schemas/chat_messages'
 import { getSimilaritySql } from './similarity'
 
-export async function retrieveVector(chatId: string | undefined, embedding: number[], pagination?: CorePagination): Promise<DBRetrievalMessages[]> {
+export async function retrieveVector(chatId: string | undefined, embedding: number[], pagination?: CorePagination, dimension = EmbeddingDimension.DIMENSION_1536): Promise<DBRetrievalMessages[]> {
   const similarity = getSimilaritySql(
-    useConfig().api.embedding.dimension || EmbeddingDimension.DIMENSION_1536,
+    dimension,
     embedding,
   )
 
