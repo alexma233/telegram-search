@@ -3,7 +3,6 @@ import type { RuntimeFlags } from './flags'
 
 import { useLogger } from '@unbird/logg'
 import { isBrowser } from '@unbird/logg/utils'
-import { useLocalStorage } from '@vueuse/core'
 
 import { applyRuntimeOverrides, validateAndMergeConfig } from './config-overrides'
 import { generateDefaultConfig } from './config-schema'
@@ -18,6 +17,7 @@ export function getDatabaseDSN(config: Config): string {
 
 export async function initConfig(flags?: RuntimeFlags) {
   if (isBrowser()) {
+    const { useLocalStorage } = await import('@vueuse/core')
     const configStorage = useLocalStorage(CONFIG_STORAGE_KEY, generateDefaultConfig())
 
     const savedConfig = configStorage.value
@@ -56,6 +56,7 @@ export async function updateConfig(newConfig: Partial<Config>) {
   useLogger().withFields({ config: validatedConfig }).log('Updating config')
 
   if (isBrowser()) {
+    const { useLocalStorage } = await import('@vueuse/core')
     const configStorage = useLocalStorage(CONFIG_STORAGE_KEY, generateDefaultConfig())
 
     config = validatedConfig
