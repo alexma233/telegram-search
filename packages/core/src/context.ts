@@ -79,6 +79,7 @@ export function createCoreContext() {
   const emitter = new EventEmitter<CoreEvent>()
   const withError = createErrorHandler(emitter)
   let telegramClient: TelegramClient
+  // let config =
 
   const toCoreEvents = new Set<keyof ToCoreEvent>()
   const fromCoreEvents = new Set<keyof FromCoreEvent>()
