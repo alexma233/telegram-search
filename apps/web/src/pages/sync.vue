@@ -45,6 +45,38 @@ function handleSync() {
   NProgress.start()
 }
 
+function handleReprocessEmbedding() {
+  if (selectedChats.value.length === 0) {
+    toast.error(t('sync.selectChats'))
+    return
+  }
+
+  websocketStore.sendEvent('message:reprocess', {
+    chatIds: selectedChats.value.map(id => id.toString()),
+    resolvers: ['embedding'],
+  })
+
+  toast.loading(t('sync.reprocessing'), {
+    description: t('sync.reprocessEmbedding'),
+  })
+}
+
+function handleReprocessJieba() {
+  if (selectedChats.value.length === 0) {
+    toast.error(t('sync.selectChats'))
+    return
+  }
+
+  websocketStore.sendEvent('message:reprocess', {
+    chatIds: selectedChats.value.map(id => id.toString()),
+    resolvers: ['jieba'],
+  })
+
+  toast.loading(t('sync.reprocessing'), {
+    description: t('sync.reprocessJieba'),
+  })
+}
+
 function handleAbort() {
   if (currentTask.value) {
     websocketStore.sendEvent('takeout:task:abort', {
@@ -96,6 +128,22 @@ watch(currentTaskProgress, (progress) => {
     </div>
 
     <div class="ml-auto flex items-center gap-2">
+      <Button
+        icon="i-lucide-sparkles"
+        variant="outline"
+        :disabled="selectedChats.length === 0 || !isLoggedIn"
+        @click="handleReprocessEmbedding"
+      >
+        {{ t('sync.reprocessEmbedding') }}
+      </Button>
+      <Button
+        icon="i-lucide-text"
+        variant="outline"
+        :disabled="selectedChats.length === 0 || !isLoggedIn"
+        @click="handleReprocessJieba"
+      >
+        {{ t('sync.reprocessJieba') }}
+      </Button>
       <Button
         icon="i-lucide-refresh-cw"
         :disabled="isButtonDisabled"
