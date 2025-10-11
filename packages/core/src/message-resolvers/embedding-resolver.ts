@@ -29,18 +29,12 @@ export function createEmbeddingResolver(): MessageResolver {
 
       logger.withFields({ messages: messages.length }).verbose('Embedding messages')
 
-      try {
-        const { embeddings, usage, dimension } = (await embedContents(messages.map(message => message.content))).expect('Failed to embed messages')
+      // Call embedContents and handle the Result
+      const result = await embedContents(messages.map(message => message.content))
 
-        // if (message.sticker != null) {
-        //   text = `A sticker sent by user ${await findStickerDescription(message.sticker.file_id)}, sticker set named ${message.sticker.set_name}`
-        // }
-        // else if (message.photo != null) {
-        //   text = `A set of photo, descriptions are: ${(await Promise.all(message.photo.map(photo => findPhotoDescription(photo.file_id)))).join('\n')}`
-        // }
-        // else if (message.text) {
-        //   text = message.text || message.caption || ''
-        // }
+      // Check if the result is an error
+      try {
+        const { embeddings, usage, dimension } = result.unwrap()
 
         logger.withFields({ embeddings: embeddings.length, usage }).verbose('Embedding messages done')
 
@@ -71,6 +65,9 @@ export function createEmbeddingResolver(): MessageResolver {
           else {
             logger.error('Embedding API failed, skipping batch')
           }
+        }
+        else {
+          logger.withError(error).error('Failed to embed messages')
         }
         // Re-throw the error to be handled at a higher level (message-resolver service)
         throw error
