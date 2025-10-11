@@ -62,7 +62,7 @@ export function createMessageResolverService(ctx: CoreContext) {
           }
           catch (error: any) {
             logger.withError(error).warn(`Failed to process messages with ${name} resolver`)
-            
+
             // Emit error event for handling at higher levels (e.g., UI notifications)
             if (error instanceof EmbeddingAPIError) {
               emitter.emit('message:resolver:error', {

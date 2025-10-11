@@ -1,8 +1,8 @@
-import { useLogger } from '@unbird/logg'
-import { toast } from 'vue-sonner'
-import { useI18n } from 'vue-i18n'
-
 import type { ClientRegisterEventHandlerFn } from '.'
+
+import { useLogger } from '@unbird/logg'
+import { useI18n } from 'vue-i18n'
+import { toast } from 'vue-sonner'
 
 export function registerMessageResolverEventHandlers(registerEventHandler: ClientRegisterEventHandlerFn) {
   const logger = useLogger('client:message-resolver')
