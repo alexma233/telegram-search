@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useAuthStore, useBridgeStore, useChatStore, useSyncTaskStore } from '@tg-search/client'
+import { useAuthStore, useBridgeStore, useChatStore, useMessageResolverStore, useSyncTaskStore } from '@tg-search/client'
 import NProgress from 'nprogress'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
@@ -22,6 +22,9 @@ const chatsStore = useChatStore()
 const { chats } = storeToRefs(chatsStore)
 
 const { currentTask, currentTaskProgress, increase } = storeToRefs(useSyncTaskStore())
+const messageResolverStore = useMessageResolverStore()
+const { lastError } = storeToRefs(messageResolverStore)
+
 const loadingToast = ref<string | number>()
 
 // 计算属性判断按钮是否应该禁用
@@ -87,6 +90,31 @@ function handleAbort() {
     toast.error(t('sync.noInProgressTask'))
   }
 }
+
+// Watch for resolver errors
+watch(lastError, (error) => {
+  if (!error)
+    return
+
+  // Show different error messages based on the type
+  if (error.resolverName === 'embedding') {
+    if (error.isRateLimited) {
+      toast.error(t('sync.embeddingApiRateLimited'))
+    }
+    else {
+      toast.error(t('sync.embeddingApiError', { error: error.error.message }))
+    }
+  }
+  else if (error.resolverName === 'jieba') {
+    toast.error(t('sync.jiebaTokenizationError', { error: error.error.message }))
+  }
+  else {
+    toast.error(t('sync.resolverError', { resolver: error.resolverName, error: error.error.message }))
+  }
+
+  // Clear the error after showing the toast
+  messageResolverStore.clearError()
+})
 
 watch(currentTaskProgress, (progress) => {
   toast.dismiss(loadingToast?.value)

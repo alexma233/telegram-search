@@ -29,9 +29,41 @@ export function createEmbeddingResolver(): MessageResolver {
 
       logger.withFields({ messages: messages.length }).verbose('Embedding messages')
 
-      const result = await embedContents(messages.map(message => message.content))
-      if (result.isErr()) {
-        const error = result.unwrapErr()
+      try {
+        const { embeddings, usage, dimension } = (await embedContents(messages.map(message => message.content))).expect('Failed to embed messages')
+
+        // if (message.sticker != null) {
+        //   text = `A sticker sent by user ${await findStickerDescription(message.sticker.file_id)}, sticker set named ${message.sticker.set_name}`
+        // }
+        // else if (message.photo != null) {
+        //   text = `A set of photo, descriptions are: ${(await Promise.all(message.photo.map(photo => findPhotoDescription(photo.file_id)))).join('\n')}`
+        // }
+        // else if (message.text) {
+        //   text = message.text || message.caption || ''
+        // }
+
+        logger.withFields({ embeddings: embeddings.length, usage }).verbose('Embedding messages done')
+
+        for (const [index, message] of messages.entries()) {
+          switch (dimension) {
+            case EmbeddingDimension.DIMENSION_1536:
+              message.vectors.vector1536 = embeddings[index]
+              break
+            case EmbeddingDimension.DIMENSION_1024:
+              message.vectors.vector1024 = embeddings[index]
+              break
+            case EmbeddingDimension.DIMENSION_768:
+              message.vectors.vector768 = embeddings[index]
+              break
+            default:
+              throw new Error(`Unsupported embedding dimension: ${dimension}`)
+          }
+        }
+
+        return Ok(messages)
+      }
+      catch (error: any) {
+        // Detect if it's an EmbeddingAPIError from the error chain
         if (error instanceof EmbeddingAPIError) {
           if (error.isRateLimited) {
             logger.warn('Embedding API rate limited, skipping batch')
@@ -40,41 +72,9 @@ export function createEmbeddingResolver(): MessageResolver {
             logger.error('Embedding API failed, skipping batch')
           }
         }
-        // Re-throw the error to be handled at a higher level
+        // Re-throw the error to be handled at a higher level (message-resolver service)
         throw error
       }
-
-      const { embeddings, usage, dimension } = result.unwrap()
-
-      // if (message.sticker != null) {
-      //   text = `A sticker sent by user ${await findStickerDescription(message.sticker.file_id)}, sticker set named ${message.sticker.set_name}`
-      // }
-      // else if (message.photo != null) {
-      //   text = `A set of photo, descriptions are: ${(await Promise.all(message.photo.map(photo => findPhotoDescription(photo.file_id)))).join('\n')}`
-      // }
-      // else if (message.text) {
-      //   text = message.text || message.caption || ''
-      // }
-
-      logger.withFields({ embeddings: embeddings.length, usage }).verbose('Embedding messages done')
-
-      for (const [index, message] of messages.entries()) {
-        switch (dimension) {
-          case EmbeddingDimension.DIMENSION_1536:
-            message.vectors.vector1536 = embeddings[index]
-            break
-          case EmbeddingDimension.DIMENSION_1024:
-            message.vectors.vector1024 = embeddings[index]
-            break
-          case EmbeddingDimension.DIMENSION_768:
-            message.vectors.vector768 = embeddings[index]
-            break
-          default:
-            throw new Error(`Unsupported embedding dimension: ${dimension}`)
-        }
-      }
-
-      return Ok(messages)
     },
   }
 }
