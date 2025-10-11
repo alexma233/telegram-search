@@ -9,5 +9,9 @@ export function registerMessageResolverEventHandlers(ctx: CoreContext) {
     emitter.on('message:process', ({ messages }) => {
       messageResolverService.processMessages(messages)
     })
+
+    emitter.on('message:reprocess', ({ chatIds, resolvers }) => {
+      messageResolverService.reprocessMessages(chatIds, resolvers)
+    })
   }
 }

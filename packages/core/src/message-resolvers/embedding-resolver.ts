@@ -5,7 +5,7 @@ import { EmbeddingDimension } from '@tg-search/common'
 import { useLogger } from '@unbird/logg'
 import { Err, Ok } from '@unbird/result'
 
-import { embedContents } from '../utils/embed'
+import { embedContents, EmbeddingAPIError } from '../utils/embed'
 
 export function createEmbeddingResolver(): MessageResolver {
   const logger = useLogger('core:resolver:embedding')
@@ -29,7 +29,22 @@ export function createEmbeddingResolver(): MessageResolver {
 
       logger.withFields({ messages: messages.length }).verbose('Embedding messages')
 
-      const { embeddings, usage, dimension } = (await embedContents(messages.map(message => message.content))).expect('Failed to embed messages')
+      const result = await embedContents(messages.map(message => message.content))
+      if (result.isErr()) {
+        const error = result.unwrapErr()
+        if (error instanceof EmbeddingAPIError) {
+          if (error.isRateLimited) {
+            logger.warn('Embedding API rate limited, skipping batch')
+          }
+          else {
+            logger.error('Embedding API failed, skipping batch')
+          }
+        }
+        // Re-throw the error to be handled at a higher level
+        throw error
+      }
+
+      const { embeddings, usage, dimension } = result.unwrap()
 
       // if (message.sticker != null) {
       //   text = `A sticker sent by user ${await findStickerDescription(message.sticker.file_id)}, sticker set named ${message.sticker.set_name}`
