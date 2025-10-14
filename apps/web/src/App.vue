@@ -12,10 +12,9 @@ import { usePWAStore } from './stores/pwa'
 
 const settings = storeToRefs(useSettingsStore())
 
-onMounted(() => {
-  hideSplashScreen()
-  useBridgeStore().init()
+onMounted(async () => {
   useSettingsStore().init()
+  await useBridgeStore().init()
   useAuthStore().init()
   usePWAStore().init()
 })

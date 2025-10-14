@@ -142,6 +142,9 @@ importers:
       '@tg-search/client':
         specifier: workspace:^
         version: link:../../packages/client
+      '@tg-search/common':
+        specifier: workspace:^
+        version: link:../../packages/common
       '@tg-search/core':
         specifier: workspace:^
         version: link:../../packages/core

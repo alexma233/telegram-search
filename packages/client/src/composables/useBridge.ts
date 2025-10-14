@@ -1,6 +1,6 @@
 import type { WsEventToServer, WsEventToServerData, WsMessageToServer } from '@tg-search/server/types'
 
-import { useCoreBridgeStore } from '../adapters/core-bridge'
+import { useSharedWorkerStore } from '../adapters/shared-worker'
 import { useWebsocketStore } from '../adapters/websocket'
 
 export type ClientSendEventFn = <T extends keyof WsEventToServer>(event: T, data?: WsEventToServerData<T>) => void
@@ -8,7 +8,7 @@ export type ClientCreateWsMessageFn = <T extends keyof WsEventToServer>(event: T
 
 export function useBridgeStore() {
   if (import.meta.env.VITE_WITH_CORE) {
-    return useCoreBridgeStore()
+    return useSharedWorkerStore()
   }
   else {
     return useWebsocketStore()
