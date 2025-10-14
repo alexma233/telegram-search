@@ -34,10 +34,11 @@ import { createTakeoutService } from './services/takeout'
 
 type EventHandler<T = void> = (ctx: CoreContext, config: Config) => T
 
-export function basicEventHandler(
+export async function basicEventHandler(
   ctx: CoreContext,
   config: Config,
-): EventHandler {
+): Promise<EventHandler> {
+  const logger = useLogger('core:event-handler')
   const registry = useMessageResolverRegistry()
 
   const connectionService = useService(ctx, createConnectionService)({
@@ -58,21 +59,23 @@ export function basicEventHandler(
   registerConfigEventHandlers(ctx)(configService)
   registerMessageResolverEventHandlers(ctx)(messageResolverService)
 
-  ;(async () => {
-    let sessionService: SessionService
+  // Initialize session service and register auth handlers - MUST await!
+  logger.log('Loading session service...')
+  let sessionService: SessionService
 
-    if (isBrowser()) {
-      const { createSessionService } = await import('./services/session.browser')
-      sessionService = useService(ctx, createSessionService)
-    }
-    else {
-      const { createSessionService } = await import('./services/session')
-      sessionService = useService(ctx, createSessionService)
-    }
+  if (isBrowser()) {
+    const { createSessionService } = await import('./services/session.browser')
+    sessionService = useService(ctx, createSessionService)
+  }
+  else {
+    const { createSessionService } = await import('./services/session')
+    sessionService = useService(ctx, createSessionService)
+  }
 
-    registerBasicEventHandlers(ctx)(connectionService, sessionService)
-    registerSessionEventHandlers(ctx)(sessionService)
-  })()
+  logger.log('Registering auth and session event handlers...')
+  registerBasicEventHandlers(ctx)(connectionService, sessionService)
+  registerSessionEventHandlers(ctx)(sessionService)
+  logger.log('✅ Auth and session event handlers registered successfully!')
 
   return () => {}
 }
@@ -108,11 +111,12 @@ export function useEventHandler(
   ctx: CoreContext,
   config: Config,
 ) {
-  const logger = useLogger()
+  const logger = useLogger('core:event-handler')
 
-  function register(fn: EventHandler) {
-    logger.withFields({ fn: fn.name }).log('Register event handler')
-    fn(ctx, config)
+  async function register(fn: EventHandler | ((ctx: CoreContext, config: Config) => Promise<EventHandler>)) {
+    logger.withFields({ fn: fn.name }).log('Registering event handler...')
+    await fn(ctx, config)
+    logger.withFields({ fn: fn.name }).log('✅ Event handler registered!')
   }
 
   return {

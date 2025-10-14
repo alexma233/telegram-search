@@ -1,8 +1,13 @@
-import type { Config } from '@tg-search/common'
 import type { CoreContext, CoreEventData, FromCoreEvent, ToCoreEvent } from '@tg-search/core'
 
-import { createCoreInstance, initDrizzle } from '@tg-search/core'
 import { initLogger, LoggerLevel, useLogger } from '@unbird/logg'
+
+// Polyfill window for isBrowser() check
+// This makes the code think we're in a browser environment
+if (typeof window === 'undefined') {
+  // @ts-expect-error - polyfill window
+  globalThis.window = globalThis
+}
 
 type WsEventToClientData<T extends keyof FromCoreEvent> = Parameters<FromCoreEvent[T]>[0]
 
@@ -23,6 +28,8 @@ const logger = useLogger('CoreSharedWorker')
 
 const sessionContexts = new Map<string, CoreContext>()
 const sessionPorts = new Map<string, MessagePort>()
+// Track per-session forwarding listeners we add to avoid nuking core handlers
+const sessionForwarders = new Map<string, Map<string, (data: unknown) => void>>()
 
 let isInitialized = false
 let coreInstanceInitialized = false
@@ -44,60 +51,25 @@ async function ensureCoreInitialized() {
   if (coreInstanceInitialized)
     return
 
-  const isDebug = true
-  initLogger(isDebug ? LoggerLevel.Debug : LoggerLevel.Verbose)
-
-  coreInstanceInitialized = true
-  logger.log('Core instance initialized in SharedWorker')
-}
-
-function getConfigFromStorage(): Config {
   try {
-    const configStr = globalThis.localStorage?.getItem('settings/config')
-    if (!configStr) {
-      logger.error('Config not found in localStorage, using default config')
-      // Import generateDefaultConfig from common (already imported as type)
-      // For now, create a minimal default config
-      return {
-        api: {
-          telegram: {
-            apiId: 0,
-            apiHash: '',
-            autoReconnect: false,
-          },
-          proxy: {
-            enabled: false,
-          },
-        },
-        database: {
-          type: 'pglite',
-          url: '',
-          host: 'localhost',
-          port: 5432,
-          database: 'telegram',
-          username: 'postgres',
-          password: '',
-        },
-        resolvers: {
-          disabledResolvers: [],
-        },
-        embedding: {
-          provider: 'openai',
-          apiKey: '',
-          baseUrl: '',
-          model: '',
-          dimension: 1536,
-        },
-      } as Config
-    }
+    const isDebug = true
+    initLogger(isDebug ? LoggerLevel.Debug : LoggerLevel.Verbose)
+    logger.log('Logger initialized')
 
-    const config = JSON.parse(configStr) as Config
-    logger.log('Config loaded successfully from localStorage')
-    return config
+    // Initialize config using initConfig, which needs localStorage
+    // Worker has localStorage in globalThis, so this should work
+    const { initConfig } = await import('@tg-search/common')
+    logger.log('@tg-search/common imported')
+
+    await initConfig()
+    logger.log('Config initialized successfully')
+
+    coreInstanceInitialized = true
+    logger.log('Core instance initialized in SharedWorker')
   }
   catch (error) {
-    logger.withError(error).error('Failed to parse config from localStorage')
-    throw new Error('Failed to parse config from localStorage')
+    logger.withError(error).error('Failed to initialize core')
+    throw error
   }
 }
 
@@ -108,8 +80,12 @@ async function getOrCreateSessionContext(sessionId: string): Promise<CoreContext
     if (!sessionContexts.has(sessionId)) {
       logger.withFields({ sessionId }).log('Creating new session context...')
 
-      const config = getConfigFromStorage()
-      logger.log('Config loaded from localStorage')
+      const { useConfig } = await import('@tg-search/common')
+      const config = useConfig()
+      logger.log('Got config from useConfig')
+
+      const { createCoreInstance, initDrizzle, basicEventHandler, afterConnectedEventHandler, useEventHandler } = await import('@tg-search/core')
+      logger.log('@tg-search/core imported')
 
       const ctx = createCoreInstance(config)
       logger.log('Core instance created')
@@ -118,6 +94,14 @@ async function getOrCreateSessionContext(sessionId: string): Promise<CoreContext
         isDatabaseDebugMode: false,
       })
       logger.log('Database initialized')
+
+      // Register event handlers - CRITICAL for Telegram to work!
+      logger.log('🔧 Starting to register event handlers...')
+      const eventHandler = useEventHandler(ctx, config)
+      await eventHandler.register(basicEventHandler)
+      logger.log('✅ Basic event handlers registered (includes auth:login)')
+      eventHandler.register(afterConnectedEventHandler)
+      logger.log('✅ After-connected event handlers registered')
 
       sessionContexts.set(sessionId, ctx)
       logger.withFields({ sessionId }).log('Session context created successfully')
@@ -163,15 +147,19 @@ function handleRPC(port: MessagePort, message: WorkerMessage) {
         logger.log('Session context obtained, setting up port...')
         sessionPorts.set(sessionId, port)
 
-        const allEventNames = ctx.emitter.eventNames()
-        allEventNames.forEach((eventName) => {
-          ctx.emitter.removeAllListeners(eventName as keyof FromCoreEvent)
-        })
+        // Prepare or reuse per-session forwarder map
+        const forwarders = sessionForwarders.get(sessionId) || new Map<string, (data: unknown) => void>()
+        sessionForwarders.set(sessionId, forwarders)
 
         const eventNames = ctx.emitter.eventNames() as Array<keyof FromCoreEvent>
         eventNames.forEach((eventName) => {
           const eventNameStr = String(eventName)
           if (!eventNameStr.startsWith('server:')) {
+            // If we previously added a forwarder for this event, remove it to avoid duplicates
+            const prev = forwarders.get(eventNameStr)
+            if (prev)
+              ctx.emitter.off(eventName as any, prev as any)
+
             const fn = (data: WsEventToClientData<keyof FromCoreEvent>) => {
               logger.withFields({ eventName: eventNameStr, sessionId }).debug('Emitting event to client')
               sendToPort(port, {
@@ -183,6 +171,7 @@ function handleRPC(port: MessagePort, message: WorkerMessage) {
             }
 
             ctx.emitter.on(eventName, fn as any)
+            forwarders.set(eventNameStr, fn as any)
           }
         })
 
@@ -262,7 +251,18 @@ async function handleEvent(message: WorkerMessage) {
       }
     }
     else {
+      logger.withFields({ event, payload }).log(`Emitting event to core: ${event}`)
+
+      // Check if there are any listeners for this event
+      const listenerCount = ctx.emitter.listenerCount(event as keyof ToCoreEvent)
+      logger.log(`Event ${event} has ${listenerCount} listeners`)
+
+      if (listenerCount === 0) {
+        logger.error(`WARNING: No listeners for event ${event}! Event will be lost!`)
+      }
+
       ctx.emitter.emit(event as keyof ToCoreEvent, deepClone(payload) as CoreEventData<keyof ToCoreEvent>)
+      logger.withFields({ event }).log(`Event emitted to core: ${event}`)
     }
   }
   catch (error) {
@@ -292,17 +292,28 @@ function handleMessage(port: MessagePort, event: MessageEvent<WorkerMessage>) {
   }
 }
 
+// Global error handler
+globalThis.addEventListener('error', (event) => {
+  logger.withError(event.error).error('Unhandled error in SharedWorker')
+})
+
+globalThis.addEventListener('unhandledrejection', (event) => {
+  logger.error('Unhandled promise rejection in SharedWorker:', event.reason)
+})
+
 globalThis.addEventListener('connect', (event) => {
   const connectEvent = event as MessageEvent
   const port = connectEvent.ports[0]
 
-  logger.log('New connection to SharedWorker')
+  logger.log('New connection to SharedWorker, port:', port)
 
   port.addEventListener('message', (msgEvent) => {
+    logger.debug('Received message from client:', msgEvent.data)
     handleMessage(port, msgEvent)
   })
 
   port.start()
+  logger.log('Port started')
 
   if (!isInitialized) {
     isInitialized = true
@@ -310,4 +321,4 @@ globalThis.addEventListener('connect', (event) => {
   }
 })
 
-logger.log('SharedWorker script loaded')
+logger.log('SharedWorker script loaded and ready')

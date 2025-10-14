@@ -11,14 +11,30 @@ export function registerBasicEventHandlers(ctx: CoreContext) {
     configuredConnectionService: ConnectionService,
     sessionService: SessionService,
   ) => {
+    logger.log('Registering auth:login event handler')
+
     emitter.on('auth:login', async ({ phoneNumber }) => {
-      const session = (await sessionService.loadSession(phoneNumber)).expect('Failed to load session')
+      logger.log('AUTH:LOGIN EVENT RECEIVED!', { phoneNumber })
+      // eslint-disable-next-line no-debugger
+      debugger
 
-      logger.withFields({ session }).verbose('Loaded session')
+      try {
+        logger.log('Loading session for', { phoneNumber })
+        const session = (await sessionService.loadSession(phoneNumber)).expect('Failed to load session')
 
-      await configuredConnectionService.login({ phoneNumber, session })
-      logger.verbose('Logged in to Telegram')
+        logger.withFields({ session }).verbose('Loaded session')
+
+        logger.log('Calling connectionService.login')
+        await configuredConnectionService.login({ phoneNumber, session })
+        logger.verbose('Logged in to Telegram')
+      }
+      catch (error) {
+        logger.withError(error).error('Failed to handle auth:login')
+        throw error
+      }
     })
+
+    logger.log('auth:login handler registered successfully')
 
     emitter.on('auth:logout', async () => {
       logger.verbose('Logged out from Telegram')
@@ -27,5 +43,7 @@ export function registerBasicEventHandlers(ctx: CoreContext) {
         await configuredConnectionService.logout(client)
       }
     })
+
+    logger.log('All auth handlers registered')
   }
 }

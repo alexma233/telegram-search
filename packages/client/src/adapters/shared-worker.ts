@@ -192,24 +192,30 @@ export const useSharedWorkerStore = defineStore('shared-worker', () => {
 
   async function connectToWorker() {
     try {
-      const workerUrl = new URL('/src/workers/core.shared-worker.ts', import.meta.url).href
+      // Use relative path from this file to the worker
+      // This file is in packages/client/src/adapters/shared-worker.ts
+      // Worker is in apps/web/src/workers/core.shared-worker.ts
+      // But in development, Vite resolves from project root
+      const workerPath = '/src/workers/core.shared-worker.ts'
+
+      logger.log('Creating SharedWorker at:', workerPath)
 
       worker = new SharedWorker(
-        workerUrl,
+        workerPath,
         { type: 'module', name: 'core-worker' },
       )
 
       port = worker.port
+      logger.log('Got MessagePort from SharedWorker')
 
       port.addEventListener('message', handleWorkerMessage)
       port.start()
-
-      logger.log('Connected to SharedWorker')
+      logger.log('MessagePort started, sending session:attach RPC...')
 
       await sendRPC('session:attach')
       isConnected.value = true
 
-      logger.log('Session attached to SharedWorker')
+      logger.log('Session attached to SharedWorker successfully')
 
       sendWsEvent({
         type: 'server:connected',
@@ -229,8 +235,8 @@ export const useSharedWorkerStore = defineStore('shared-worker', () => {
     }
 
     try {
-      registerAllEventHandlers(registerEventHandler)
       await connectToWorker()
+      registerAllEventHandlers(registerEventHandler)
 
       try {
         await sendRPC('session:getSnapshot')
