@@ -58,11 +58,31 @@ async function ensureCoreInitialized() {
 
     // Initialize config using initConfig, which needs localStorage
     // Worker has localStorage in globalThis, so this should work
-    const { initConfig } = await import('@tg-search/common')
+    const { initConfig, useConfig } = await import('@tg-search/common')
     logger.log('@tg-search/common imported')
 
     await initConfig()
     logger.log('Config initialized successfully')
+
+    // Apply Vite env overrides for Telegram to ensure worker has env-config
+    try {
+      const cfg = useConfig()
+      const apiId = (import.meta as any).env?.VITE_TELEGRAM_APP_ID as string | undefined
+      const apiHash = (import.meta as any).env?.VITE_TELEGRAM_APP_HASH as string | undefined
+      if (apiId || apiHash) {
+        cfg.api = cfg.api || {} as any
+        const currentTg = (cfg.api as any).telegram || {}
+        ;(cfg.api as any).telegram = {
+          ...currentTg,
+          ...(apiId && { apiId }),
+          ...(apiHash && { apiHash }),
+        }
+        logger.log('Applied Vite env overrides for Telegram API credentials')
+      }
+    }
+    catch (e) {
+      logger.withError(e).warn('Failed to apply Vite env overrides')
+    }
 
     coreInstanceInitialized = true
     logger.log('Core instance initialized in SharedWorker')
