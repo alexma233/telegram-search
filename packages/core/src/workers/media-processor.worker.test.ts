@@ -6,7 +6,9 @@ import { processMediaBuffer } from './media-processor.worker'
 
 describe('media-processor.worker', () => {
   it('should process media buffer and detect mime type for PNG', async () => {
-    // Simple PNG magic bytes
+    // PNG file signature (magic bytes):
+    // 89 50 4E 47 0D 0A 1A 0A - PNG signature
+    // 00 00 00 0D 49 48 44 52 - IHDR chunk header
     const pngBuffer = Buffer.from([
       0x89,
       0x50,
