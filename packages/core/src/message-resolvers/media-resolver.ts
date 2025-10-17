@@ -9,9 +9,9 @@ import type { CoreMessage } from '../utils/message'
 import { Buffer } from 'buffer'
 
 import { useLogger } from '@unbird/logg'
-import { fileTypeFromBuffer } from 'file-type'
 
 import { findPhotoByFileId, findStickerByFileId } from '../models'
+import { processMediaInWorker } from '../workers/media-pool'
 
 export function createMediaResolver(ctx: CoreContext): MessageResolver {
   const logger = useLogger('core:resolver:media')
@@ -35,12 +35,22 @@ export function createMediaResolver(ctx: CoreContext): MessageResolver {
 
               // 只有当数据库中有 sticker_bytes 时才直接返回
               if (sticker && sticker.sticker_bytes) {
-                return {
+                const byte = Buffer.from(sticker.sticker_bytes)
+
+                // Use worker pool for file type detection
+                const { mimeType } = await processMediaInWorker({
                   messageUUID: message.uuid,
-                  byte: Buffer.from(sticker.sticker_bytes),
+                  byte,
                   type: media.type,
                   platformId: media.platformId,
-                  mimeType: (await fileTypeFromBuffer(sticker.sticker_bytes))?.mime,
+                })
+
+                return {
+                  messageUUID: message.uuid,
+                  byte,
+                  type: media.type,
+                  platformId: media.platformId,
+                  mimeType,
                 } satisfies CoreMessageMediaFromCache
               }
             }
@@ -49,12 +59,22 @@ export function createMediaResolver(ctx: CoreContext): MessageResolver {
             if (media.type === 'photo') {
               const photo = (await findPhotoByFileId(media.platformId)).unwrap()
               if (photo && photo.image_bytes) {
-                return {
+                const byte = Buffer.from(photo.image_bytes)
+
+                // Use worker pool for file type detection
+                const { mimeType } = await processMediaInWorker({
                   messageUUID: message.uuid,
-                  byte: Buffer.from(photo.image_bytes),
+                  byte,
                   type: media.type,
                   platformId: media.platformId,
-                  mimeType: (await fileTypeFromBuffer(photo.image_bytes))?.mime,
+                })
+
+                return {
+                  messageUUID: message.uuid,
+                  byte,
+                  type: media.type,
+                  platformId: media.platformId,
+                  mimeType,
                 } satisfies CoreMessageMediaFromServer
               }
             }
@@ -66,13 +86,25 @@ export function createMediaResolver(ctx: CoreContext): MessageResolver {
               logger.warn(`Media is not a buffer, ${mediaFetched?.constructor.name}`)
             }
 
+            // Use worker pool for file type detection when byte is available
+            let mimeType: string | undefined
+            if (byte) {
+              const result = await processMediaInWorker({
+                messageUUID: message.uuid,
+                byte,
+                type: media.type,
+                platformId: media.platformId,
+              })
+              mimeType = result.mimeType
+            }
+
             return {
               messageUUID: message.uuid,
               apiMedia: media.apiMedia,
               byte,
               type: media.type,
               platformId: media.platformId,
-              mimeType: byte ? (await fileTypeFromBuffer(byte))?.mime : undefined,
+              mimeType,
             } satisfies CoreMessageMediaFromServer
           }),
         )
