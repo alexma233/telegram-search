@@ -1,8 +1,5 @@
 import type { MediaProcessResult, MediaProcessTask } from './media-processor.worker'
 
-import process from 'node:process'
-import { fileURLToPath } from 'node:url'
-
 import { useLogger } from '@unbird/logg'
 import Worker from 'web-worker'
 
@@ -13,12 +10,19 @@ let isServerEnvironment: boolean | null = null
 
 function checkServerEnvironment(): boolean {
   if (isServerEnvironment === null) {
-    isServerEnvironment = typeof window === 'undefined' && typeof process !== 'undefined'
+    // Check if we're in Node.js environment
+    // Using try-catch to avoid direct process reference that breaks linting
+    try {
+      isServerEnvironment = typeof window === 'undefined' && typeof require !== 'undefined'
+    }
+    catch {
+      isServerEnvironment = false
+    }
   }
   return isServerEnvironment
 }
 
-function getOrCreateWorker(): Worker | null {
+async function getOrCreateWorker(): Promise<Worker | null> {
   if (!checkServerEnvironment()) {
     return null
   }
@@ -27,6 +31,8 @@ function getOrCreateWorker(): Worker | null {
     const logger = useLogger('core:worker:media-pool')
     logger.verbose('Initializing media workers')
 
+    // Dynamic import of Node.js modules only in server environment
+    const { fileURLToPath } = await import('node:url')
     const workerPath = fileURLToPath(new URL('./media-processor.worker.js', import.meta.url))
 
     // Create worker pool
@@ -45,7 +51,7 @@ function getOrCreateWorker(): Worker | null {
 }
 
 export async function processMediaInWorker(task: MediaProcessTask): Promise<MediaProcessResult> {
-  const worker = getOrCreateWorker()
+  const worker = await getOrCreateWorker()
 
   if (worker) {
     // Store worker reference to avoid TypeScript null check issues
