@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer'
 
 import { describe, expect, it } from 'vitest'
 
+import { setupWorkers } from './media-pool'
 import { processMediaBuffer } from './media-processor.worker'
 
 describe('media-processor.worker', () => {
@@ -55,5 +56,19 @@ describe('media-processor.worker', () => {
     expect(result.type).toBe('document')
     expect(result.platformId).toBe('test-id')
     expect(result.mimeType).toBeUndefined()
+  })
+})
+
+describe('setupWorkers', () => {
+  it('should configure worker URL without throwing', () => {
+    expect(() => {
+      setupWorkers('/path/to/worker.mjs')
+    }).not.toThrow()
+  })
+
+  it('should configure worker URL with custom max workers', () => {
+    expect(() => {
+      setupWorkers('/path/to/worker.mjs', 2)
+    }).not.toThrow()
   })
 })

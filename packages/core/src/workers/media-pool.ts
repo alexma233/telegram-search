@@ -7,6 +7,7 @@ let workers: Worker[] = []
 let currentWorkerIndex = 0
 const MAX_WORKERS = 4
 let isServerEnvironment: boolean | null = null
+let workerUrl: string | null = null
 
 function checkServerEnvironment(): boolean {
   if (isServerEnvironment === null) {
@@ -22,6 +23,38 @@ function checkServerEnvironment(): boolean {
   return isServerEnvironment
 }
 
+/**
+ * Setup worker pool with explicit worker URL
+ * 
+ * Call this function before processing any media to provide the worker URL explicitly.
+ * This is useful when the worker file path cannot be resolved automatically.
+ * 
+ * @param url - The URL or path to the media-processor.worker.mjs file
+ * @param maxWorkers - Maximum number of workers to create (default: 4)
+ * 
+ * @example
+ * ```typescript
+ * import { setupWorkers, createCoreContext } from '@tg-search/core'
+ * 
+ * // In Node.js, provide the path to the worker file
+ * setupWorkers('./node_modules/@tg-search/core/dist/workers/media-processor.worker.mjs')
+ * 
+ * // Then create your core context
+ * const ctx = createCoreContext()
+ * ```
+ */
+export function setupWorkers(url: string, maxWorkers = MAX_WORKERS): void {
+  const logger = useLogger('core:worker:media-pool')
+  
+  if (workers.length > 0) {
+    logger.warn('Workers already initialized, destroying existing pool')
+    destroyMediaWorkerPool()
+  }
+  
+  workerUrl = url
+  logger.withFields({ workerUrl, maxWorkers }).verbose('Worker URL configured')
+}
+
 async function getOrCreateWorker(): Promise<Worker | null> {
   if (!checkServerEnvironment()) {
     return null
@@ -31,9 +64,19 @@ async function getOrCreateWorker(): Promise<Worker | null> {
     const logger = useLogger('core:worker:media-pool')
     logger.verbose('Initializing media workers')
 
-    // Dynamic import of Node.js modules only in server environment
-    const { fileURLToPath } = await import('node:url')
-    const workerPath = fileURLToPath(new URL('./workers/media-processor.worker.mjs', import.meta.url))
+    let workerPath: string
+    
+    if (workerUrl) {
+      // Use explicitly provided worker URL
+      workerPath = workerUrl
+      logger.debug('Using provided worker URL')
+    }
+    else {
+      // Fall back to dynamic path resolution
+      logger.debug('No worker URL provided, using dynamic resolution')
+      const { fileURLToPath } = await import('node:url')
+      workerPath = fileURLToPath(new URL('./workers/media-processor.worker.mjs', import.meta.url))
+    }
 
     // Create worker pool
     for (let i = 0; i < MAX_WORKERS; i++) {
@@ -80,12 +123,13 @@ export async function processMediaInWorker(task: MediaProcessTask): Promise<Medi
   return await processMediaBuffer(task)
 }
 
-export async function destroyMediaWorkerPool(): Promise<void> {
+export function destroyMediaWorkerPool(): void {
   for (const worker of workers) {
     worker.terminate()
   }
   workers = []
   currentWorkerIndex = 0
+  workerUrl = null
 }
 
 export function getMediaWorkerPool() {
