@@ -4,9 +4,11 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 import { useLogger } from '@unbird/logg'
-import Tinypool from 'tinypool'
+import Worker from 'web-worker'
 
-let pool: Tinypool | null = null
+let workers: Worker[] = []
+let currentWorkerIndex = 0
+const MAX_WORKERS = 4
 let isServerEnvironment: boolean | null = null
 
 function checkServerEnvironment(): boolean {
@@ -16,34 +18,55 @@ function checkServerEnvironment(): boolean {
   return isServerEnvironment
 }
 
-export function getMediaWorkerPool(): Tinypool | null {
+function getOrCreateWorker(): Worker | null {
   if (!checkServerEnvironment()) {
     return null
   }
 
-  if (!pool) {
+  if (workers.length === 0) {
     const logger = useLogger('core:worker:media-pool')
-    logger.verbose('Initializing media worker pool')
+    logger.verbose('Initializing media workers')
 
     const workerPath = fileURLToPath(new URL('./media-processor.worker.js', import.meta.url))
 
-    pool = new Tinypool({
-      filename: workerPath,
-      minThreads: 1,
-      maxThreads: 4,
-    })
+    // Create worker pool
+    for (let i = 0; i < MAX_WORKERS; i++) {
+      const worker = new Worker(workerPath, { type: 'module' })
+      workers.push(worker)
+    }
 
-    logger.withFields({ workerPath }).verbose('Media worker pool initialized')
+    logger.withFields({ count: MAX_WORKERS, workerPath }).verbose('Media workers initialized')
   }
 
-  return pool
+  // Round-robin worker selection
+  const worker = workers[currentWorkerIndex]
+  currentWorkerIndex = (currentWorkerIndex + 1) % workers.length
+  return worker
 }
 
 export async function processMediaInWorker(task: MediaProcessTask): Promise<MediaProcessResult> {
-  const workerPool = getMediaWorkerPool()
+  const worker = getOrCreateWorker()
 
-  if (workerPool) {
-    return await workerPool.run(task, { name: 'processMediaBuffer' })
+  if (worker) {
+    // Store worker reference to avoid TypeScript null check issues
+    const workerRef = worker
+    return new Promise((resolve, reject) => {
+      function handleError(error: ErrorEvent) {
+        workerRef.removeEventListener('message', handleMessage)
+        workerRef.removeEventListener('error', handleError)
+        reject(error)
+      }
+
+      function handleMessage(event: MessageEvent) {
+        workerRef.removeEventListener('message', handleMessage)
+        workerRef.removeEventListener('error', handleError)
+        resolve(event.data)
+      }
+
+      workerRef.addEventListener('message', handleMessage)
+      workerRef.addEventListener('error', handleError)
+      workerRef.postMessage(task)
+    })
   }
 
   // Fallback to synchronous processing in browser environment
@@ -52,8 +75,13 @@ export async function processMediaInWorker(task: MediaProcessTask): Promise<Medi
 }
 
 export async function destroyMediaWorkerPool(): Promise<void> {
-  if (pool) {
-    await pool.destroy()
-    pool = null
+  for (const worker of workers) {
+    worker.terminate()
   }
+  workers = []
+  currentWorkerIndex = 0
+}
+
+export function getMediaWorkerPool() {
+  return workers.length > 0 ? workers : null
 }

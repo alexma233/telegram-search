@@ -27,3 +27,16 @@ export async function processMediaBuffer(task: MediaProcessTask): Promise<MediaP
     mimeType,
   }
 }
+
+// Web Worker message handler
+if (typeof globalThis !== 'undefined' && typeof globalThis.postMessage === 'function') {
+  globalThis.addEventListener('message', async (event: MessageEvent<MediaProcessTask>) => {
+    try {
+      const result = await processMediaBuffer(event.data)
+      globalThis.postMessage(result)
+    }
+    catch (error) {
+      globalThis.postMessage({ error: error instanceof Error ? error.message : String(error) })
+    }
+  })
+}
