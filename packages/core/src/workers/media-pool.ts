@@ -33,7 +33,7 @@ async function getOrCreateWorker(): Promise<Worker | null> {
 
     // Dynamic import of Node.js modules only in server environment
     const { fileURLToPath } = await import('node:url')
-    const workerPath = fileURLToPath(new URL('./media-processor.worker.js', import.meta.url))
+    const workerPath = fileURLToPath(new URL('./workers/media-processor.worker.mjs', import.meta.url))
 
     // Create worker pool
     for (let i = 0; i < MAX_WORKERS; i++) {

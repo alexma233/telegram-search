@@ -5,6 +5,7 @@ export default defineConfig({
   entry: [
     'src/index.ts',
     'src/types.ts',
+    'src/workers/media-processor.worker.ts',
   ],
   dts: true,
   sourcemap: true,
