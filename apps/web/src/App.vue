@@ -3,7 +3,6 @@
 
 import { useAuthStore, useBridgeStore, useSettingsStore } from '@tg-search/client'
 import { storeToRefs } from 'pinia'
-import { hideSplashScreen } from 'vite-plugin-splash-screen/runtime'
 import { onMounted, watch } from 'vue'
 import { RouterView } from 'vue-router'
 import { Toaster } from 'vue-sonner'
