@@ -15,7 +15,6 @@ const { t } = useI18n()
 const router = useRouter()
 
 const selectedChats = ref<number[]>([])
-const listenToSelectedChats = ref(false)
 
 const sessionStore = useAuthStore()
 const { isLoggedIn } = storeToRefs(sessionStore)
@@ -35,14 +34,23 @@ if (increase.value === undefined || increase.value === null) {
   increase.value = true
 }
 
-// Initialize listenToSelectedChats from config
+// Get currently listening chat IDs from config
+const listeningChatIds = computed(() => {
+  return config.value?.api?.telegram?.listenToChatIds?.map(id => Number(id)) || []
+})
+
+// Check if currently listening
+const isListening = computed(() => {
+  return listeningChatIds.value.length > 0
+})
+
+// Initialize selected chats from listening config on mount
 watch(config, (newConfig) => {
   if (newConfig?.api?.telegram?.listenToChatIds) {
     const listenedIds = newConfig.api.telegram.listenToChatIds.map(id => Number(id))
-    // Check if currently selected chats match the listened chats
-    if (listenedIds.length > 0 && selectedChats.value.length > 0) {
-      listenToSelectedChats.value = listenedIds.every(id => selectedChats.value.includes(id))
-        && selectedChats.value.every(id => listenedIds.includes(id))
+    // Auto-select the chats that are being listened to
+    if (listenedIds.length > 0 && selectedChats.value.length === 0) {
+      selectedChats.value = listenedIds
     }
   }
 }, { immediate: true })
@@ -107,36 +115,29 @@ function handleAbort() {
   }
 }
 
-// Watch listenToSelectedChats and update config
-watch(listenToSelectedChats, (newValue) => {
+// Start listening to selected chats
+function handleStartListening() {
+  if (!config.value || selectedChats.value.length === 0)
+    return
+
+  config.value.api = config.value.api || {}
+  config.value.api.telegram = config.value.api.telegram || {}
+  config.value.api.telegram.listenToChatIds = selectedChats.value.map(id => id.toString())
+  websocketStore.sendEvent('config:update', { config: config.value })
+  toast.success(t('sync.listeningStarted'))
+}
+
+// Stop listening to chats
+function handleStopListening() {
   if (!config.value)
     return
 
-  if (newValue) {
-    // Enable listening for selected chats
-    config.value.api = config.value.api || {}
-    config.value.api.telegram = config.value.api.telegram || {}
-    config.value.api.telegram.listenToChatIds = selectedChats.value.map(id => id.toString())
+  if (config.value.api?.telegram?.listenToChatIds) {
+    config.value.api.telegram.listenToChatIds = []
     websocketStore.sendEvent('config:update', { config: config.value })
+    toast.success(t('sync.listeningStopped'))
   }
-  else {
-    // Disable listening for selected chats
-    if (config.value.api?.telegram?.listenToChatIds) {
-      config.value.api.telegram.listenToChatIds = []
-      websocketStore.sendEvent('config:update', { config: config.value })
-    }
-  }
-})
-
-// Watch selectedChats changes when listenToSelectedChats is enabled
-watch(selectedChats, (newChats) => {
-  if (listenToSelectedChats.value && config.value) {
-    config.value.api = config.value.api || {}
-    config.value.api.telegram = config.value.api.telegram || {}
-    config.value.api.telegram.listenToChatIds = newChats.map(id => id.toString())
-    websocketStore.sendEvent('config:update', { config: config.value })
-  }
-})
+}
 
 watch(currentTaskProgress, (progress) => {
   if (progress === 100) {
@@ -297,12 +298,43 @@ watch(currentTaskProgress, (progress) => {
             </div>
           </div>
 
-          <!-- Listen to selected chats option -->
+          <!-- Listening status display -->
           <div
-            v-if="selectedChats.length > 0"
+            v-if="isListening"
+            class="border border-green-500/30 rounded-lg bg-green-500/5 p-4 shadow-sm"
+          >
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex items-start gap-3">
+                <div class="mt-0.5 h-8 w-8 flex flex-shrink-0 items-center justify-center rounded-full bg-green-500/10">
+                  <div class="i-lucide-radio h-4 w-4 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <label class="text-sm text-green-700 font-medium dark:text-green-300">
+                    {{ t('sync.currentlyListening') }}
+                  </label>
+                  <p class="mt-1 text-xs text-green-600/80 dark:text-green-400/80">
+                    {{ t('sync.listeningToCount', { count: listeningChatIds.length }) }}
+                  </p>
+                </div>
+              </div>
+              <Button
+                icon="i-lucide-square"
+                variant="outline"
+                size="sm"
+                class="border-green-600/30 text-green-700 hover:bg-green-500/10 dark:text-green-400"
+                @click="handleStopListening"
+              >
+                {{ t('sync.stopListening') }}
+              </Button>
+            </div>
+          </div>
+
+          <!-- Listen to selected chats button -->
+          <div
+            v-if="selectedChats.length > 0 && !isListening"
             class="border rounded-lg bg-card p-4 shadow-sm"
           >
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between gap-4">
               <div>
                 <label class="text-sm text-foreground font-medium">
                   {{ t('sync.listenToSelectedChats') }}
@@ -311,14 +343,14 @@ watch(currentTaskProgress, (progress) => {
                   {{ t('sync.listenToSelectedChatsDescription') }}
                 </p>
               </div>
-              <label class="relative inline-flex cursor-pointer items-center">
-                <input
-                  v-model="listenToSelectedChats"
-                  type="checkbox"
-                  class="peer sr-only"
-                >
-                <div class="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:border after:rounded-full after:bg-background peer-checked:bg-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
-              </label>
+              <Button
+                icon="i-lucide-play"
+                variant="default"
+                size="sm"
+                @click="handleStartListening"
+              >
+                {{ t('sync.startListening') }}
+              </Button>
             </div>
           </div>
 
@@ -326,6 +358,7 @@ watch(currentTaskProgress, (progress) => {
             <ChatSelector
               v-model:selected-chats="selectedChats"
               :chats="chats"
+              :listening-chat-ids="listeningChatIds"
             />
           </div>
         </div>
