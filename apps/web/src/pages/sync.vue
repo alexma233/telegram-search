@@ -307,7 +307,7 @@ watch(currentTaskProgress, (progress) => {
                 <label class="text-sm text-foreground font-medium">
                   {{ t('sync.listenToSelectedChats') }}
                 </label>
-                <p class="text-xs text-muted-foreground mt-1">
+                <p class="mt-1 text-xs text-muted-foreground">
                   {{ t('sync.listenToSelectedChatsDescription') }}
                 </p>
               </div>

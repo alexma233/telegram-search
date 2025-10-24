@@ -237,7 +237,7 @@ onMounted(() => {
                   <label class="text-sm text-foreground font-medium">
                     {{ t('settings.listenToAllChats') }}
                   </label>
-                  <p class="text-xs text-muted-foreground mt-1">
+                  <p class="mt-1 text-xs text-muted-foreground">
                     {{ t('settings.listenToAllChatsDescription') }}
                   </p>
                 </div>

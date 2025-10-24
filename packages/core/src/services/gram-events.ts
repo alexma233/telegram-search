@@ -3,7 +3,6 @@ import type { Api } from 'telegram'
 import type { CoreContext } from '../context'
 
 import { useConfig } from '@tg-search/common'
-import bigInt from 'big-integer'
 import { NewMessage } from 'telegram/events'
 
 export interface GramEventsEventToCore {}
