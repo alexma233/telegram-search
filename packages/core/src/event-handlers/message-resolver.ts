@@ -24,5 +24,17 @@ export function registerMessageResolverEventHandlers(ctx: CoreContext) {
         }
       })
     })
+
+    emitter.on('message:reprocess', ({ chatIds, resolvers }) => {
+      void limit(async () => {
+        try {
+          await messageResolverService.reprocessMessages(chatIds, resolvers)
+        }
+        catch (error) {
+          logger.withError(error).error('Failed to reprocess messages')
+          ctx.withError(error, 'Failed to reprocess messages')
+        }
+      })
+    })
   }
 }

@@ -15,6 +15,7 @@ const { t } = useI18n()
 const router = useRouter()
 
 const selectedChats = ref<number[]>([])
+const selectedResolver = ref<string>('all')
 
 const sessionStore = useAuthStore()
 const { isLoggedIn } = storeToRefs(sessionStore)
@@ -60,6 +61,16 @@ const isButtonDisabled = computed(() => {
   return selectedChats.value.length === 0 || !isLoggedIn.value || isTaskInProgress.value
 })
 
+// Resolver options for dropdown
+const resolverOptions = computed(() => [
+  { label: t('sync.reprocessAll'), value: 'all' },
+  { label: t('settings.embeddingResolver'), value: 'embedding' },
+  { label: t('settings.jiebaResolver'), value: 'jieba' },
+  { label: t('settings.linkResolver'), value: 'link' },
+  { label: t('settings.mediaResolver'), value: 'media' },
+  { label: t('settings.userResolver'), value: 'user' },
+])
+
 function handleSync() {
   increase.value = true
   websocketStore.sendEvent('takeout:run', {
@@ -89,6 +100,16 @@ function handleAbort() {
   else {
     toast.error(t('sync.noInProgressTask'))
   }
+}
+
+function handleReprocess() {
+  const resolvers = selectedResolver.value === 'all' ? undefined : [selectedResolver.value]
+  websocketStore.sendEvent('message:reprocess', {
+    chatIds: selectedChats.value.map(id => id.toString()),
+    resolvers,
+  })
+
+  toast.success(t('sync.reprocessing'))
 }
 
 watch(currentTaskProgress, (progress) => {
@@ -143,6 +164,31 @@ watch(currentTaskProgress, (progress) => {
         >
           {{ t('sync.resync') }}
         </Button>
+        <div class="mx-2 h-6 w-px bg-border" />
+        <div class="flex items-center gap-2">
+          <select
+            v-model="selectedResolver"
+            class="h-8 appearance-none border border-border rounded-md bg-background px-3 pr-8 text-sm transition-colors focus:border-primary hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+            :disabled="isButtonDisabled"
+          >
+            <option
+              v-for="option in resolverOptions"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.label }}
+            </option>
+          </select>
+          <Button
+            icon="i-lucide-play"
+            variant="outline"
+            size="sm"
+            :disabled="isButtonDisabled"
+            @click="handleReprocess"
+          >
+            {{ t('sync.reprocess') }}
+          </Button>
+        </div>
       </div>
     </header>
 
