@@ -226,6 +226,33 @@ onMounted(() => {
             </div>
           </div>
 
+          <!-- Telegram Settings -->
+          <div>
+            <h3 class="mb-2 text-lg font-medium">
+              {{ t('settings.telegramSettings') }}
+            </h3>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <label class="text-sm text-foreground font-medium">
+                    {{ t('settings.listenToAllChats') }}
+                  </label>
+                  <p class="text-xs text-muted-foreground mt-1">
+                    {{ t('settings.listenToAllChatsDescription') }}
+                  </p>
+                </div>
+                <label class="relative inline-flex cursor-pointer items-center">
+                  <input
+                    v-model="config.api.telegram.receiveMessage"
+                    type="checkbox"
+                    class="peer sr-only"
+                  >
+                  <div class="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:border after:rounded-full after:bg-background peer-checked:bg-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
+                </label>
+              </div>
+            </div>
+          </div>
+
           <!-- OpenAI API -->
           <div>
             <h3 class="mb-2 text-lg font-medium">

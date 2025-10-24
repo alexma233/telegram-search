@@ -18,11 +18,28 @@ export function createGramEventsService(ctx: CoreContext) {
   const { emitter, getClient } = ctx
 
   function registerGramEvents() {
+    const config = useConfig()
+    const { receiveMessage, listenToChatIds } = config.api.telegram
+
+    // If not receiving messages at all, don't register
+    if (!receiveMessage && (!listenToChatIds || listenToChatIds.length === 0)) {
+      return
+    }
+
+    // Determine which chats to listen to
+    let chatIds: bigint[] | undefined
+
+    if (listenToChatIds && listenToChatIds.length > 0) {
+      // Listen to specific chats
+      chatIds = listenToChatIds.map(id => BigInt(id))
+    }
+    // If receiveMessage is true and no specific chats, listen to all (chatIds remains undefined)
+
     getClient().addEventHandler((event) => {
-      if (event.message && useConfig().api.telegram.receiveMessage) {
+      if (event.message) {
         emitter.emit('gram:message:received', { message: event.message })
       }
-    }, new NewMessage({}))
+    }, new NewMessage({ chats: chatIds }))
   }
 
   return {

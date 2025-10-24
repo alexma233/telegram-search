@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getErrorMessage, useAuthStore, useBridgeStore, useChatStore, useSyncTaskStore } from '@tg-search/client'
+import { getErrorMessage, useAuthStore, useBridgeStore, useChatStore, useSettingsStore, useSyncTaskStore } from '@tg-search/client'
 import NProgress from 'nprogress'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
@@ -15,6 +15,7 @@ const { t } = useI18n()
 const router = useRouter()
 
 const selectedChats = ref<number[]>([])
+const listenToSelectedChats = ref(false)
 
 const sessionStore = useAuthStore()
 const { isLoggedIn } = storeToRefs(sessionStore)
@@ -26,10 +27,25 @@ const { chats } = storeToRefs(chatsStore)
 const syncTaskStore = useSyncTaskStore()
 const { currentTask, currentTaskProgress, increase } = storeToRefs(syncTaskStore)
 
+const settingsStore = useSettingsStore()
+const { config } = storeToRefs(settingsStore)
+
 // Default to incremental sync
 if (increase.value === undefined || increase.value === null) {
   increase.value = true
 }
+
+// Initialize listenToSelectedChats from config
+watch(config, (newConfig) => {
+  if (newConfig?.api?.telegram?.listenToChatIds) {
+    const listenedIds = newConfig.api.telegram.listenToChatIds.map(id => Number(id))
+    // Check if currently selected chats match the listened chats
+    if (listenedIds.length > 0 && selectedChats.value.length > 0) {
+      listenToSelectedChats.value = listenedIds.every(id => selectedChats.value.includes(id))
+        && selectedChats.value.every(id => listenedIds.includes(id))
+    }
+  }
+}, { immediate: true })
 
 // Task in progress status
 const isTaskInProgress = computed(() => {
@@ -90,6 +106,37 @@ function handleAbort() {
     toast.error(t('sync.noInProgressTask'))
   }
 }
+
+// Watch listenToSelectedChats and update config
+watch(listenToSelectedChats, (newValue) => {
+  if (!config.value)
+    return
+
+  if (newValue) {
+    // Enable listening for selected chats
+    config.value.api = config.value.api || {}
+    config.value.api.telegram = config.value.api.telegram || {}
+    config.value.api.telegram.listenToChatIds = selectedChats.value.map(id => id.toString())
+    websocketStore.sendEvent('config:update', { config: config.value })
+  }
+  else {
+    // Disable listening for selected chats
+    if (config.value.api?.telegram?.listenToChatIds) {
+      config.value.api.telegram.listenToChatIds = []
+      websocketStore.sendEvent('config:update', { config: config.value })
+    }
+  }
+})
+
+// Watch selectedChats changes when listenToSelectedChats is enabled
+watch(selectedChats, (newChats) => {
+  if (listenToSelectedChats.value && config.value) {
+    config.value.api = config.value.api || {}
+    config.value.api.telegram = config.value.api.telegram || {}
+    config.value.api.telegram.listenToChatIds = newChats.map(id => id.toString())
+    websocketStore.sendEvent('config:update', { config: config.value })
+  }
+})
 
 watch(currentTaskProgress, (progress) => {
   if (progress === 100) {
@@ -247,6 +294,31 @@ watch(currentTaskProgress, (progress) => {
               <span class="text-sm text-foreground font-medium">
                 {{ t('sync.selectedChats', { count: selectedChats.length }) }}
               </span>
+            </div>
+          </div>
+
+          <!-- Listen to selected chats option -->
+          <div
+            v-if="selectedChats.length > 0"
+            class="border rounded-lg bg-card p-4 shadow-sm"
+          >
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="text-sm text-foreground font-medium">
+                  {{ t('sync.listenToSelectedChats') }}
+                </label>
+                <p class="text-xs text-muted-foreground mt-1">
+                  {{ t('sync.listenToSelectedChatsDescription') }}
+                </p>
+              </div>
+              <label class="relative inline-flex cursor-pointer items-center">
+                <input
+                  v-model="listenToSelectedChats"
+                  type="checkbox"
+                  class="peer sr-only"
+                >
+                <div class="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:border after:rounded-full after:bg-background peer-checked:bg-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
+              </label>
             </div>
           </div>
 
