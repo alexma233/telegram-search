@@ -3,6 +3,7 @@ import type { Api } from 'telegram'
 import type { CoreContext } from '../context'
 
 import { useConfig } from '@tg-search/common'
+import bigInt from 'big-integer'
 import { NewMessage } from 'telegram/events'
 
 export interface GramEventsEventToCore {}
@@ -18,28 +19,57 @@ export function createGramEventsService(ctx: CoreContext) {
   const { emitter, getClient } = ctx
 
   function registerGramEvents() {
-    const config = useConfig()
-    const { receiveMessage, listenToChatIds } = config.api.telegram
-
-    // If not receiving messages at all, don't register
-    if (!receiveMessage && (!listenToChatIds || listenToChatIds.length === 0)) {
-      return
-    }
-
-    // Determine which chats to listen to
-    let chatIds: bigint[] | undefined
-
-    if (listenToChatIds && listenToChatIds.length > 0) {
-      // Listen to specific chats
-      chatIds = listenToChatIds.map(id => BigInt(id))
-    }
-    // If receiveMessage is true and no specific chats, listen to all (chatIds remains undefined)
-
+    // Register a generic event handler that checks config dynamically
     getClient().addEventHandler((event) => {
-      if (event.message) {
-        emitter.emit('gram:message:received', { message: event.message })
+      if (!event.message)
+        return
+
+      const config = useConfig()
+      const { receiveMessage, listenToChatIds } = config.api.telegram
+
+      // Check if we should process this message
+      const shouldProcess = receiveMessage
+        || (listenToChatIds && listenToChatIds.length > 0)
+
+      if (!shouldProcess)
+        return
+
+      // If we have specific chat IDs, check if this message is from one of them
+      if (listenToChatIds && listenToChatIds.length > 0 && !receiveMessage) {
+        const chatId = event.message.chatId?.toString()
+        const peerId = event.message.peerId
+
+        // Check if the message is from one of the listened chats
+        let isFromListenedChat = false
+
+        if (chatId && listenToChatIds.includes(chatId)) {
+          isFromListenedChat = true
+        }
+        else if (peerId) {
+          // Convert peerId to string for comparison
+          let peerIdStr: string | undefined
+
+          if ('userId' in peerId) {
+            peerIdStr = peerId.userId?.toString()
+          }
+          else if ('chatId' in peerId) {
+            peerIdStr = peerId.chatId?.toString()
+          }
+          else if ('channelId' in peerId) {
+            peerIdStr = peerId.channelId?.toString()
+          }
+
+          if (peerIdStr && listenToChatIds.includes(peerIdStr)) {
+            isFromListenedChat = true
+          }
+        }
+
+        if (!isFromListenedChat)
+          return
       }
-    }, new NewMessage({ chats: chatIds }))
+
+      emitter.emit('gram:message:received', { message: event.message })
+    }, new NewMessage({}))
   }
 
   return {
