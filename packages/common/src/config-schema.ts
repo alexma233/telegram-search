@@ -50,7 +50,7 @@ export const telegramConfigSchema = object({
   apiId: optional(string()),
   apiHash: optional(string()),
   proxy: optional(proxyConfigSchema),
-  receiveMessage: optional(boolean(), false),
+  receiveAllMessage: optional(boolean(), false),
   listenToChatIds: optional(array(string()), []),
   autoReconnect: optional(boolean(), true),
 })

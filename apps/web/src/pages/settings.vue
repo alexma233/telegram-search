@@ -243,7 +243,7 @@ onMounted(() => {
                 </div>
                 <label class="relative inline-flex cursor-pointer items-center">
                   <input
-                    v-model="config.api.telegram.receiveMessage"
+                    v-model="config.api.telegram.receiveAllMessage"
                     type="checkbox"
                     class="peer sr-only"
                   >

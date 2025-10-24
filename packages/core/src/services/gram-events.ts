@@ -24,10 +24,10 @@ export function createGramEventsService(ctx: CoreContext) {
         return
 
       const config = useConfig()
-      const { receiveMessage, listenToChatIds } = config.api.telegram
+      const { receiveAllMessage, listenToChatIds } = config.api.telegram
 
-      // If receiveMessage is true, process all messages
-      if (receiveMessage) {
+      // If receiveAllMessage is true, process all messages
+      if (receiveAllMessage) {
         emitter.emit('gram:message:received', { message: event.message })
         return
       }
