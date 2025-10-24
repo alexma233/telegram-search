@@ -26,15 +26,14 @@ export function createGramEventsService(ctx: CoreContext) {
       const config = useConfig()
       const { receiveMessage, listenToChatIds } = config.api.telegram
 
-      // Check if we should process this message
-      const shouldProcess = receiveMessage
-        || (listenToChatIds && listenToChatIds.length > 0)
-
-      if (!shouldProcess)
+      // If receiveMessage is true, process all messages
+      if (receiveMessage) {
+        emitter.emit('gram:message:received', { message: event.message })
         return
+      }
 
-      // If we have specific chat IDs, check if this message is from one of them
-      if (listenToChatIds && listenToChatIds.length > 0 && !receiveMessage) {
+      // If we have specific chat IDs to listen to, check if this message is from one of them
+      if (listenToChatIds && listenToChatIds.length > 0) {
         const chatId = event.message.chatId?.toString()
         const peerId = event.message.peerId
 
@@ -63,11 +62,10 @@ export function createGramEventsService(ctx: CoreContext) {
           }
         }
 
-        if (!isFromListenedChat)
-          return
+        if (isFromListenedChat) {
+          emitter.emit('gram:message:received', { message: event.message })
+        }
       }
-
-      emitter.emit('gram:message:received', { message: event.message })
     }, new NewMessage({}))
   }
 
