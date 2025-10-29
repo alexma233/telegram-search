@@ -9,13 +9,13 @@ import { toast } from 'vue-sonner'
 
 import ChatSelector from '../components/ChatSelector.vue'
 import { Button } from '../components/ui/Button'
+import DropdownButton from '../components/ui/DropdownButton.vue'
 import { Progress } from '../components/ui/Progress'
 
 const { t } = useI18n()
 const router = useRouter()
 
 const selectedChats = ref<number[]>([])
-const selectedResolver = ref<string>('all')
 
 const sessionStore = useAuthStore()
 const { isLoggedIn } = storeToRefs(sessionStore)
@@ -93,23 +93,34 @@ function handleResync() {
 
 function handleAbort() {
   if (currentTask.value) {
-    websocketStore.sendEvent('takeout:task:abort', {
-      taskId: currentTask.value.taskId,
-    })
+    // Send appropriate abort event based on task type
+    if (currentTask.value.type === 'takeout') {
+      websocketStore.sendEvent('takeout:task:abort', {
+        taskId: currentTask.value.taskId,
+      })
+    }
+    else if (currentTask.value.type === 'reprocess') {
+      websocketStore.sendEvent('message:reprocess:task:abort', {
+        taskId: currentTask.value.taskId,
+      })
+    }
+
+    NProgress.done()
+    currentTask.value = undefined
   }
   else {
     toast.error(t('sync.noInProgressTask'))
   }
 }
 
-function handleReprocess() {
-  const resolvers = selectedResolver.value === 'all' ? undefined : [selectedResolver.value]
+function handleReprocess(resolverType: string) {
+  const resolvers = resolverType === 'all' ? undefined : [resolverType]
   websocketStore.sendEvent('message:reprocess', {
     chatIds: selectedChats.value.map(id => id.toString()),
     resolvers,
   })
 
-  toast.success(t('sync.reprocessing'))
+  NProgress.start()
 }
 
 watch(currentTaskProgress, (progress) => {
@@ -165,30 +176,15 @@ watch(currentTaskProgress, (progress) => {
           {{ t('sync.resync') }}
         </Button>
         <div class="mx-2 h-6 w-px bg-border" />
-        <div class="flex items-center gap-2">
-          <select
-            v-model="selectedResolver"
-            class="h-8 appearance-none border border-border rounded-md bg-background px-3 pr-8 text-sm transition-colors focus:border-primary hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-            :disabled="isButtonDisabled"
-          >
-            <option
-              v-for="option in resolverOptions"
-              :key="option.value"
-              :value="option.value"
-            >
-              {{ option.label }}
-            </option>
-          </select>
-          <Button
-            icon="i-lucide-play"
-            variant="outline"
-            size="sm"
-            :disabled="isButtonDisabled"
-            @click="handleReprocess"
-          >
-            {{ t('sync.reprocess') }}
-          </Button>
-        </div>
+        <DropdownButton
+          button-icon="i-lucide-play"
+          :button-text="t('sync.reprocess')"
+          :options="resolverOptions"
+          :disabled="isButtonDisabled"
+          variant="outline"
+          size="sm"
+          @select="handleReprocess"
+        />
       </div>
     </header>
 

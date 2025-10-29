@@ -5,7 +5,7 @@ import { computed, ref } from 'vue'
 
 export const useSyncTaskStore = defineStore('sync-task', () => {
   const increase = ref(false)
-  const currentTask = ref<CoreTask<'takeout'>>()
+  const currentTask = ref<CoreTask<'takeout'> | CoreTask<'reprocess'>>()
   const currentTaskProgress = computed(() => {
     if (!currentTask.value)
       return 0

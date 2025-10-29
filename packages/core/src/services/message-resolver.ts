@@ -8,6 +8,7 @@ import { useLogger } from '@guiiai/logg'
 import { useConfig } from '@tg-search/common'
 
 import { convertToCoreMessage } from '../utils/message'
+import { createTask } from '../utils/task'
 
 export interface MessageResolverEventToCore {
   /**
@@ -21,11 +22,14 @@ export interface MessageResolverEventToCore {
    * This allows re-running message processing pipeline on existing messages.
    */
   'message:reprocess': (data: { chatIds: string[], resolvers?: string[] }) => void
+  /**
+   * Aborts a reprocess task by its task ID
+   */
+  'message:reprocess:task:abort': (data: { taskId: string }) => void
 }
 
 export interface MessageResolverEventFromCore {
-  'message:reprocess:progress': (data: { chatId: string, processed: number, total: number }) => void
-  'message:reprocess:complete': (data: { chatIds: string[] }) => void
+  'message:reprocess:task:progress': (data: any) => void
 }
 
 export type MessageResolverEvent = MessageResolverEventFromCore & MessageResolverEventToCore
@@ -107,65 +111,122 @@ export function createMessageResolverService(ctx: CoreContext) {
       await processCoreMessagesWithResolvers(coreMessages, options)
     }
 
-    async function reprocessMessages(chatIds: string[], selectedResolvers?: string[]) {
+    async function reprocessMessages(
+      chatIds: string[],
+      selectedResolvers?: string[],
+      task?: ReturnType<typeof createTask<'reprocess'>>,
+    ) {
       logger.withFields({ chatIds, resolvers: selectedResolvers }).log('Reprocess messages')
 
-      // Import fetchMessages dynamically to avoid circular dependencies
-      const { fetchMessages } = await import('../models/chat-message')
+      // If no task provided, create one (for backward compatibility)
+      const reprocessTask = task ?? createTask('reprocess', {
+        chatIds,
+        resolvers: selectedResolvers,
+      }, emitter)
 
-      for (const chatId of chatIds) {
-        let offset = 0
-        const limit = 100
-        let hasMore = true
+      reprocessTask.markStarted()
 
-        let processedCount = 0
-        let totalCount = 0
+      try {
+        // Import fetchMessages dynamically to avoid circular dependencies
+        const { fetchMessages } = await import('../models/chat-message')
 
-        // Note: We'll update total count as we process messages
+        let totalProcessed = 0
+        let totalMessages = 0
 
-        while (hasMore) {
+        // First pass: count total messages
+        for (const chatId of chatIds) {
           try {
-            const { coreMessages } = (await fetchMessages(chatId, { limit, offset })).unwrap()
+            let offset = 0
+            const limit = 100
+            let hasMore = true
 
-            if (coreMessages.length === 0) {
-              hasMore = false
-              break
+            while (hasMore) {
+              const { coreMessages } = (await fetchMessages(chatId, { limit, offset })).unwrap()
+              if (coreMessages.length === 0) {
+                hasMore = false
+                break
+              }
+              totalMessages += coreMessages.length
+              offset += limit
+              hasMore = coreMessages.length === limit
             }
-
-            // Reprocess these messages
-            await processCoreMessagesWithResolvers(coreMessages, {
-              takeout: true,
-              selectedResolvers,
-            })
-
-            processedCount += coreMessages.length
-            totalCount = processedCount // Update total as we go
-
-            // Emit progress
-            emitter.emit('message:reprocess:progress', {
-              chatId,
-              processed: processedCount,
-              total: totalCount,
-            })
-
-            offset += limit
-            hasMore = coreMessages.length === limit
           }
           catch (error) {
-            logger.withError(error).error('Failed to reprocess messages')
-            hasMore = false
+            logger.withError(error).warn('Failed to count messages')
           }
         }
 
-        logger.withFields({ chatId, count: processedCount }).log('Reprocessed messages for chat')
-      }
+        // Second pass: process messages
+        for (const chatId of chatIds) {
+          let offset = 0
+          const limit = 100
+          let hasMore = true
 
-      emitter.emit('message:reprocess:complete', { chatIds })
+          let processedCount = 0
+
+          while (hasMore) {
+            // Check if task was aborted
+            if (reprocessTask.abortController.signal.aborted) {
+              logger.log('Reprocess task was aborted')
+              return
+            }
+
+            try {
+              const { coreMessages } = (await fetchMessages(chatId, { limit, offset })).unwrap()
+
+              if (coreMessages.length === 0) {
+                hasMore = false
+                break
+              }
+
+              // Reprocess these messages
+              await processCoreMessagesWithResolvers(coreMessages, {
+                takeout: true,
+                selectedResolvers,
+              })
+
+              processedCount += coreMessages.length
+              totalProcessed += coreMessages.length
+
+              // Calculate overall progress percentage
+              const progressPercent = totalMessages > 0
+                ? Math.floor((totalProcessed / totalMessages) * 100)
+                : 0
+
+              // Update task progress
+              reprocessTask.updateProgress(
+                progressPercent,
+                `Processing chat ${chatId}: ${totalProcessed}/${totalMessages} messages`,
+              )
+
+              offset += limit
+              hasMore = coreMessages.length === limit
+            }
+            catch (error) {
+              logger.withError(error).error('Failed to reprocess messages')
+              reprocessTask.updateError(error)
+              return
+            }
+          }
+
+          logger.withFields({ chatId, count: processedCount }).log('Reprocessed messages for chat')
+        }
+
+        // Mark task as complete
+        reprocessTask.updateProgress(100, 'Reprocessing complete')
+      }
+      catch (error) {
+        logger.withError(error).error('Failed to reprocess messages')
+        reprocessTask.updateError(error)
+      }
     }
 
     return {
       processMessages,
       reprocessMessages,
+      createReprocessTask(chatIds: string[], resolvers?: string[]) {
+        return createTask('reprocess', { chatIds, resolvers }, emitter)
+      },
     }
   }
 }

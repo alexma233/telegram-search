@@ -3,12 +3,18 @@ import type { TakeoutTaskMetadata } from '../services/takeout'
 
 import { useLogger } from '@guiiai/logg'
 
-type CoreTaskType = 'takeout' | 'getMessage' | 'embed'
+type CoreTaskType = 'takeout' | 'getMessage' | 'embed' | 'reprocess'
+
+export interface ReprocessTaskMetadata {
+  chatIds: string[]
+  resolvers?: string[]
+}
 
 interface CoreTasks {
   takeout: TakeoutTaskMetadata
   getMessage: undefined
   embed: undefined
+  reprocess: ReprocessTaskMetadata
 }
 
 export interface CoreTaskData<T extends CoreTaskType> {
@@ -56,6 +62,9 @@ export function createTask<T extends CoreTaskType>(
   const emitUpdate = () => {
     if (type === 'takeout') {
       emitter.emit('takeout:task:progress', task.toJSON() as any)
+    }
+    else if (type === 'reprocess') {
+      emitter.emit('message:reprocess:task:progress', task.toJSON() as any)
     }
   }
 

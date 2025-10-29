@@ -16,21 +16,16 @@ describe('message-resolver service', () => {
       expect(typeof service.reprocessMessages).toBe('function')
     })
 
-    it('should emit progress events during reprocessing', async () => {
+    it('should emit task progress events during reprocessing', async () => {
       const ctx = createCoreContext()
       const registry = useMessageResolverRegistry()
       const service = createMessageResolverService(ctx)(registry)
 
       // Mock event emission
-      const progressEvents: any[] = []
-      const completeEvents: any[] = []
+      const taskProgressEvents: any[] = []
 
-      ctx.emitter.on('message:reprocess:progress', (data) => {
-        progressEvents.push(data)
-      })
-
-      ctx.emitter.on('message:reprocess:complete', (data) => {
-        completeEvents.push(data)
+      ctx.emitter.on('message:reprocess:task:progress', (data) => {
+        taskProgressEvents.push(data)
       })
 
       // Since we can't easily test database interactions in a unit test,
