@@ -4,6 +4,19 @@
  */
 
 const AVATAR_CACHE_NAME = 'telegram-search-avatars-v1'
+const AVATAR_CACHE_MAX_AGE = 31536000 // 1 year in seconds
+
+/**
+ * Create a blob from avatar bytes
+ * @param avatarBytes - The avatar image bytes
+ * @param mimeType - The MIME type of the image
+ * @returns Blob and its URL
+ */
+function createAvatarBlob(avatarBytes: Uint8Array, mimeType: string): { blob: Blob, url: string } {
+  const blob = new Blob([avatarBytes as BlobPart], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  return { blob, url }
+}
 
 /**
  * Store an avatar in the browser cache
@@ -31,21 +44,21 @@ export async function cacheAvatar(entityId: string, avatarBytes: Uint8Array): Pr
     const response = new Response(avatarBytes as BlobPart, {
       headers: {
         'Content-Type': mimeType,
-        'Cache-Control': 'max-age=31536000', // Cache for 1 year
+        'Cache-Control': `max-age=${AVATAR_CACHE_MAX_AGE}`,
       },
     })
 
     await cache.put(url, response)
 
     // Create a blob URL for immediate use
-    const blob = new Blob([avatarBytes as BlobPart], { type: mimeType })
-    return URL.createObjectURL(blob)
+    const { url: blobUrl } = createAvatarBlob(avatarBytes, mimeType)
+    return blobUrl
   }
   catch (error) {
     console.error('Failed to cache avatar:', error)
     // Fallback to blob URL without caching
-    const blob = new Blob([avatarBytes as BlobPart], { type: 'image/jpeg' })
-    return URL.createObjectURL(blob)
+    const { url: blobUrl } = createAvatarBlob(avatarBytes, 'image/jpeg')
+    return blobUrl
   }
 }
 

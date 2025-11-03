@@ -1,8 +1,8 @@
-// eslint-disable-next-line unicorn/prefer-node-protocol
-import { Buffer } from 'buffer'
-
 import type { TelegramClient } from 'telegram'
 import type { Entity } from 'telegram/define'
+
+// eslint-disable-next-line unicorn/prefer-node-protocol
+import { Buffer } from 'buffer'
 
 import { useLogger } from '@guiiai/logg'
 
