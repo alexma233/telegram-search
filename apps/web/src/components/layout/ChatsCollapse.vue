@@ -63,6 +63,7 @@ function toggleActive() {
       >
         <Avatar
           :name="chat.name"
+          :entity-id="chat.id.toString()"
           size="sm"
           class="flex-shrink-0"
         />

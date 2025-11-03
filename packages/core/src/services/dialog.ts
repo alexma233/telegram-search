@@ -1,11 +1,15 @@
 import type { Result } from '@unbird/result'
 import type { Dialog } from 'telegram/tl/custom/dialog'
+// eslint-disable-next-line unicorn/prefer-node-protocol
+import type { Buffer } from 'buffer'
 
 import type { CoreContext } from '../context'
 
 import { useLogger } from '@guiiai/logg'
 import { circularObject } from '@tg-search/common'
 import { Err, Ok } from '@unbird/result'
+
+import { downloadProfilePhoto } from '../utils/avatar'
 
 export type DialogType = 'user' | 'group' | 'channel'
 
@@ -17,6 +21,7 @@ export interface CoreDialog {
   messageCount?: number
   lastMessage?: string
   lastMessageDate?: Date
+  avatarBytes?: Buffer
 }
 
 export interface DialogEventToCore {
@@ -107,6 +112,9 @@ export function createDialogService(ctx: CoreContext) {
         lastMessageDate = new Date(dialog.message.date * 1000)
       }
 
+      // Download avatar for the dialog
+      const avatarBytes = await downloadProfilePhoto(getClient(), dialog.entity)
+
       dialogs.push({
         id: result.id,
         name: result.name,
@@ -115,6 +123,7 @@ export function createDialogService(ctx: CoreContext) {
         messageCount,
         lastMessage,
         lastMessageDate,
+        avatarBytes,
       })
     }
 

@@ -1,14 +1,18 @@
 import type { Result } from '@unbird/result'
+// eslint-disable-next-line unicorn/prefer-node-protocol
+import type { Buffer } from 'buffer'
 
 import type { CoreContext } from '../context'
 
 import { Ok } from '@unbird/result'
 
 import { resolveEntity } from '../utils/entity'
+import { downloadProfilePhoto } from '../utils/avatar'
 
 export interface CoreBaseEntity {
   id: string
   name: string
+  avatarBytes?: Buffer
 }
 
 export interface CoreUserEntity extends CoreBaseEntity {
@@ -28,10 +32,12 @@ export type CoreEntity = CoreUserEntity | CoreChatEntity | CoreChannelEntity
 
 export interface EntityEventToCore {
   'entity:me:fetch': () => void
+  'entity:avatar:fetch': (data: { entityId: string }) => void
 }
 
 export interface EntityEventFromCore {
   'entity:me:data': (data: CoreUserEntity) => void
+  'entity:avatar:data': (data: { entityId: string, avatarBytes?: Buffer }) => void
 }
 
 export type EntityEvent = EntityEventFromCore & EntityEventToCore
@@ -49,12 +55,28 @@ export function createEntityService(ctx: CoreContext) {
   async function getMeInfo(): Promise<Result<CoreUserEntity>> {
     const apiUser = await getClient().getMe()
     const result = resolveEntity(apiUser).expect('Failed to resolve entity') as CoreUserEntity
+    
+    // Download avatar
+    const avatarBytes = await downloadProfilePhoto(getClient(), apiUser)
+    if (avatarBytes) {
+      result.avatarBytes = avatarBytes
+    }
+    
     emitter.emit('entity:me:data', result)
     return Ok(result)
+  }
+
+  async function fetchEntityAvatar(entityId: string): Promise<Buffer | undefined> {
+    const entity = await getEntity(entityId)
+    const avatarBytes = await downloadProfilePhoto(getClient(), entity)
+    
+    emitter.emit('entity:avatar:data', { entityId, avatarBytes })
+    return avatarBytes
   }
 
   return {
     getEntity,
     getMeInfo,
+    fetchEntityAvatar,
   }
 }

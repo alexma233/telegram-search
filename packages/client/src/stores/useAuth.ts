@@ -10,6 +10,7 @@ export interface SessionContext {
   phoneNumber?: string
   isConnected?: boolean
   me?: CoreUserEntity
+  avatarUrls?: Map<string, string> // Map of entityId -> blob URL
 }
 
 export const useAuthStore = defineStore('session', () => {

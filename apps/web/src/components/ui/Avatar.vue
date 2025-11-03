@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { useAvatar } from '@tg-search/client'
+import { computed, onMounted } from 'vue'
 
 interface Props {
   src?: string
   name?: string
   size?: 'sm' | 'md' | 'lg'
   isOnline?: boolean
+  entityId?: string | number // Entity ID for auto-loading avatar from cache
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -53,6 +55,21 @@ const backgroundColor = computed(() => {
   const index = props.name.trim().split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
   return colors[index % colors.length]
 })
+
+// Use avatar composable if entityId is provided
+const { avatarUrl, loadFromCache } = props.entityId ? useAvatar(props.entityId) : { avatarUrl: { value: undefined }, loadFromCache: () => {} }
+
+// Computed src that prioritizes: explicit src prop > cached avatar > undefined
+const effectiveSrc = computed(() => {
+  return props.src || avatarUrl.value
+})
+
+// Load from cache on mount if entityId is provided
+onMounted(() => {
+  if (props.entityId && !props.src) {
+    loadFromCache()
+  }
+})
 </script>
 
 <template>
@@ -64,8 +81,8 @@ const backgroundColor = computed(() => {
       ]"
     >
       <img
-        v-if="src"
-        :src="src"
+        v-if="effectiveSrc"
+        :src="effectiveSrc"
         :alt="name"
         class="h-full w-full object-cover"
       >

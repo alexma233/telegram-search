@@ -25,6 +25,7 @@ export async function recordChats(chats: CoreDialog[]) {
       chat_id: chat.id.toString(),
       chat_name: chat.name,
       chat_type: chat.type,
+      avatar_bytes: chat.avatarBytes,
       // created_at: chat.lastMessageDate,
       // updated_at: Date.now(),
     })))
@@ -33,6 +34,7 @@ export async function recordChats(chats: CoreDialog[]) {
       set: {
         chat_name: sql`excluded.chat_name`,
         chat_type: sql`excluded.chat_type`,
+        avatar_bytes: sql`excluded.avatar_bytes`,
         updated_at: Date.now(), // TODO: is it correct?
       },
     })

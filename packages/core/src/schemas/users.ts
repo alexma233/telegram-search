@@ -1,5 +1,7 @@
 import { bigint, index, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
+import { bytea } from './type'
+
 export const usersTable = pgTable('users', {
   id: uuid().primaryKey().defaultRandom(),
   platform: text().notNull().default('telegram'),
@@ -7,6 +9,7 @@ export const usersTable = pgTable('users', {
   name: text().notNull().default(''),
   username: text().notNull().default(''),
   type: text().notNull().default('user').$type<'user' | 'chat' | 'channel'>(),
+  avatar_bytes: bytea(),
   created_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),
   updated_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),
 }, table => [

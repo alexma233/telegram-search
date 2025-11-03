@@ -41,6 +41,7 @@ const userId = computed(() => activeSessionComputed.value?.me?.id)
     <div class="flex items-center gap-3 border-b p-3 dark:border-gray-600">
       <Avatar
         :name="username"
+        :entity-id="userId"
         size="md"
       />
       <div class="flex flex-col">
