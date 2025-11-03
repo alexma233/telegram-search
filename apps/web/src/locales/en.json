@@ -58,6 +58,8 @@
     "openInChat": "Open in chat"
   },
   "search": {
+    "loadingMore": "Loading more...",
+    "noMoreResults": "No more results",
     "noRelatedMessages": "No related messages found",
     "search": "Search",
     "searchMessages": "Search messages...",

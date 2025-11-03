@@ -58,6 +58,8 @@
     "openInChat": "在聊天中打开"
   },
   "search": {
+    "loadingMore": "加载更多...",
+    "noMoreResults": "没有更多结果了",
     "noRelatedMessages": "没有找到相关消息",
     "search": "搜索",
     "searchMessages": "搜索消息...",

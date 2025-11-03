@@ -2,7 +2,7 @@
 import type { CoreRetrievalMessages } from '@tg-search/core/types'
 
 import { useBridgeStore } from '@tg-search/client'
-import { useDebounce } from '@vueuse/core'
+import { useDebounce, useScroll } from '@vueuse/core'
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -11,6 +11,7 @@ import MessageList from '../../components/messages/MessageList.vue'
 const { t } = useI18n()
 
 const isLoading = ref(false)
+const isLoadingMore = ref(false)
 
 const keyword = ref<string>('')
 const keywordDebounced = useDebounce(keyword, 1000)
@@ -18,27 +19,83 @@ const keywordDebounced = useDebounce(keyword, 1000)
 const websocketStore = useBridgeStore()
 const searchResult = ref<CoreRetrievalMessages[]>([])
 
-// TODO: Infinite scroll
+const pageSize = 10
+const currentOffset = ref(0)
+const hasMore = ref(true)
+
+const messageListRef = ref<HTMLElement | null>(null)
+
+// Infinite scroll implementation
 watch(keywordDebounced, (newKeyword) => {
   if (newKeyword.length === 0) {
     searchResult.value = []
+    currentOffset.value = 0
+    hasMore.value = true
     return
   }
 
-  isLoading.value = true
+  // Reset for new search
+  currentOffset.value = 0
+  hasMore.value = true
+  searchResult.value = []
+
+  performSearch()
+})
+
+async function performSearch(isLoadMore = false) {
+  if (keywordDebounced.value.length === 0)
+    return
+
+  if (isLoadMore) {
+    if (!hasMore.value || isLoadingMore.value)
+      return
+    isLoadingMore.value = true
+  }
+  else {
+    isLoading.value = true
+  }
+
   websocketStore.sendEvent('storage:search:messages', {
-    content: newKeyword,
+    content: keywordDebounced.value,
     useVector: true,
     pagination: {
-      limit: 10,
-      offset: 0,
+      limit: pageSize,
+      offset: currentOffset.value,
     },
   })
 
-  websocketStore.waitForEvent('storage:search:messages:data').then(({ messages }) => {
-    searchResult.value = messages
+  try {
+    const { messages } = await websocketStore.waitForEvent('storage:search:messages:data')
+
+    if (isLoadMore) {
+      searchResult.value = [...searchResult.value, ...messages]
+    }
+    else {
+      searchResult.value = messages
+    }
+
+    currentOffset.value += messages.length
+    hasMore.value = messages.length >= pageSize
+  }
+  finally {
     isLoading.value = false
-  })
+    isLoadingMore.value = false
+  }
+}
+
+function loadMore() {
+  performSearch(true)
+}
+
+// Set up scroll detection
+const { arrivedState } = useScroll(messageListRef, {
+  offset: { bottom: 100 },
+})
+
+watch(() => arrivedState.bottom, (isAtBottom) => {
+  if (isAtBottom && hasMore.value && !isLoading.value && !isLoadingMore.value) {
+    loadMore()
+  }
 })
 </script>
 
@@ -73,7 +130,16 @@ watch(keywordDebounced, (newKeyword) => {
       :class="{ 'opacity-0': !keywordDebounced, 'opacity-100': keywordDebounced }"
     >
       <template v-if="searchResult.length > 0">
-        <MessageList :messages="searchResult" :keyword="keyword" />
+        <div ref="messageListRef" class="h-full overflow-y-auto">
+          <MessageList :messages="searchResult" :keyword="keyword" />
+          <div v-if="isLoadingMore" class="flex flex-col items-center justify-center py-6 text-muted-foreground opacity-70">
+            <span class="i-lucide-loader-circle mb-2 animate-spin text-2xl" />
+            <span class="text-sm">{{ t('search.loadingMore') }}</span>
+          </div>
+          <div v-else-if="!hasMore && searchResult.length > 0" class="flex flex-col items-center justify-center py-6 text-muted-foreground opacity-50">
+            <span class="text-sm">{{ t('search.noMoreResults') }}</span>
+          </div>
+        </div>
       </template>
       <template v-else-if="isLoading">
         <div class="flex flex-col items-center justify-center py-12 text-muted-foreground opacity-70">
