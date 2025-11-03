@@ -42,6 +42,7 @@ watch(keywordDebounced, (newKeyword) => {
   // Reset for new search
   currentOffset.value = 0
   hasMore.value = true
+  isLoading.value = true // Show loading immediately
   searchResult.value = []
 
   performSearch()
