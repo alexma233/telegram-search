@@ -1,7 +1,8 @@
-import type { Result } from '@unbird/result'
-import type { Dialog } from 'telegram/tl/custom/dialog'
 // eslint-disable-next-line unicorn/prefer-node-protocol
 import type { Buffer } from 'buffer'
+
+import type { Result } from '@unbird/result'
+import type { Dialog } from 'telegram/tl/custom/dialog'
 
 import type { CoreContext } from '../context'
 

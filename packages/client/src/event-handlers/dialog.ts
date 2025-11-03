@@ -9,20 +9,25 @@ export function registerDialogEventHandlers(
 ) {
   registerEventHandler('dialog:data', async (data) => {
     useChatStore().chats = data.dialogs
-    
+
     // Cache avatars for all dialogs
     const session = useBridgeStore().getActiveSession()
     if (session) {
       if (!session.avatarUrls) {
         session.avatarUrls = new Map()
       }
-      
+
       for (const dialog of data.dialogs) {
         if (dialog.avatarBytes) {
           try {
-            const avatarUrl = await cacheAvatar(dialog.id.toString(), new Uint8Array(dialog.avatarBytes))
+            // Convert Buffer to Uint8Array for browser compatibility
+            const bytes = dialog.avatarBytes instanceof Uint8Array
+              ? dialog.avatarBytes
+              : new Uint8Array(dialog.avatarBytes)
+            const avatarUrl = await cacheAvatar(dialog.id.toString(), bytes)
             session.avatarUrls.set(dialog.id.toString(), avatarUrl)
-          } catch (error) {
+          }
+          catch (error) {
             console.error(`Failed to cache avatar for dialog ${dialog.id}:`, error)
           }
         }

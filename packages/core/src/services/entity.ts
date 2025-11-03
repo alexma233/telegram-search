@@ -1,13 +1,14 @@
-import type { Result } from '@unbird/result'
 // eslint-disable-next-line unicorn/prefer-node-protocol
 import type { Buffer } from 'buffer'
+
+import type { Result } from '@unbird/result'
 
 import type { CoreContext } from '../context'
 
 import { Ok } from '@unbird/result'
 
-import { resolveEntity } from '../utils/entity'
 import { downloadProfilePhoto } from '../utils/avatar'
+import { resolveEntity } from '../utils/entity'
 
 export interface CoreBaseEntity {
   id: string
@@ -55,13 +56,13 @@ export function createEntityService(ctx: CoreContext) {
   async function getMeInfo(): Promise<Result<CoreUserEntity>> {
     const apiUser = await getClient().getMe()
     const result = resolveEntity(apiUser).expect('Failed to resolve entity') as CoreUserEntity
-    
+
     // Download avatar
     const avatarBytes = await downloadProfilePhoto(getClient(), apiUser)
     if (avatarBytes) {
       result.avatarBytes = avatarBytes
     }
-    
+
     emitter.emit('entity:me:data', result)
     return Ok(result)
   }
@@ -69,7 +70,7 @@ export function createEntityService(ctx: CoreContext) {
   async function fetchEntityAvatar(entityId: string): Promise<Buffer | undefined> {
     const entity = await getEntity(entityId)
     const avatarBytes = await downloadProfilePhoto(getClient(), entity)
-    
+
     emitter.emit('entity:avatar:data', { entityId, avatarBytes })
     return avatarBytes
   }
