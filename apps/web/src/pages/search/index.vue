@@ -75,7 +75,7 @@ async function performSearch(isLoadMore = false) {
     }
 
     currentOffset.value += messages.length
-    hasMore.value = messages.length >= pageSize
+    hasMore.value = messages.length === pageSize
   }
   finally {
     isLoading.value = false

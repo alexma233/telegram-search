@@ -81,7 +81,7 @@ async function performSearch(isLoadMore = false) {
     }
 
     currentOffset.value += messages.length
-    hasMore.value = messages.length >= pageSize
+    hasMore.value = messages.length === pageSize
   }
   finally {
     isLoading.value = false
@@ -144,23 +144,23 @@ watch(() => arrivedState.bottom, (isAtBottom) => {
       <template v-if="searchResult.length > 0">
         <div ref="messageListRef" class="h-full overflow-y-auto">
           <MessageList :messages="searchResult" :keyword="keyword" />
-          <div v-if="isLoadingMore" class="flex flex-col items-center justify-center py-6 text-gray-500 opacity-70 dark:text-gray-400">
+          <div v-if="isLoadingMore" class="flex flex-col items-center justify-center py-6 text-muted-foreground opacity-70">
             <span class="i-lucide-loader-circle mb-2 animate-spin text-2xl" />
             <span class="text-sm">{{ t('search.loadingMore') }}</span>
           </div>
-          <div v-else-if="!hasMore && searchResult.length > 0" class="flex flex-col items-center justify-center py-6 text-gray-500 opacity-50 dark:text-gray-400">
+          <div v-else-if="!hasMore && searchResult.length > 0" class="flex flex-col items-center justify-center py-6 text-muted-foreground opacity-50">
             <span class="text-sm">{{ t('search.noMoreResults') }}</span>
           </div>
         </div>
       </template>
       <template v-else-if="isLoading">
-        <div class="flex flex-col items-center justify-center py-12 text-gray-500 opacity-70 dark:text-gray-400">
+        <div class="flex flex-col items-center justify-center py-12 text-muted-foreground opacity-70">
           <span class="i-lucide-loader-circle mb-2 animate-spin text-3xl" />
           <span>{{ t('search.searching') }}</span>
         </div>
       </template>
       <template v-else-if="searchResult.length === 0">
-        <div class="flex flex-col items-center justify-center py-12 text-gray-500 opacity-70 dark:text-gray-400">
+        <div class="flex flex-col items-center justify-center py-12 text-muted-foreground opacity-70">
           <span class="i-lucide-search mb-2 text-3xl" />
           <span>{{ t('search.noRelatedMessages') }}</span>
         </div>
