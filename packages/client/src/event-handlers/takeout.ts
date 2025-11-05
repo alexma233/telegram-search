@@ -24,7 +24,7 @@ export function registerTakeoutEventHandlers(
 
     // Restore tasks from server
     data.tasks.forEach((task) => {
-      store.setTask(task as any)
+      store.setTask(task)
     })
   })
 }

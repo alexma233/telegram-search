@@ -135,7 +135,8 @@
   "taskDrawer": {
     "title": "Background Tasks",
     "noTasks": "No background tasks",
-    "clearAll": "Clear All"
+    "clearAll": "Clear All",
+    "unknownChat": "Chat {chatId}"
   },
   "virtualMessageList": {
     "scrolling": "Scrolling..."

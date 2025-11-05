@@ -135,7 +135,8 @@
   "taskDrawer": {
     "title": "后台任务",
     "noTasks": "没有后台任务",
-    "clearAll": "清空全部"
+    "clearAll": "清空全部",
+    "unknownChat": "聊天 {chatId}"
   },
   "virtualMessageList": {
     "scrolling": "加载中"

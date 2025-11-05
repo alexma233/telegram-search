@@ -44,14 +44,14 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
       let messages: Api.Message[] = []
 
       for (const chatId of chatIds) {
-        const stats = increaseOptions.find(item => item.chatId === chatId)
+        const chatInfo = increaseOptions.find(item => item.chatId === chatId)
 
         if (!increase) {
           // Full sync mode: sync all messages (overwrite)
           logger.withFields({ chatId, mode: 'full' }).verbose('Starting full sync')
 
           // Create task for full sync
-          const task = createTask('takeout', { chatIds: [chatId], chatId, chatName: stats?.chatName }, emitter)
+          const task = createTask('takeout', { chatIds: [chatId], chatId, chatName: chatInfo?.chatName }, emitter)
           activeTasks.set(task.taskId, task)
 
           const opts = {
@@ -97,11 +97,11 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
         else {
           // Incremental sync mode: bidirectional fill (forward + backward)
           // Only sync if there are already some messages in the database
-          if (!stats || (stats.firstMessageId === 0 && stats.latestMessageId === 0)) {
+          if (!chatInfo || (chatInfo.firstMessageId === 0 && chatInfo.latestMessageId === 0)) {
             logger.withFields({ chatId }).warn('No existing messages found, switching to full sync')
 
             // Create task for fallback full sync
-            const task = createTask('takeout', { chatIds: [chatId], chatId, chatName: stats?.chatName }, emitter)
+            const task = createTask('takeout', { chatIds: [chatId], chatId, chatName: chatInfo?.chatName }, emitter)
             activeTasks.set(task.taskId, task)
 
             const opts = {
@@ -150,7 +150,7 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
 
             // First, get total message count from Telegram
             const totalMessageCount = (await takeoutService.getTotalMessageCount(chatId)) ?? 0
-            const alreadySyncedCount = stats.messageCount
+            const alreadySyncedCount = chatInfo.messageCount
             const needToSyncCount = Math.max(0, totalMessageCount - alreadySyncedCount)
 
             logger.withFields({
@@ -161,7 +161,7 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
             }).verbose('Incremental sync calculation')
 
             // Create task for manual progress management
-            const task = createTask('takeout', { chatIds: [chatId], chatId, chatName: stats?.chatName }, emitter)
+            const task = createTask('takeout', { chatIds: [chatId], chatId, chatName: chatInfo?.chatName }, emitter)
             activeTasks.set(task.taskId, task)
             task.updateProgress(0, 'Starting incremental sync')
 
@@ -169,13 +169,13 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
 
             // Phase 1: Backward fill - sync messages after latest_message_id (newer messages)
             // For getting newer messages, we need to start from offsetId=0 (newest) and use minId filter
-            logger.withFields({ chatId, mode: 'incremental-backward', minId: stats.latestMessageId }).verbose('Starting backward fill')
+            logger.withFields({ chatId, mode: 'incremental-backward', minId: chatInfo.latestMessageId }).verbose('Starting backward fill')
             const backwardOpts = {
               pagination: {
                 ...pagination,
                 offset: 0, // Start from the newest message
               },
-              minId: stats.latestMessageId, // Filter: only get messages > latestMessageId
+              minId: chatInfo.latestMessageId, // Filter: only get messages > latestMessageId
               maxId: 0,
               expectedCount: needToSyncCount, // This is the calculated number of messages that need to be synced for accurate progress tracking
               disableAutoProgress: true, // Disable auto progress to prevent reset between phases
@@ -191,7 +191,7 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
               }
 
               // Skip the latestMessageId itself (we already have it)
-              if (message.id === stats.latestMessageId) {
+              if (message.id === chatInfo.latestMessageId) {
                 continue
               }
 
@@ -226,11 +226,11 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
 
             // Phase 2: Forward fill - sync messages before first_message_id (older messages)
             // Start from the first synced message and go backwards (towards message ID 1)
-            logger.withFields({ chatId, mode: 'incremental-forward', startFrom: stats.firstMessageId }).verbose('Starting forward fill')
+            logger.withFields({ chatId, mode: 'incremental-forward', startFrom: chatInfo.firstMessageId }).verbose('Starting forward fill')
             const forwardOpts = {
               pagination: {
                 ...pagination,
-                offset: stats.firstMessageId, // Start from first synced message
+                offset: chatInfo.firstMessageId, // Start from first synced message
               },
               minId: 0, // No lower limit
               maxId: 0, // Will fetch older messages from offsetId

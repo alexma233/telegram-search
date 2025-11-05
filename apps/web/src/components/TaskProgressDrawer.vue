@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import type { CoreTask } from '@tg-search/core'
-
 import { getErrorMessage, useBridgeStore, useChatStore, useSyncTaskStore } from '@tg-search/client'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
@@ -23,6 +21,9 @@ const chatStore = useChatStore()
 const syncTaskStore = useSyncTaskStore()
 const { activeTasks, completedTasks, failedTasks } = storeToRefs(syncTaskStore)
 
+// Type alias for task (can be from server without methods)
+type TaskType = (typeof activeTasks.value)[0]
+
 const isOpen = computed({
   get: () => props.modelValue,
   set: value => emit('update:modelValue', value),
@@ -38,39 +39,42 @@ const allTasks = computed(() => {
 })
 
 // Get chat name from chat ID
-function getChatName(task: CoreTask<'takeout'>) {
+function getChatName(task: (typeof activeTasks.value)[0]) {
   if (task.metadata.chatName) {
     return task.metadata.chatName
   }
   if (task.metadata.chatId) {
     const chat = chatStore.getChat(task.metadata.chatId)
-    return chat?.name || task.metadata.chatId
+    if (chat?.name) {
+      return chat.name
+    }
+    return t('taskDrawer.unknownChat', { chatId: task.metadata.chatId })
   }
-  return task.metadata.chatIds?.[0] || 'Unknown'
+  return t('taskDrawer.unknownChat', { chatId: task.metadata.chatIds?.[0] || 'Unknown' })
 }
 
 // Check if task is active (in progress)
-function isTaskActive(task: CoreTask<'takeout'>) {
+function isTaskActive(task: TaskType) {
   return task.progress >= 0 && task.progress < 100 && !task.lastError
 }
 
 // Check if task is completed
-function isTaskCompleted(task: CoreTask<'takeout'>) {
+function isTaskCompleted(task: TaskType) {
   return task.progress === 100
 }
 
 // Check if task is failed
-function isTaskFailed(task: CoreTask<'takeout'>) {
+function isTaskFailed(task: TaskType) {
   return !!task.lastError && task.lastError !== 'Task aborted'
 }
 
 // Check if task was cancelled
-function isTaskCancelled(task: CoreTask<'takeout'>) {
+function isTaskCancelled(task: TaskType) {
   return task.lastError === 'Task aborted'
 }
 
 // Get localized error message
-function getTaskErrorMessage(task: CoreTask<'takeout'>) {
+function getTaskErrorMessage(task: TaskType) {
   if (!task.rawError) {
     return task.lastError
   }
@@ -78,7 +82,7 @@ function getTaskErrorMessage(task: CoreTask<'takeout'>) {
 }
 
 // Get localized task message
-function getLocalizedTaskMessage(task: CoreTask<'takeout'>) {
+function getLocalizedTaskMessage(task: TaskType) {
   const msg = task.lastMessage || ''
   if (!msg)
     return ''
