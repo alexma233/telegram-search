@@ -18,4 +18,13 @@ export function registerTakeoutEventHandlers(
       }, 3000) // Keep completed/cancelled tasks visible for 3 seconds
     }
   })
+
+  registerEventHandler('takeout:task:list:data', (data) => {
+    const store = useSyncTaskStore()
+    
+    // Restore tasks from server
+    data.tasks.forEach((task) => {
+      store.setTask(task as any)
+    })
+  })
 }

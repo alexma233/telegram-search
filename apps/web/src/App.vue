@@ -13,7 +13,12 @@ import { usePWAStore } from './stores/pwa'
 const settings = storeToRefs(useSettingsStore())
 
 onMounted(async () => {
-  await useBridgeStore().init()
+  const bridgeStore = useBridgeStore()
+  await bridgeStore.init()
+  
+  // Request current task list from server (for task restoration in server mode)
+  bridgeStore.sendEvent('takeout:task:list')
+  
   useSettingsStore().init()
   useAuthStore().init()
   usePWAStore().init()

@@ -2,6 +2,7 @@ import type { Api } from 'telegram'
 
 import type { CoreContext } from '../context'
 import type { TakeoutService } from '../services'
+import type { CoreTaskData } from '../types/task'
 
 import { useLogger } from '@guiiai/logg'
 import { usePagination } from '@tg-search/common'
@@ -297,6 +298,12 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
       else {
         logger.withFields({ taskId }).warn('Task not found for abort')
       }
+    })
+
+    emitter.on('takeout:task:list', () => {
+      logger.verbose('Listing active tasks')
+      const tasks = Array.from(activeTasks.values()).map(task => task.toJSON()) as Array<Omit<CoreTaskData<'takeout'>, 'abortController'>>
+      emitter.emit('takeout:task:list:data', { tasks })
     })
   }
 }

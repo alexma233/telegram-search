@@ -4,7 +4,7 @@ import type { Api } from 'telegram'
 
 import type { CoreDialog } from './dialog'
 import type { CoreMessage } from './message'
-import type { CoreTask } from './task'
+import type { CoreTask, CoreTaskData } from './task'
 
 // ============================================================================
 // Instance Events
@@ -190,10 +190,12 @@ export interface StorageMessageContextParams {
 export interface TakeoutEventToCore {
   'takeout:run': (data: { chatIds: string[], increase?: boolean }) => void
   'takeout:task:abort': (data: { taskId: string }) => void
+  'takeout:task:list': () => void
 }
 
 export interface TakeoutEventFromCore {
   'takeout:task:progress': (data: CoreTask<'takeout'>) => void
+  'takeout:task:list:data': (data: { tasks: Array<Omit<CoreTaskData<'takeout'>, 'abortController'>> }) => void
 }
 
 export interface TakeoutOpts {
