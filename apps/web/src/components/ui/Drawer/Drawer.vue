@@ -20,7 +20,7 @@ const emit = defineEmits<{
 
 const isOpen = computed({
   get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value),
+  set: value => emit('update:modelValue', value),
 })
 
 const transformClass = computed(() => {
@@ -50,6 +50,8 @@ const positionClass = computed(() => {
       return 'inset-x-0 top-0'
     case 'bottom':
       return 'inset-x-0 bottom-0'
+    default:
+      return 'inset-y-0 right-0'
   }
 })
 
@@ -88,7 +90,7 @@ function closeDrawer() {
   <div
     :class="[transformClass, positionClass]"
     :style="sizeStyle"
-    class="fixed z-50 bg-card shadow-xl border-l flex flex-col"
+    class="fixed z-50 flex flex-col border-l bg-card shadow-xl"
   >
     <slot />
   </div>

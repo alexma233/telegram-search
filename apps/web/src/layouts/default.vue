@@ -33,7 +33,7 @@ const searchParams = ref('')
 // Task drawer state
 const taskDrawerOpen = ref(false)
 const syncTaskStore = useSyncTaskStore()
-const { hasActiveTask, activeTasks } = storeToRefs(syncTaskStore)
+const { hasActiveTask } = storeToRefs(syncTaskStore)
 
 // --- Build info using unplugin-info ---
 const buildVersionLabel = computed(() => {
@@ -310,7 +310,7 @@ function handleAvatarClick() {
               <!-- Active task indicator badge -->
               <div
                 v-if="hasActiveTask"
-                class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-card"
+                class="absolute h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-card -right-0.5 -top-0.5"
               >
                 <div class="h-full w-full animate-ping rounded-full bg-primary opacity-75" />
               </div>

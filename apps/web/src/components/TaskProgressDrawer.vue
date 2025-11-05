@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { getErrorMessage, useBridgeStore, useChatStore, useSyncTaskStore } from '@tg-search/client'
 import type { CoreTask } from '@tg-search/core'
+
+import { getErrorMessage, useBridgeStore, useChatStore, useSyncTaskStore } from '@tg-search/client'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -9,24 +10,22 @@ import { Button } from './ui/Button'
 import { Drawer } from './ui/Drawer'
 import { Progress } from './ui/Progress'
 
+const props = defineProps<{
+  modelValue: boolean
+}>()
+const emit = defineEmits<{
+  'update:modelValue': [value: boolean]
+}>()
 const { t } = useI18n()
 const websocketStore = useBridgeStore()
 const chatStore = useChatStore()
 
 const syncTaskStore = useSyncTaskStore()
-const { activeTasks, completedTasks, failedTasks, hasActiveTask } = storeToRefs(syncTaskStore)
-
-const props = defineProps<{
-  modelValue: boolean
-}>()
-
-const emit = defineEmits<{
-  'update:modelValue': [value: boolean]
-}>()
+const { activeTasks, completedTasks, failedTasks } = storeToRefs(syncTaskStore)
 
 const isOpen = computed({
   get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value),
+  set: value => emit('update:modelValue', value),
 })
 
 // All tasks to display (active, completed recent, and failed)
@@ -159,9 +158,11 @@ function clearAllCompleted() {
     <!-- Content -->
     <div class="min-h-0 flex-1 overflow-y-auto p-4">
       <!-- No tasks message -->
-      <div v-if="allTasks.length === 0" class="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
+      <div v-if="allTasks.length === 0" class="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground">
         <div class="i-lucide-inbox h-12 w-12 opacity-20" />
-        <p class="text-sm">{{ t('taskDrawer.noTasks') }}</p>
+        <p class="text-sm">
+          {{ t('taskDrawer.noTasks') }}
+        </p>
       </div>
 
       <!-- Task list -->
@@ -178,7 +179,7 @@ function clearAllCompleted() {
           }"
         >
           <!-- Task header -->
-          <div class="flex items-start gap-3 mb-3">
+          <div class="mb-3 flex items-start gap-3">
             <div
               class="h-10 w-10 flex flex-shrink-0 items-center justify-center rounded-full"
               :class="{
@@ -208,7 +209,7 @@ function clearAllCompleted() {
 
             <div class="min-w-0 flex-1">
               <!-- Chat name -->
-              <div class="truncate text-sm font-semibold text-foreground">
+              <div class="truncate text-sm text-foreground font-semibold">
                 {{ getChatName(task) }}
               </div>
 

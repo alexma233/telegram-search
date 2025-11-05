@@ -7,10 +7,10 @@ export function registerTakeoutEventHandlers(
 ) {
   registerEventHandler('takeout:task:progress', (data) => {
     const store = useSyncTaskStore()
-    
+
     // Update the task in the store
     store.setTask(data)
-    
+
     // Auto-remove completed or cancelled tasks after a delay
     if (data.progress === 100 || (data.lastError === 'Task aborted')) {
       setTimeout(() => {
@@ -21,7 +21,7 @@ export function registerTakeoutEventHandlers(
 
   registerEventHandler('takeout:task:list:data', (data) => {
     const store = useSyncTaskStore()
-    
+
     // Restore tasks from server
     data.tasks.forEach((task) => {
       store.setTask(task as any)
