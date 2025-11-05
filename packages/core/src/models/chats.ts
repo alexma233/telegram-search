@@ -16,6 +16,17 @@ export async function fetchChats() {
   )
 }
 
+export async function fetchChatById(chatId: string) {
+  return withDb(db => db
+    .select()
+    .from(joinedChatsTable)
+    .where(
+      sql`${joinedChatsTable.platform} = 'telegram' AND ${joinedChatsTable.chat_id} = ${chatId}`,
+    )
+    .limit(1),
+  )
+}
+
 export async function recordChats(chats: CoreDialog[]) {
   // TODO: better way to do this?
   return withDb(async db => db

@@ -107,6 +107,7 @@
   },
   "sync": {
     "cancel": "取消",
+    "cancelled": "已取消",
     "dismiss": "关闭",
     "incrementalSync": "增量同步",
     "noInProgressTask": "没有进行中的任务",
@@ -130,6 +131,11 @@
     "startingIncrementalSync": "开始增量同步",
     "incrementalSyncCompleted": "增量同步完成",
     "processedMessages": "已处理 {processed}/{total} 条消息"
+  },
+  "taskDrawer": {
+    "title": "后台任务",
+    "noTasks": "没有后台任务",
+    "clearAll": "清空全部"
   },
   "virtualMessageList": {
     "scrolling": "加载中"

@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import type { ChatGroup } from '@tg-search/client'
 
-import { useBridgeStore, useChatStore, useSettingsStore } from '@tg-search/client'
+import { useBridgeStore, useChatStore, useSettingsStore, useSyncTaskStore } from '@tg-search/client'
 import { breakpointsTailwind, useBreakpoints, useDark } from '@vueuse/core'
 import { abbreviatedSha as gitShortSha } from '~build/git'
 import { version as pkgVersion } from '~build/package'
@@ -14,6 +14,7 @@ import { RouterView, useRoute, useRouter } from 'vue-router'
 
 import LanguageSelector from '../components/layout/LanguageSelector.vue'
 import SidebarSelector from '../components/layout/SidebarSelector.vue'
+import TaskProgressDrawer from '../components/TaskProgressDrawer.vue'
 import Avatar from '../components/ui/Avatar.vue'
 import { Button } from '../components/ui/Button'
 
@@ -28,6 +29,11 @@ const router = useRouter()
 const { t } = useI18n()
 
 const searchParams = ref('')
+
+// Task drawer state
+const taskDrawerOpen = ref(false)
+const syncTaskStore = useSyncTaskStore()
+const { hasActiveTask, activeTasks } = storeToRefs(syncTaskStore)
 
 // --- Build info using unplugin-info ---
 const buildVersionLabel = computed(() => {
@@ -291,6 +297,25 @@ function handleAvatarClick() {
 
           <!-- Control buttons -->
           <div class="flex flex-shrink-0 items-center gap-1">
+            <!-- Task progress button -->
+            <div class="relative">
+              <Button
+                icon="i-lucide-list-checks"
+                class="h-8 w-8 rounded-md p-0"
+                variant="ghost"
+                size="sm"
+                :title="t('taskDrawer.title')"
+                @click="taskDrawerOpen = true"
+              />
+              <!-- Active task indicator badge -->
+              <div
+                v-if="hasActiveTask"
+                class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-card"
+              >
+                <div class="h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+              </div>
+            </div>
+
             <Button
               :icon="isDark ? 'i-lucide-sun' : 'i-lucide-moon'"
               class="h-8 w-8 rounded-md p-0"
@@ -322,5 +347,8 @@ function handleAvatarClick() {
         >{{ buildTimeLabel }}</span>
       </div>
     </div>
+
+    <!-- Task Progress Drawer -->
+    <TaskProgressDrawer v-model="taskDrawerOpen" />
   </div>
 </template>

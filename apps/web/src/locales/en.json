@@ -107,6 +107,7 @@
   },
   "sync": {
     "cancel": "Cancel",
+    "cancelled": "Cancelled",
     "dismiss": "Dismiss",
     "incrementalSync": "Incremental Sync",
     "noInProgressTask": "No task in progress",
@@ -130,6 +131,11 @@
     "startingIncrementalSync": "Starting incremental sync",
     "incrementalSyncCompleted": "Incremental sync completed",
     "processedMessages": "Processed {processed}/{total} messages"
+  },
+  "taskDrawer": {
+    "title": "Background Tasks",
+    "noTasks": "No background tasks",
+    "clearAll": "Clear All"
   },
   "virtualMessageList": {
     "scrolling": "Scrolling..."

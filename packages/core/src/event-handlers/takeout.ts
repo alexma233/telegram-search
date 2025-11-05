@@ -7,7 +7,7 @@ import { useLogger } from '@guiiai/logg'
 import { usePagination } from '@tg-search/common'
 
 import { MESSAGE_PROCESS_BATCH_SIZE } from '../constants'
-import { getChatMessageStatsByChatId } from '../models'
+import { fetchChatById, getChatMessageStatsByChatId } from '../models'
 import { createTask } from '../utils/task'
 
 export function registerTakeoutEventHandlers(ctx: CoreContext) {
@@ -23,11 +23,14 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
       const pagination = usePagination()
 
       // Get chat message stats for incremental sync
-      const increaseOptions: { chatId: string, firstMessageId: number, latestMessageId: number, messageCount: number }[] = await Promise.all(
+      const increaseOptions: { chatId: string, chatName?: string, firstMessageId: number, latestMessageId: number, messageCount: number }[] = await Promise.all(
         chatIds.map(async (chatId) => {
           const stats = (await getChatMessageStatsByChatId(chatId))?.unwrap()
+          const chatData = (await fetchChatById(chatId))?.unwrap()
+          const chatName = chatData?.[0]?.chat_name
           return {
             chatId,
+            chatName,
             firstMessageId: stats?.first_message_id ?? 0, // First synced message ID
             latestMessageId: stats?.latest_message_id ?? 0, // Latest synced message ID
             messageCount: stats?.message_count ?? 0, // Number of messages already in DB
@@ -47,7 +50,7 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
           logger.withFields({ chatId, mode: 'full' }).verbose('Starting full sync')
 
           // Create task for full sync
-          const task = createTask('takeout', { chatIds: [chatId] }, emitter)
+          const task = createTask('takeout', { chatIds: [chatId], chatId, chatName: stats?.chatName }, emitter)
           activeTasks.set(task.taskId, task)
 
           const opts = {
@@ -97,7 +100,7 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
             logger.withFields({ chatId }).warn('No existing messages found, switching to full sync')
 
             // Create task for fallback full sync
-            const task = createTask('takeout', { chatIds: [chatId] }, emitter)
+            const task = createTask('takeout', { chatIds: [chatId], chatId, chatName: stats?.chatName }, emitter)
             activeTasks.set(task.taskId, task)
 
             const opts = {
@@ -157,7 +160,7 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
             }).verbose('Incremental sync calculation')
 
             // Create task for manual progress management
-            const task = createTask('takeout', { chatIds: [chatId] }, emitter)
+            const task = createTask('takeout', { chatIds: [chatId], chatId, chatName: stats?.chatName }, emitter)
             activeTasks.set(task.taskId, task)
             task.updateProgress(0, 'Starting incremental sync')
 
