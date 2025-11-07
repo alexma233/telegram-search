@@ -167,7 +167,7 @@ export function setupWsRoutes(app: App) {
     }
   }, 15 * 60 * 1000) // Run cleanup every 15 minutes
 
-  // Cleanup interval on process exit to prevent leak (registered only once)
+  // Register cleanup on process signals (using .once to prevent duplicate handlers if this function is somehow called multiple times)
   const clearCleanupInterval = () => clearInterval(cleanupInterval)
   process.once('SIGINT', clearCleanupInterval)
   process.once('SIGTERM', clearCleanupInterval)
