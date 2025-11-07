@@ -201,100 +201,103 @@ Parameters:
     // Track tool call start times
     const toolCallStartTimes = new Map<string, number>()
 
-    const result = await generateText({
-      baseURL: llmConfig.apiBase,
-      model: llmConfig.model,
-      apiKey: llmConfig.apiKey,
-      messages,
-      tools,
-      temperature: llmConfig.temperature ?? 0.7,
-      maxSteps: 5, // Allow up to 5 tool calling steps
-      abortSignal: abortController.signal,
-      onEvent: (event: any) => {
-        // Log all events for debugging
-        if (event.type === 'tool-call') {
-          const startTime = Date.now()
-          toolCallStartTimes.set(event.toolCall.id, startTime)
+    try {
+      const result = await generateText({
+        baseURL: llmConfig.apiBase,
+        model: llmConfig.model,
+        apiKey: llmConfig.apiKey,
+        messages,
+        tools,
+        temperature: llmConfig.temperature ?? 0.7,
+        maxSteps: 5, // Allow up to 5 tool calling steps
+        abortSignal: abortController.signal,
+        onEvent: (event: any) => {
+          // Log all events for debugging
+          if (event.type === 'tool-call') {
+            const startTime = Date.now()
+            toolCallStartTimes.set(event.toolCall.id, startTime)
 
-          logger.withFields({
-            toolName: event.toolCall.name,
-            arguments: event.toolCall.arguments,
-          }).log('Tool call initiated')
-
-          onToolCall({
-            name: event.toolCall.name,
-            description: tools.find(t => t.function.name === event.toolCall.name)?.function.description || '',
-            input: event.toolCall.arguments,
-            output: null,
-            timestamp: startTime,
-          })
-        }
-        else if (event.type === 'tool-result') {
-          const startTime = toolCallStartTimes.get(event.toolResult.id) || Date.now()
-          const duration = Date.now() - startTime
-
-          logger.withFields({
-            toolName: event.toolResult.name,
-            duration,
-            resultPreview: event.toolResult.result?.substring(0, 200),
-          }).log('Tool result received')
-
-          onToolResult(event.toolResult.name, event.toolResult.result, duration)
-        }
-        else if (event.type === 'text-delta') {
-          onTextDelta(event.text)
-        }
-        else if (event.type === 'step-start') {
-          logger.withFields({ step: event.step }).log('Step started')
-        }
-        else if (event.type === 'step-finish') {
-          if (event.usage) {
             logger.withFields({
-              step: event.step,
-              promptTokens: event.usage.prompt_tokens,
-              completionTokens: event.usage.completion_tokens,
-              totalTokens: event.usage.total_tokens,
-            }).log('Step finished')
+              toolName: event.toolCall.name,
+              arguments: event.toolCall.arguments,
+            }).log('Tool call initiated')
+
+            onToolCall({
+              name: event.toolCall.name,
+              description: tools.find(t => t.function.name === event.toolCall.name)?.function.description || '',
+              input: event.toolCall.arguments,
+              output: null,
+              timestamp: startTime,
+            })
           }
-          else {
-            logger.withFields({ step: event.step }).log('Step finished')
+          else if (event.type === 'tool-result') {
+            const startTime = toolCallStartTimes.get(event.toolResult.id) || Date.now()
+            const duration = Date.now() - startTime
+
+            logger.withFields({
+              toolName: event.toolResult.name,
+              duration,
+              resultPreview: event.toolResult.result?.substring(0, 200),
+            }).log('Tool result received')
+
+            onToolResult(event.toolResult.name, event.toolResult.result, duration)
           }
-        }
-      },
-    })
+          else if (event.type === 'text-delta') {
+            onTextDelta(event.text)
+          }
+          else if (event.type === 'step-start') {
+            logger.withFields({ step: event.step }).log('Step started')
+          }
+          else if (event.type === 'step-finish') {
+            if (event.usage) {
+              logger.withFields({
+                step: event.step,
+                promptTokens: event.usage.prompt_tokens,
+                completionTokens: event.usage.completion_tokens,
+                totalTokens: event.usage.total_tokens,
+              }).log('Step finished')
+            }
+            else {
+              logger.withFields({ step: event.step }).log('Step finished')
+            }
+          }
+        },
+      })
 
-    clearTimeout(timeoutId)
-
-    logger.withFields({
-      textLength: result.text?.length ?? 0,
-      stepsCount: result.steps.length,
-    }).log('Generation completed')
-
-    // If there's final text and no text-delta events were fired, send the complete text
-    if (result.text) {
-      onTextDelta(result.text)
-    }
-
-    if (result.usage) {
       logger.withFields({
-        promptTokens: result.usage.prompt_tokens,
-        completionTokens: result.usage.completion_tokens,
-        totalTokens: result.usage.total_tokens,
-      }).log('Total usage')
+        textLength: result.text?.length ?? 0,
+        stepsCount: result.steps.length,
+      }).log('Generation completed')
 
-      onComplete({
-        promptTokens: result.usage.prompt_tokens || 0,
-        completionTokens: result.usage.completion_tokens || 0,
-        totalTokens: result.usage.total_tokens || 0,
-      })
+      // If there's final text and no text-delta events were fired, send the complete text
+      if (result.text) {
+        onTextDelta(result.text)
+      }
+
+      if (result.usage) {
+        logger.withFields({
+          promptTokens: result.usage.prompt_tokens,
+          completionTokens: result.usage.completion_tokens,
+          totalTokens: result.usage.total_tokens,
+        }).log('Total usage')
+
+        onComplete({
+          promptTokens: result.usage.prompt_tokens || 0,
+          completionTokens: result.usage.completion_tokens || 0,
+          totalTokens: result.usage.total_tokens || 0,
+        })
+      }
+      else {
+        logger.warn('No usage data available')
+        onComplete({
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+        })
+      }
     }
-    else {
-      logger.warn('No usage data available')
-      onComplete({
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-      })
+    finally {
+      clearTimeout(timeoutId)
     }
   }
 

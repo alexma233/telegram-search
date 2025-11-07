@@ -4,6 +4,8 @@ import type { App } from 'h3'
 import type { WsEventToClientData, WsMessageToServer } from './events'
 import type { Peer } from './types'
 
+import process from 'node:process'
+
 import { useLogger } from '@guiiai/logg'
 import { useConfig } from '@tg-search/common'
 import { createCoreInstance } from '@tg-search/core'
@@ -24,6 +26,8 @@ export function setupWsRoutes(app: App) {
   const logger = useLogger('server:ws')
   const clientStatesBySession = new Map<string, ClientState>()
   const eventListenersByPeer = new Map<string, Map<keyof FromCoreEvent, EventListener>>()
+  const sessionLastAccessTime = new Map<string, number>()
+  const peerToSession = new Map<string, string>()
 
   function useSessionId(peer: Peer) {
     const url = new URL(peer.request.url)
@@ -51,6 +55,10 @@ export function setupWsRoutes(app: App) {
 
       state = clientStatesBySession.get(sessionId)!
     }
+
+    // Track session access time and peer mapping
+    sessionLastAccessTime.set(sessionId, Date.now())
+    peerToSession.set(peer.id, sessionId)
 
     return {
       sessionId,
@@ -138,6 +146,29 @@ export function setupWsRoutes(app: App) {
       eventListenersByPeer.get(peer.id)?.forEach((fn, eventName) => {
         state.ctx?.emitter.removeListener(eventName, fn as any)
       })
+      eventListenersByPeer.delete(peer.id)
+      peerToSession.delete(peer.id)
     },
   }))
+
+  // Cleanup stale sessions every 30 minutes
+  const SESSION_TIMEOUT = 30 * 60 * 1000 // 30 minutes
+  const cleanupInterval = setInterval(() => {
+    const now = Date.now()
+    const activeSessions = new Set(peerToSession.values())
+
+    for (const [sessionId, lastAccessTime] of sessionLastAccessTime.entries()) {
+      // Only clean up sessions that are both inactive and not connected to any peer
+      if (now - lastAccessTime > SESSION_TIMEOUT && !activeSessions.has(sessionId)) {
+        logger.withFields({ sessionId }).log('Cleaning up stale session')
+        clientStatesBySession.delete(sessionId)
+        sessionLastAccessTime.delete(sessionId)
+      }
+    }
+  }, 15 * 60 * 1000) // Run cleanup every 15 minutes
+
+  // Cleanup interval on process exit
+  process.on('beforeExit', () => {
+    clearInterval(cleanupInterval)
+  })
 }

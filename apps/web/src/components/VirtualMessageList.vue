@@ -3,7 +3,7 @@ import type { CoreMessage } from '@tg-search/core'
 
 import { useWindowSize } from '@vueuse/core'
 import { VList } from 'virtua/vue'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import MessageBubble from './messages/MessageBubble.vue'
@@ -40,6 +40,14 @@ const containerHeight = computed(() => Math.max(windowHeight.value - 200, 400))
 const isAtTop = ref(false)
 const isAtBottom = ref(true)
 let lastMessageCount = 0
+
+// Cleanup scroll timer on unmount
+onBeforeUnmount(() => {
+  if (scrollTimer) {
+    clearTimeout(scrollTimer)
+    scrollTimer = null
+  }
+})
 
 // Watch for message changes to maintain scroll position
 watch(() => props.messages, async (newMessages, oldMessages) => {

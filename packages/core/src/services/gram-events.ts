@@ -7,16 +7,28 @@ export type GramEventsService = ReturnType<typeof createGramEventsService>
 
 export function createGramEventsService(ctx: CoreContext) {
   const { emitter, getClient } = ctx
+  let eventHandlerCallback: ((event: any) => void) | undefined
 
   function registerGramEvents() {
-    getClient().addEventHandler((event) => {
+    // Define the callback first so we can remove it later
+    eventHandlerCallback = (event) => {
       if (event.message && useConfig().api.telegram.receiveMessage) {
         emitter.emit('gram:message:received', { message: event.message })
       }
-    }, new NewMessage({}))
+    }
+
+    getClient().addEventHandler(eventHandlerCallback, new NewMessage({}))
+  }
+
+  function unregisterGramEvents() {
+    if (eventHandlerCallback) {
+      getClient().removeEventHandler(eventHandlerCallback, new NewMessage({}))
+      eventHandlerCallback = undefined
+    }
   }
 
   return {
     registerGramEvents,
+    unregisterGramEvents,
   }
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onClickOutside } from '@vueuse/core'
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 interface MenuItem {
   label: string
@@ -28,16 +28,24 @@ const menuStyle = computed(() => ({
   top: `${props.y}px`,
 }))
 
+let positionAdjustTimeout: ReturnType<typeof setTimeout> | null = null
+
 onClickOutside(menuRef, () => {
   isOpen.value = false
 })
 
 watch(isOpen, (value) => {
+  // Clear any existing timeout
+  if (positionAdjustTimeout) {
+    clearTimeout(positionAdjustTimeout)
+    positionAdjustTimeout = null
+  }
+
   if (!value)
     return
 
   // Adjust position if menu is off-screen
-  setTimeout(() => {
+  positionAdjustTimeout = setTimeout(() => {
     if (!menuRef.value)
       return
 
@@ -61,6 +69,13 @@ watch(isOpen, (value) => {
       })
     }
   }, 0)
+})
+
+onBeforeUnmount(() => {
+  if (positionAdjustTimeout) {
+    clearTimeout(positionAdjustTimeout)
+    positionAdjustTimeout = null
+  }
 })
 
 function handleItemClick(item: MenuItem) {
