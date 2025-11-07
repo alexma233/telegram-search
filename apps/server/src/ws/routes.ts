@@ -151,7 +151,7 @@ export function setupWsRoutes(app: App) {
     },
   }))
 
-  // Cleanup stale sessions every 30 minutes
+  // Cleanup stale sessions every 15 minutes
   const SESSION_TIMEOUT = 30 * 60 * 1000 // 30 minutes
   const cleanupInterval = setInterval(() => {
     const now = Date.now()
@@ -167,8 +167,8 @@ export function setupWsRoutes(app: App) {
     }
   }, 15 * 60 * 1000) // Run cleanup every 15 minutes
 
-  // Cleanup interval on process exit to prevent leak
+  // Cleanup interval on process exit to prevent leak (registered only once)
   const clearCleanupInterval = () => clearInterval(cleanupInterval)
-  process.on('SIGINT', clearCleanupInterval)
-  process.on('SIGTERM', clearCleanupInterval)
+  process.once('SIGINT', clearCleanupInterval)
+  process.once('SIGTERM', clearCleanupInterval)
 }
