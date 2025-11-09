@@ -29,7 +29,7 @@ export function createTask<T extends CoreTaskType>(
     if (type === 'takeout') {
       emitter.emit('takeout:task:progress', task.toJSON() as any)
     }
-    
+
     // Persist task state to database
     try {
       await saveTask(task.toJSON())

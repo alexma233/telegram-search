@@ -1,13 +1,10 @@
 import type { CoreTaskData, CoreTaskType } from '../types/task'
 
-import { useLogger } from '@guiiai/logg'
 import { Ok } from '@unbird/result'
 import { and, desc, eq, inArray } from 'drizzle-orm'
 
 import { withDb } from '../db'
 import { tasksTable } from '../schemas/tasks'
-
-const logger = useLogger('core:models:tasks')
 
 export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'aborted'
 
@@ -19,7 +16,7 @@ export interface DBTask {
   progress: number
   last_message: string | null
   last_error: string | null
-  metadata: any
+  metadata: unknown
   created_at: number
   updated_at: number
   completed_at: number | null
@@ -73,7 +70,7 @@ export async function getTaskByTaskId(taskId: string) {
       .where(eq(tasksTable.task_id, taskId))
       .limit(1),
   )
-  
+
   const rows = result.expect('Failed to get task by task ID')
   return Ok(rows.length > 0 ? rows[0] as DBTask : null)
 }
@@ -89,7 +86,7 @@ export async function getTasksByType(type: CoreTaskType) {
       .where(eq(tasksTable.type, type))
       .orderBy(desc(tasksTable.created_at)),
   )
-  
+
   const rows = result.expect('Failed to get tasks by type')
   return Ok(rows as DBTask[])
 }
@@ -105,7 +102,7 @@ export async function getTasksByStatus(statuses: TaskStatus[]) {
       .where(inArray(tasksTable.status, statuses))
       .orderBy(desc(tasksTable.created_at)),
   )
-  
+
   const rows = result.expect('Failed to get tasks by status')
   return Ok(rows as DBTask[])
 }
@@ -114,21 +111,21 @@ export async function getTasksByStatus(statuses: TaskStatus[]) {
  * Get resumable tasks (pending or running)
  */
 export async function getResumableTasks(type?: CoreTaskType) {
-  const result = await withDb(async db => {
+  const result = await withDb(async (db) => {
     return db
       .select()
       .from(tasksTable)
       .where(
         type
           ? and(
-            inArray(tasksTable.status, ['pending', 'running']),
-            eq(tasksTable.type, type),
-          )
+              inArray(tasksTable.status, ['pending', 'running']),
+              eq(tasksTable.type, type),
+            )
           : inArray(tasksTable.status, ['pending', 'running']),
       )
       .orderBy(desc(tasksTable.created_at))
   })
-  
+
   const rows = result.expect('Failed to get resumable tasks')
   return Ok(rows as DBTask[])
 }

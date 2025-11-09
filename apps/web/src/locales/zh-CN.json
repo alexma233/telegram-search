@@ -164,6 +164,10 @@
     "initTakeoutSession": "初始化数据导出会话",
     "noInProgressTask": "没有进行中的任务",
     "processedMessages": "已处理 {processed}/{total} 条消息",
+    "progress": "进度",
+    "resume": "恢复",
+    "resumableTasks": "可恢复的任务 ({count})",
+    "resumableTasksHint": "这些任务已中断，可以恢复继续执行",
     "resync": "重新同步",
     "resyncDescription": "清空数据并重新同步所有消息",
     "selectAll": "全选",
@@ -178,7 +182,8 @@
     "syncCompleted": "同步完成",
     "syncFailed": "同步失败",
     "syncPrompt": "同步对话之后才能搜索全部的聊天记录",
-    "syncing": "同步中..."
+    "syncing": "同步中...",
+    "taskForChats": "{count} 个聊天的任务"
   },
   "virtualMessageList": {
     "scrolling": "加载中"

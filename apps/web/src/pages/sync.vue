@@ -27,11 +27,16 @@ const chatsStore = useChatStore()
 const { chats } = storeToRefs(chatsStore)
 
 const syncTaskStore = useSyncTaskStore()
-const { currentTask, currentTaskProgress, increase } = storeToRefs(syncTaskStore)
+const { currentTask, currentTaskProgress, increase, resumableTasks } = storeToRefs(syncTaskStore)
 
 // Default to incremental sync
 if (increase.value === undefined || increase.value === null) {
   increase.value = true
+}
+
+// Load persisted tasks on mount
+if (isLoggedIn.value) {
+  websocketStore.sendEvent('takeout:tasks:load', undefined)
 }
 
 // Task in progress status
@@ -195,6 +200,11 @@ function handleAbort() {
   }
 }
 
+function handleResume(taskId: string) {
+  websocketStore.sendEvent('takeout:task:resume', { taskId })
+  NProgress.start()
+}
+
 watch(currentTaskProgress, (progress) => {
   if (progress === 100) {
     toast.success(t('sync.syncCompleted'))
@@ -330,6 +340,55 @@ watch(currentTaskProgress, (progress) => {
               >
                 {{ t('sync.cancel') }}
               </Button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resumable tasks section -->
+        <div
+          v-if="resumableTasks.length > 0 && !isTaskInProgress"
+          class="border border-blue-200/50 rounded-2xl bg-blue-50/30 p-6 shadow-sm dark:border-blue-800/30 dark:bg-blue-950/20"
+        >
+          <div class="space-y-4">
+            <div class="flex items-center gap-3">
+              <div class="h-10 w-10 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/50">
+                <span class="i-lucide-clock h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h3 class="text-sm text-foreground font-semibold">
+                  {{ t('sync.resumableTasks', { count: resumableTasks.length }) }}
+                </h3>
+                <p class="text-xs text-muted-foreground">
+                  {{ t('sync.resumableTasksHint') }}
+                </p>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <div
+                v-for="task in resumableTasks"
+                :key="task.taskId"
+                class="flex items-center justify-between border rounded-lg bg-card p-3"
+              >
+                <div class="flex flex-1 items-center gap-3">
+                  <div class="flex-1">
+                    <div class="text-sm text-foreground font-medium">
+                      {{ t('sync.taskForChats', { count: task.metadata?.chatIds?.length || 0 }) }}
+                    </div>
+                    <div class="text-xs text-muted-foreground">
+                      {{ t('sync.progress') }}: {{ task.progress }}%
+                      <span v-if="task.lastMessage"> • {{ task.lastMessage }}</span>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    icon="i-lucide-play"
+                    @click="handleResume(task.taskId)"
+                  >
+                    {{ t('sync.resume') }}
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

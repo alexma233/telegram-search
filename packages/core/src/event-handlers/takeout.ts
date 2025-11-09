@@ -301,21 +301,21 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
       try {
         const { getResumableTasks } = await import('../models/tasks')
         const result = await getResumableTasks('takeout')
-        
+
         if (!result) {
           logger.warn('Failed to load tasks - no result')
           return
         }
-        
+
         const tasks = result.unwrap()
-        
+
         if (!tasks) {
           logger.warn('Failed to load tasks - no tasks')
           return
         }
-        
+
         logger.withFields({ count: tasks.length }).verbose('Loaded persisted tasks')
-        
+
         // Convert DB tasks to CoreTask format for UI
         const coreTasks = tasks.map(dbTask => ({
           taskId: dbTask.task_id,
@@ -323,11 +323,11 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
           progress: dbTask.progress,
           lastMessage: dbTask.last_message ?? undefined,
           lastError: dbTask.last_error ?? undefined,
-          metadata: dbTask.metadata,
+          metadata: dbTask.metadata as { chatIds: string[] },
           createdAt: new Date(dbTask.created_at),
           updatedAt: new Date(dbTask.updated_at),
         }))
-        
+
         emitter.emit('takeout:tasks:list', { tasks: coreTasks })
       }
       catch (error) {
@@ -337,36 +337,36 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
 
     emitter.on('takeout:task:resume', async ({ taskId }) => {
       logger.withFields({ taskId }).verbose('Resuming takeout task')
-      
+
       try {
         const { getTaskByTaskId } = await import('../models/tasks')
         const result = await getTaskByTaskId(taskId)
-        
+
         if (!result) {
           logger.withFields({ taskId }).warn('Task not found for resume - no result')
           return
         }
-        
+
         const dbTask = result.unwrap()
-        
+
         if (!dbTask) {
           logger.withFields({ taskId }).warn('Task not found for resume')
           return
         }
-        
+
         if (dbTask.type !== 'takeout') {
           logger.withFields({ taskId, type: dbTask.type }).warn('Cannot resume non-takeout task')
           return
         }
-        
+
         // Check if already running
         if (activeTasks.has(taskId)) {
           logger.withFields({ taskId }).warn('Task already running')
           return
         }
-        
+
         logger.withFields({ taskId, metadata: dbTask.metadata }).verbose('Resuming task with metadata')
-        
+
         // Resume by triggering a new sync with the same chats
         // Use incremental sync to continue from where it left off
         const metadata = dbTask.metadata as { chatIds: string[] }

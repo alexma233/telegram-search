@@ -164,6 +164,10 @@
     "initTakeoutSession": "Init takeout session",
     "noInProgressTask": "No task in progress",
     "processedMessages": "Processed {processed}/{total} messages",
+    "progress": "Progress",
+    "resume": "Resume",
+    "resumableTasks": "Resumable tasks ({count})",
+    "resumableTasksHint": "These tasks were interrupted and can be resumed",
     "resync": "Re-sync",
     "resyncDescription": "Clear data and resync all messages",
     "selectAll": "Select All",
@@ -178,7 +182,8 @@
     "syncCompleted": "Sync completed",
     "syncFailed": "Sync failed",
     "syncPrompt": "After a synchronized conversation, you can search all chat records.",
-    "syncing": "Syncing..."
+    "syncing": "Syncing...",
+    "taskForChats": "Task for {count} chat(s)"
   },
   "virtualMessageList": {
     "scrolling": "Loading..."
