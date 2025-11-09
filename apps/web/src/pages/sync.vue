@@ -300,6 +300,9 @@ watch(currentTaskProgress, (progress) => {
               <div class="flex flex-1 flex-col gap-1">
                 <span class="text-base text-foreground font-semibold">
                   {{ currentTask?.lastError ? t('sync.syncFailed') : t('sync.syncing') }}
+                  <span v-if="!currentTask?.lastError && currentTask?.metadata?.chatIds" class="text-sm font-normal text-muted-foreground">
+                    ({{ currentTask.metadata.chatIds.length }} {{ currentTask.metadata.chatIds.length === 1 ? t('sync.chat') : t('sync.chats') }})
+                  </span>
                 </span>
                 <span v-if="currentTask?.lastError" class="text-sm text-destructive">{{ errorMessage }}</span>
                 <span v-else-if="localizedTaskMessage" class="text-sm text-muted-foreground">{{ localizedTaskMessage }}</span>

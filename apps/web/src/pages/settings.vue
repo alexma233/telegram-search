@@ -32,6 +32,10 @@ const isPostgresSelected = computed(() => config.value?.database?.type === 'post
 const hasConnectionUrl = computed(() => !!config.value?.database?.url?.trim())
 const shouldDisableIndividualFields = computed(() => isPostgresSelected.value && hasConnectionUrl.value)
 
+// Computed properties for API key warnings
+const isEmbeddingKeyMissing = computed(() => !config.value?.api?.embedding?.apiKey?.trim())
+const isLlmKeyMissing = computed(() => !config.value?.api?.llm?.apiKey?.trim())
+
 // Message resolvers configuration
 const messageResolvers = [
   { key: 'media' },
@@ -232,6 +236,14 @@ onMounted(() => {
             <h3 class="mb-2 text-lg font-medium">
               {{ t('settings.embedding') }}
             </h3>
+            <div v-if="isEmbeddingKeyMissing" class="mb-4 rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3">
+              <div class="flex items-start gap-2">
+                <div class="i-lucide-alert-triangle mt-0.5 h-4 w-4 shrink-0 text-yellow-600 dark:text-yellow-500" />
+                <p class="text-sm text-yellow-800 dark:text-yellow-300">
+                  {{ t('settings.embeddingApiKeyWarning') || 'Embedding API key is not configured. This is required for message search and semantic features.' }}
+                </p>
+              </div>
+            </div>
             <div class="grid gap-4">
               <div>
                 <label class="block text-sm text-muted-foreground font-medium">Provider</label>
@@ -260,6 +272,7 @@ onMounted(() => {
                   v-model="config.api.embedding.apiKey"
                   type="password"
                   class="mt-1 block w-full border rounded-md bg-background px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  :class="{ 'border-yellow-500 dark:border-yellow-600': isEmbeddingKeyMissing }"
                 >
               </div>
               <div>
@@ -278,6 +291,14 @@ onMounted(() => {
             <h3 class="mb-2 text-lg font-medium">
               {{ t('settings.llm') }}
             </h3>
+            <div v-if="isLlmKeyMissing" class="mb-4 rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3">
+              <div class="flex items-start gap-2">
+                <div class="i-lucide-alert-triangle mt-0.5 h-4 w-4 shrink-0 text-yellow-600 dark:text-yellow-500" />
+                <p class="text-sm text-yellow-800 dark:text-yellow-300">
+                  {{ t('settings.llmApiKeyWarning') || 'LLM API key is not configured. This is required for AI chat features.' }}
+                </p>
+              </div>
+            </div>
             <div class="grid gap-4">
               <div>
                 <label class="block text-sm text-muted-foreground font-medium">{{ t('settings.llmProvider') }}</label>
@@ -303,6 +324,7 @@ onMounted(() => {
                   v-model="config.api.llm.apiKey"
                   type="password"
                   class="mt-1 block w-full border rounded-md bg-background px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  :class="{ 'border-yellow-500 dark:border-yellow-600': isLlmKeyMissing }"
                 >
               </div>
               <div>
