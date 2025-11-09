@@ -3,6 +3,8 @@ import type { CoreTask, CoreTaskData, CoreTasks, CoreTaskType } from '../types/t
 
 import { useLogger } from '@guiiai/logg'
 
+import { saveTask } from '../models/tasks'
+
 /**
  * Create a task that manages its own state
  */
@@ -23,9 +25,17 @@ export function createTask<T extends CoreTaskType>(
 
   let task: CoreTask<T>
 
-  const emitUpdate = () => {
+  const emitUpdate = async () => {
     if (type === 'takeout') {
       emitter.emit('takeout:task:progress', task.toJSON() as any)
+    }
+    
+    // Persist task state to database
+    try {
+      await saveTask(task.toJSON())
+    }
+    catch (error) {
+      useLogger().withError(error).error('Failed to persist task state')
     }
   }
 
@@ -84,6 +94,11 @@ export function createTask<T extends CoreTaskType>(
       }
     },
   }
+
+  // Save initial task state to database
+  saveTask(task.toJSON()).catch((error) => {
+    useLogger().withError(error).error('Failed to persist initial task state')
+  })
 
   return task
 }
