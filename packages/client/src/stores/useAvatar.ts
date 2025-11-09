@@ -27,6 +27,8 @@ export const useAvatarStore = defineStore('avatar', () => {
   const chatAvatars = ref<Map<string, AvatarEntry>>(new Map())
   // Track in-flight prioritized chat avatar fetches to avoid duplicate sends
   const inflightChatFetchIds = ref<Set<string>>(new Set())
+  // Track in-flight user avatar fetches to avoid duplicate sends
+  const inflightUserFetchIds = ref<Set<string>>(new Set())
 
   /**
    * Get cached avatar blob URL for a user.
@@ -129,6 +131,7 @@ export const useAvatarStore = defineStore('avatar', () => {
   /**
    * Ensure a user's avatar is available in cache.
    * If missing, triggers a lazy fetch via core event 'entity:avatar:fetch'.
+   * Deduplicates in-flight requests to avoid concurrent fetches for the same user.
    */
   function ensureUserAvatar(userId: string | number | undefined) {
     if (!userId)
@@ -137,12 +140,27 @@ export const useAvatarStore = defineStore('avatar', () => {
     const existing = userAvatars.value.get(key)
     if (existing && (!existing.expiresAt || Date.now() < existing.expiresAt))
       return
+    // Dedupe: if a fetch is already in-flight for this user, skip
+    if (inflightUserFetchIds.value.has(key))
+      return
     try {
+      inflightUserFetchIds.value.add(key)
       websocketStore.sendEvent('entity:avatar:fetch', { userId: key })
     }
     catch (error) {
       console.warn('[Avatar] ensureUserAvatar sendEvent failed:', error)
+      inflightUserFetchIds.value.delete(key)
     }
+  }
+
+  /**
+   * Mark a user avatar fetch as completed.
+   * Should be called once an 'entity:avatar:data' arrives or on error.
+   */
+  function markUserFetchCompleted(userId: string | number | undefined): void {
+    if (!userId)
+      return
+    inflightUserFetchIds.value.delete(String(userId))
   }
 
   /**
@@ -218,6 +236,7 @@ export const useAvatarStore = defineStore('avatar', () => {
     userAvatars,
     chatAvatars,
     inflightChatFetchIds,
+    inflightUserFetchIds,
     size,
     getUserAvatarUrl,
     getChatAvatarUrl,
@@ -228,6 +247,7 @@ export const useAvatarStore = defineStore('avatar', () => {
     ensureChatAvatar,
     isChatFetchInflight,
     markChatFetchCompleted,
+    markUserFetchCompleted,
     cleanupExpired,
   }
 })

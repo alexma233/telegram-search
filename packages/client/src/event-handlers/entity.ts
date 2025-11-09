@@ -51,6 +51,9 @@ export function registerEntityEventHandlers(
 
     avatarStore.setUserAvatar(data.userId, { blobUrl: url, fileId: data.fileId, mimeType: data.mimeType })
 
+    // Signal completion to clear in-flight flag for this user
+    avatarStore.markUserFetchCompleted(data.userId)
+
     // console.warn('[Avatar] Updated user avatar', { userId: data.userId, fileId: data.fileId })
   })
 }

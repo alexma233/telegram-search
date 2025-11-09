@@ -183,13 +183,26 @@ watch(chats, (list) => {
 /**
  * Prioritize fetching avatars for currently visible chats.
  * - Prefills small set from disk cache
- * - Triggers prioritized network fetch for missing avatars
+ * - Triggers prioritized network fetch for missing avatars with rate limiting
  */
 async function prioritizeVisibleAvatars(list: any[], count = 50) {
   const top = list.slice(0, count)
   await prefillChatAvatarsParallel(top)
-  for (const chat of top) {
-    avatarStore.ensureChatAvatar(chat.id, chat.avatarFileId)
+  
+  // Rate-limit avatar fetches to avoid overwhelming the server
+  // Process in batches with a small delay between each batch
+  const batchSize = 10
+  const delayMs = 100 // 100ms delay between batches
+  
+  for (let i = 0; i < top.length; i += batchSize) {
+    const batch = top.slice(i, i + batchSize)
+    for (const chat of batch) {
+      avatarStore.ensureChatAvatar(chat.id, chat.avatarFileId)
+    }
+    // Add delay between batches to prevent request overload
+    if (i + batchSize < top.length) {
+      await new Promise(resolve => setTimeout(resolve, delayMs))
+    }
   }
 }
 
