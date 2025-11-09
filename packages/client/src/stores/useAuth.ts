@@ -62,8 +62,11 @@ export const useAuthStore = defineStore('session', () => {
     }
 
     function logout() {
-      websocketStore.getActiveSession()!.isConnected = false
-      websocketStore.sendEvent('auth:logout', undefined)
+      const session = websocketStore.getActiveSession()
+      if (session) {
+        session.isConnected = false
+        websocketStore.sendEvent('auth:logout', { phoneNumber: session.phoneNumber })
+      }
       websocketStore.cleanup()
     }
 

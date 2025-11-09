@@ -75,13 +75,17 @@ COPY --from=builder /app/packages/common/src ./packages/common/src
 COPY --from=builder /app/packages/client/src ./packages/client/src
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 
-# Copy nginx config and frontend
-COPY --from=web /etc/nginx/nginx.conf /etc/nginx/nginx.conf
+# Copy nginx config template and frontend
+COPY nginx.conf.template /etc/nginx/nginx.conf.template
 COPY --from=web /usr/share/nginx/html /usr/share/nginx/html
 
 # Copy essential config files
 COPY --from=builder /app/drizzle ./drizzle
 COPY --from=builder /app/config/config.example.yaml ./config/config.example.yaml
+
+# Copy startup script
+COPY scripts/start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 
 # Copy root configs needed at runtime (including pnpm-workspace.yaml for project root detection)
 COPY pnpm-workspace.yaml tsconfig.json drizzle.config.ts ./
@@ -94,9 +98,12 @@ ENV TELEGRAM_API_HASH="d524b414d21f4d37f08684c1df41ac9c"
 ENV EMBEDDING_API_KEY=""
 ENV EMBEDDING_BASE_URL="https://api.openai.com/v1"
 ENV PROXY_URL=""
+ENV BACKEND_HOST="127.0.0.1"
+ENV BACKEND_PORT="3000"
+ENV HOST="0.0.0.0"
 
 # Declare volumes for data persistence
 VOLUME ["/app/config", "/app/data"]
 
-# Start nginx and server
-CMD ["sh", "-c", "nginx && exec node apps/server/dist/app.mjs"]
+# Start using the startup script
+CMD ["/app/start.sh"]

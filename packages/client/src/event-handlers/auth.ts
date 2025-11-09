@@ -20,6 +20,16 @@ export function registerBasicEventHandlers(
     useBridgeStore().getActiveSession()!.isConnected = true
   })
 
+  registerEventHandler('auth:disconnected', () => {
+    const session = useBridgeStore().getActiveSession()
+    if (session) {
+      session.isConnected = false
+      session.phoneNumber = undefined
+      session.me = undefined
+    }
+    toast.success('Logged out successfully')
+  })
+
   registerEventHandler('auth:error', ({ error }) => {
     // TODO better toast error message
     toast.error(JSON.stringify(error))

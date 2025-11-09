@@ -87,9 +87,10 @@ async function bootstrap() {
   const listener = toNodeListener(app)
 
   const port = process.env.PORT ? Number(process.env.PORT) : 3000
-  const server = await listen(listener, { port, ws: app.websocket as CrossWSOptions })
+  const host = process.env.HOST || '0.0.0.0'
+  const server = await listen(listener, { port, host, ws: app.websocket as CrossWSOptions })
 
-  logger.log('Server started')
+  logger.withFields({ host, port }).log('Server started')
 
   const shutdown = () => {
     logger.log('Shutting down server gracefully...')

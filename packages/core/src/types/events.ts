@@ -24,7 +24,7 @@ export interface ClientInstanceEventFromCore {
 
 export interface ConnectionEventToCore {
   'auth:login': (data: { phoneNumber: string }) => void
-  'auth:logout': () => void
+  'auth:logout': (data?: { phoneNumber?: string }) => void
   'auth:code': (data: { code: string }) => void
   'auth:password': (data: { password: string }) => void
 }
@@ -33,6 +33,7 @@ export interface ConnectionEventFromCore {
   'auth:code:needed': () => void
   'auth:password:needed': () => void
   'auth:connected': () => void
+  'auth:disconnected': () => void
   'auth:error': (data: { error: unknown }) => void
 }
 

@@ -22,7 +22,7 @@ export function createConfigService(ctx: CoreContext) {
     if (!validatedConfig.success) {
       throw new Error('Invalid config')
     }
-    updateConfigCommon(validatedConfig.output)
+    await updateConfigCommon(validatedConfig.output)
 
     emitter.emit('config:data', { config: validatedConfig.output })
   }

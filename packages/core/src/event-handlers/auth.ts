@@ -20,12 +20,22 @@ export function registerBasicEventHandlers(ctx: CoreContext) {
       logger.verbose('Logged in to Telegram')
     })
 
-    emitter.on('auth:logout', async () => {
-      logger.verbose('Logged out from Telegram')
+    emitter.on('auth:logout', async (data) => {
+      const phoneNumber = data?.phoneNumber
+      logger.withFields({ phoneNumber }).verbose('Logging out from Telegram')
       const client = ctx.getClient()
       if (client) {
         await configuredConnectionService.logout(client)
+        ctx.setClient(undefined)
       }
+      
+      // Clean the session file if phoneNumber is provided
+      if (phoneNumber) {
+        await sessionService.cleanSession(phoneNumber)
+      }
+      
+      emitter.emit('auth:disconnected')
+      logger.verbose('Logged out from Telegram successfully')
     })
   }
 }
