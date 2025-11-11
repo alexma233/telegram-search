@@ -127,6 +127,13 @@
       "when": 1762892291475,
       "tag": "0017_true_stephen_strange",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1762892820204,
+      "tag": "0018_small_doctor_faustus",
+      "breakpoints": true
     }
   ]
 }

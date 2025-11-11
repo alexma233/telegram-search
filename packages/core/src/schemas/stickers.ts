@@ -25,4 +25,5 @@ export const stickersTable = pgTable('stickers', {
   index('stickers_description_vector_1536_index').using('hnsw', table.description_vector_1536.op('vector_cosine_ops')),
   index('stickers_description_vector_1024_index').using('hnsw', table.description_vector_1024.op('vector_cosine_ops')),
   index('stickers_description_vector_768_index').using('hnsw', table.description_vector_768.op('vector_cosine_ops')),
+  index('stickers_owner_user_id_index').on(table.owner_user_id),
 ])

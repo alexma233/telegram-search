@@ -25,4 +25,5 @@ export const photosTable = pgTable('photos', {
   index('photos_description_vector_1024_index').using('hnsw', table.description_vector_1024.op('vector_cosine_ops')),
   index('photos_description_vector_768_index').using('hnsw', table.description_vector_768.op('vector_cosine_ops')),
   index('photos_message_id_index').on(table.message_id),
+  index('photos_owner_user_id_index').on(table.owner_user_id),
 ])

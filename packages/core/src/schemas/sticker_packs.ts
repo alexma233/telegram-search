@@ -1,6 +1,6 @@
 // https://github.com/moeru-ai/airi/blob/main/services/telegram-bot/src/db/schema.ts
 
-import { bigint, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { bigint, index, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
 export const stickerPacksTable = pgTable('sticker_packs', {
   id: uuid().primaryKey().defaultRandom(),
@@ -13,4 +13,5 @@ export const stickerPacksTable = pgTable('sticker_packs', {
   owner_user_id: text(),
 }, table => [
   uniqueIndex('sticker_packs_platform_platform_id_unique_index').on(table.platform, table.platform_id),
+  index('sticker_packs_owner_user_id_index').on(table.owner_user_id),
 ])

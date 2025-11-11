@@ -32,4 +32,5 @@ export const chatMessagesTable = pgTable('chat_messages', {
   index('chat_messages_content_vector_768_index').using('hnsw', table.content_vector_768.op('vector_cosine_ops')),
   index('jieba_tokens_index').using('gin', table.jieba_tokens.op('jsonb_path_ops')),
   index('chat_messages_from_user_uuid_index').on(table.from_user_uuid),
+  index('chat_messages_owner_user_id_index').on(table.owner_user_id),
 ])
