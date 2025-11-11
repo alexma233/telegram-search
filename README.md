@@ -194,6 +194,11 @@ This project is a **monorepo** with event-driven architecture:
 
 📖 **Full architecture details, event flow, and diagrams:** [CONTRIBUTING.md](./CONTRIBUTING.md)
 
+📊 **Observability & Monitoring:** [OBSERVABILITY.md](./docs/OBSERVABILITY.md) | [中文版](./docs/OBSERVABILITY_CN.md)
+- Prometheus metrics for runtime & business monitoring
+- OpenTelemetry support for distributed tracing
+- Track takeout tasks, messages, WebSocket connections, and more
+
 ## 🚨 Warnings
 > [!WARNING]
 > We have not issued any virtual currency, please do not be deceived.

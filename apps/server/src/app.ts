@@ -9,7 +9,7 @@ import { initDrizzle } from '@tg-search/core'
 import { createApp, createRouter, defineEventHandler, toNodeListener } from 'h3'
 import { listen } from 'listhen'
 
-import { getMetrics, initMetrics } from './observability/metrics'
+import { getMetrics, httpRequestDuration, httpRequests, initMetrics } from './observability/metrics'
 import { initOtel, shutdownOtel } from './observability/otel'
 import { setupWsRoutes } from './ws/routes'
 
@@ -45,9 +45,8 @@ function configureServer(logger: ReturnType<typeof useLogger>, flags: RuntimeFla
 
       if (startTime) {
         const duration = (Date.now() - startTime) / 1000 // Convert to seconds
-        const { httpRequestDuration, httpRequests } = require('./observability/metrics')
         httpRequestDuration.observe({ method, path }, duration)
-        
+
         // Get status from response
         const status = event.node.res.statusCode || 200
         httpRequests.inc({ method, path, status: String(status) })
@@ -65,7 +64,6 @@ function configureServer(logger: ReturnType<typeof useLogger>, flags: RuntimeFla
       const startTime = (event.node.req as any)._startTime
       if (startTime) {
         const duration = (Date.now() - startTime) / 1000
-        const { httpRequestDuration, httpRequests } = require('./observability/metrics')
         httpRequestDuration.observe({ method, path }, duration)
         httpRequests.inc({ method, path, status: String(status) })
       }
@@ -145,12 +143,12 @@ async function bootstrap() {
 
   const shutdown = async () => {
     logger.log('Shutting down server gracefully...')
-    
+
     // Shutdown OpenTelemetry if it was initialized
     if (otelEnabled) {
       await shutdownOtel()
     }
-    
+
     server.close()
     process.exit(0)
   }
