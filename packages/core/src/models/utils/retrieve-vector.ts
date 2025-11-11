@@ -56,6 +56,7 @@ export async function retrieveVector(
       deleted_at: chatMessagesTable.deleted_at,
       platform_timestamp: chatMessagesTable.platform_timestamp,
       jieba_tokens: chatMessagesTable.jieba_tokens,
+      owner_user_id: chatMessagesTable.owner_user_id,
       similarity: sql<number>`${similarity} AS "similarity"`,
       time_relevance: sql<number>`${timeRelevance} AS "time_relevance"`,
       combined_score: sql<number>`${combinedScore} AS "combined_score"`,

@@ -12,6 +12,7 @@ export const joinedChatsTable = pgTable('joined_chats', () => {
     dialog_date: bigint({ mode: 'number' }).notNull().default(0),
     created_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),
     updated_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),
+    owner_user_id: text(),
   }
 }, (table) => {
   return [

@@ -61,6 +61,7 @@ export async function retrieveJieba(
       deleted_at: chatMessagesTable.deleted_at,
       platform_timestamp: chatMessagesTable.platform_timestamp,
       jieba_tokens: chatMessagesTable.jieba_tokens,
+      owner_user_id: chatMessagesTable.owner_user_id,
       chat_name: joinedChatsTable.chat_name,
     })
     .from(chatMessagesTable)

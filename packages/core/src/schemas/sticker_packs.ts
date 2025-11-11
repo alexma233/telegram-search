@@ -10,6 +10,7 @@ export const stickerPacksTable = pgTable('sticker_packs', {
   description: text().notNull().default(''),
   created_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),
   updated_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),
+  owner_user_id: text(),
 }, table => [
   uniqueIndex('sticker_packs_platform_platform_id_unique_index').on(table.platform, table.platform_id),
 ])
