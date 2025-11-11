@@ -41,6 +41,8 @@ import { useConfig } from '@tg-search/common'
 import { createCoreInstance, destroyCoreInstance } from '@tg-search/core'
 import { defineWebSocketHandler } from 'h3'
 
+import { wsConnectionsActive, wsConnectionsTotal, wsMessages } from '../observability/metrics'
+import { registerTaskMetrics } from '../observability/task-metrics'
 import { sendWsEvent } from './events'
 
 /**
@@ -146,6 +148,9 @@ export function setupWsRoutes(app: App) {
         lastActive: Date.now(),
       }
 
+      // Register task metrics for this account
+      registerTaskMetrics(ctx)
+
       accountStates.set(accountId, account)
     }
 
@@ -181,6 +186,10 @@ export function setupWsRoutes(app: App) {
       account.activePeers.add(peer.id)
       peerObjects.set(peer.id, peer)
 
+      // Update metrics
+      wsConnectionsTotal.inc({ status: 'opened' })
+      wsConnectionsActive.inc()
+
       logger.withFields({ accountId, activePeers: account.activePeers.size }).log('Peer added to account')
 
       sendWsEvent(peer, 'server:connected', { sessionId: accountId, connected: account.isConnected })
@@ -200,6 +209,9 @@ export function setupWsRoutes(app: App) {
       }
 
       const event = message.json<WsMessageToServer>()
+
+      // Track incoming WebSocket message
+      wsMessages.inc({ direction: 'inbound', event_type: event.type })
 
       try {
         if (event.type === 'server:event:register') {
@@ -312,6 +324,10 @@ export function setupWsRoutes(app: App) {
 
     async close(peer) {
       logger.withFields({ peerId: peer.id }).log('WebSocket connection closed')
+
+      // Update metrics
+      wsConnectionsTotal.inc({ status: 'closed' })
+      wsConnectionsActive.dec()
 
       const accountId = peerToAccountId.get(peer.id)
       if (!accountId) {

@@ -61,3 +61,19 @@ api:
     temperature: 0.7
     # Maximum tokens in response
     maxTokens: 2000
+
+# Observability settings (server mode only)
+# These settings can also be configured via environment variables:
+# - OTEL_ENABLED=true (enable OpenTelemetry)
+# - OTEL_SERVICE_NAME=telegram-search-server (service name)
+# - OTEL_PROMETHEUS_PORT=9464 (Prometheus exporter port)
+observability:
+  # Enable OpenTelemetry instrumentation (optional)
+  # When enabled, OTEL will run on a separate port from the main server
+  otel:
+    enabled: false
+    serviceName: 'telegram-search-server'
+    prometheusPort: 9464
+  
+  # Prometheus metrics are always enabled and available at:
+  # http://localhost:3000/metrics (main server port)

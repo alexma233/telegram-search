@@ -4,6 +4,8 @@ import type { Peer } from './types'
 
 import { useLogger } from '@guiiai/logg'
 
+import { wsMessages } from '../observability/metrics'
+
 export interface WsEventFromServer {
   'server:connected': (data: { sessionId: string, connected: boolean }) => void
   'server:error': (data: { error?: string | Error | unknown }) => void
@@ -38,6 +40,8 @@ export function sendWsEvent<T extends keyof WsEventToClient>(
   event: T,
   data: WsEventToClientData<T>,
 ) {
+  // Track outgoing WebSocket message
+  wsMessages.inc({ direction: 'outbound', event_type: event })
   peer.send(createWsMessage(event, data))
 }
 

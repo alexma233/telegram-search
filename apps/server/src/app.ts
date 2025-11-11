@@ -9,6 +9,8 @@ import { initDrizzle } from '@tg-search/core'
 import { createApp, createRouter, defineEventHandler, toNodeListener } from 'h3'
 import { listen } from 'listhen'
 
+import { getMetrics, initMetrics } from './observability/metrics'
+import { initOtel, shutdownOtel } from './observability/otel'
 import { setupWsRoutes } from './ws/routes'
 
 function setupErrorHandlers(logger: ReturnType<typeof useLogger>): void {
@@ -26,20 +28,47 @@ function configureServer(logger: ReturnType<typeof useLogger>, flags: RuntimeFla
     debug: flags.isDebugMode,
     onRequest(event) {
       const path = event.path
-      const method = event.method
+      const method = event.method as string
+
+      // Store request start time for duration tracking
+      (event.node.req as any)._startTime = Date.now()
 
       logger.withFields({
         method,
         path,
       }).log('Request started')
     },
+    onBeforeResponse(event) {
+      const path = event.path
+      const method = event.method as string
+      const startTime = (event.node.req as any)._startTime
+
+      if (startTime) {
+        const duration = (Date.now() - startTime) / 1000 // Convert to seconds
+        const { httpRequestDuration, httpRequests } = require('./observability/metrics')
+        httpRequestDuration.observe({ method, path }, duration)
+        
+        // Get status from response
+        const status = event.node.res.statusCode || 200
+        httpRequests.inc({ method, path, status: String(status) })
+      }
+    },
     onError(error, event) {
       const path = event.path
-      const method = event.method
+      const method = event.method as string
 
       const status = error instanceof Error && 'statusCode' in error
         ? (error as { statusCode: number }).statusCode
         : 500
+
+      // Track error metrics
+      const startTime = (event.node.req as any)._startTime
+      if (startTime) {
+        const duration = (Date.now() - startTime) / 1000
+        const { httpRequestDuration, httpRequests } = require('./observability/metrics')
+        httpRequestDuration.observe({ method, path }, duration)
+        httpRequests.inc({ method, path, status: String(status) })
+      }
 
       logger.withFields({
         method,
@@ -58,6 +87,15 @@ function configureServer(logger: ReturnType<typeof useLogger>, flags: RuntimeFla
   const router = createRouter()
   router.get('/health', defineEventHandler(() => {
     return Response.json({ success: true })
+  }))
+
+  router.get('/metrics', defineEventHandler(async () => {
+    const metrics = await getMetrics()
+    return new Response(metrics, {
+      headers: {
+        'Content-Type': 'text/plain; version=0.0.4; charset=utf-8',
+      },
+    })
   }))
 
   app.use(router)
@@ -83,6 +121,20 @@ async function bootstrap() {
 
   setupErrorHandlers(logger)
 
+  // Initialize observability
+  initMetrics()
+  logger.log('Prometheus metrics initialized')
+
+  // Initialize OpenTelemetry (optional, can be controlled via env)
+  const otelEnabled = process.env.OTEL_ENABLED === 'true'
+  if (otelEnabled) {
+    initOtel({
+      enabled: true,
+      serviceName: process.env.OTEL_SERVICE_NAME || 'telegram-search-server',
+      prometheusPort: process.env.OTEL_PROMETHEUS_PORT ? Number(process.env.OTEL_PROMETHEUS_PORT) : 9464,
+    })
+  }
+
   const app = configureServer(logger, flags)
   const listener = toNodeListener(app)
 
@@ -91,8 +143,14 @@ async function bootstrap() {
 
   logger.log('Server started')
 
-  const shutdown = () => {
+  const shutdown = async () => {
     logger.log('Shutting down server gracefully...')
+    
+    // Shutdown OpenTelemetry if it was initialized
+    if (otelEnabled) {
+      await shutdownOtel()
+    }
+    
     server.close()
     process.exit(0)
   }
