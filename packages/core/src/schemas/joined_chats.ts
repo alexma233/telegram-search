@@ -14,7 +14,7 @@ export const joinedChatsTable = pgTable('joined_chats', () => {
     updated_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),
     owner_user_id: text(),
   }
-}, (table) => [
+}, table => [
   uniqueIndex('platform_chat_id_unique_index').on(table.platform, table.chat_id),
   index('joined_chats_owner_user_id_index').on(table.owner_user_id),
 ])
