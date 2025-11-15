@@ -164,6 +164,8 @@
     "initTakeoutSession": "Init takeout session",
     "noInProgressTask": "No task in progress",
     "processedMessages": "Processed {processed}/{total} messages",
+    "processingMessages": "Processing messages ({active} active, {pending} pending)",
+    "processingCompleted": "Processing completed",
     "resync": "Re-sync",
     "resyncDescription": "Clear data and resync all messages",
     "selectAll": "Select All",

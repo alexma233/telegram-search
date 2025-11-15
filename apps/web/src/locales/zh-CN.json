@@ -164,6 +164,8 @@
     "initTakeoutSession": "初始化数据导出会话",
     "noInProgressTask": "没有进行中的任务",
     "processedMessages": "已处理 {processed}/{total} 条消息",
+    "processingMessages": "处理消息中（{active} 个活跃，{pending} 个等待）",
+    "processingCompleted": "处理完成",
     "resync": "重新同步",
     "resyncDescription": "清空数据并重新同步所有消息",
     "selectAll": "全选",

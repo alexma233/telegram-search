@@ -172,6 +172,32 @@ const localizedTaskMessage = computed(() => {
   }
 })
 
+/**
+ * Localize message processing progress message.
+ * Shows processing state with active and pending counts.
+ */
+const localizedProcessingMessage = computed(() => {
+  const msg = currentTask.value?.processingMessage || ''
+  if (!msg)
+    return ''
+
+  // Parse processing message: "Processing messages (2 active, 5 pending)"
+  const processingMatch = msg.match(/^Processing messages \((\d+) active, (\d+) pending\)$/i)
+  if (processingMatch) {
+    const active = Number(processingMatch[1])
+    const pending = Number(processingMatch[2])
+    return t('sync.processingMessages', { active, pending })
+  }
+
+  // Map known status messages
+  if (msg === 'Processing completed') {
+    return t('sync.processingCompleted')
+  }
+
+  // Return original text for unknown messages
+  return msg
+})
+
 function handleSync() {
   increase.value = true
   websocketStore.sendEvent('takeout:run', {
@@ -206,12 +232,18 @@ function handleAbort() {
 }
 
 watch(currentTaskProgress, (progress) => {
-  if (progress === 100) {
+  const task = currentTask.value
+  const processingProgress = task?.processingProgress
+  
+  // Sync is only complete when both takeout (progress) and processing (processingProgress) are done
+  const isBothComplete = progress === 100 && (processingProgress === 100 || processingProgress === undefined)
+  
+  if (isBothComplete) {
     toast.success(t('sync.syncCompleted'))
     NProgress.done()
     increase.value = true
   }
-  else if (progress < 0 && currentTask.value?.lastError) {
+  else if (progress < 0 && task?.lastError) {
     // Check if task was cancelled
     if (isTaskCancelled.value) {
       // Task was cancelled, just clear the task and stop progress
@@ -225,6 +257,10 @@ watch(currentTaskProgress, (progress) => {
   }
   else if (progress >= 0 && progress < 100) {
     NProgress.set(progress / 100)
+  }
+  else if (progress === 100 && processingProgress !== undefined && processingProgress < 100) {
+    // Takeout done but processing still ongoing - keep progress bar near complete
+    NProgress.set(0.95)
   }
 })
 
@@ -326,6 +362,7 @@ watch(selectedChats, (newChats) => {
                 </span>
                 <span v-if="currentTask?.lastError" class="text-sm text-destructive">{{ errorMessage }}</span>
                 <span v-else-if="localizedTaskMessage" class="text-sm text-muted-foreground">{{ localizedTaskMessage }}</span>
+                <span v-if="!currentTask?.lastError && localizedProcessingMessage" class="text-sm text-muted-foreground">{{ localizedProcessingMessage }}</span>
               </div>
             </div>
 

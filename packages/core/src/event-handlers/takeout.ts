@@ -18,6 +18,28 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
   const activeTasks = new Map<string, ReturnType<typeof createTask>>()
 
   return (takeoutService: TakeoutService) => {
+    // Listen for processing progress updates
+    emitter.on('message:process:progress', ({ taskId, pending, active }) => {
+      const task = activeTasks.get(taskId)
+      if (!task) return
+      
+      // Update task with processing progress
+      const totalInQueue = pending + active
+      if (totalInQueue === 0) {
+        // All processing complete
+        task.updateProcessingProgress(100, 'Processing completed')
+        
+        // Now we can truly mark the task as complete and clean up
+        if (task.progress === 100) {
+          logger.withFields({ taskId }).verbose('Takeout and processing both complete')
+          activeTasks.delete(taskId)
+        }
+      } else {
+        // Still processing - show queue state
+        task.updateProcessingProgress(-1, `Processing messages (${active} active, ${pending} pending)`)
+      }
+    })
+
     emitter.on('takeout:run', async ({ chatIds, increase, syncOptions }) => {
       logger.withFields({ chatIds, increase, syncOptions }).verbose('Running takeout')
       const pagination = usePagination()
@@ -38,6 +60,7 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
       logger.withFields({ increaseOptions }).verbose('Chat message stats')
 
       let messages: Api.Message[] = []
+      let lastTask: ReturnType<typeof createTask> | undefined
 
       for (const chatId of chatIds) {
         const stats = increaseOptions.find(item => item.chatId === chatId)
@@ -49,6 +72,7 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
           // Create task for full sync
           const task = createTask('takeout', { chatIds: [chatId] }, emitter)
           activeTasks.set(task.taskId, task)
+          lastTask = task
 
           const opts = {
             pagination: {
@@ -86,7 +110,7 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
                 batchSize,
               }).debug('Processing takeout batch')
 
-              emitter.emit('message:process', { messages, isTakeout: true, syncOptions })
+              emitter.emit('message:process', { messages, isTakeout: true, syncOptions, taskId: task.taskId })
               messages = []
             }
           }
@@ -98,7 +122,8 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
             continue
           }
 
-          activeTasks.delete(task.taskId)
+          // Don't delete task yet - wait for processing to complete
+          // activeTasks.delete(task.taskId) will be called when processing is done
         }
         else {
           // Incremental sync mode: bidirectional fill (forward + backward)
@@ -109,6 +134,7 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
             // Create task for fallback full sync
             const task = createTask('takeout', { chatIds: [chatId] }, emitter)
             activeTasks.set(task.taskId, task)
+            lastTask = task
 
             const opts = {
               pagination: {
@@ -146,7 +172,7 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
                   batchSize,
                 }).debug('Processing fallback sync batch')
 
-                emitter.emit('message:process', { messages, isTakeout: true, syncOptions })
+                emitter.emit('message:process', { messages, isTakeout: true, syncOptions, taskId: task.taskId })
                 messages = []
               }
             }
@@ -158,7 +184,8 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
               continue
             }
 
-            activeTasks.delete(task.taskId)
+            // Don't delete task yet - wait for processing to complete
+            // activeTasks.delete(task.taskId) will be called when processing is done
           }
           else {
             // Incremental sync mode: bidirectional fill (backward + forward)
@@ -179,6 +206,7 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
             // Create task for manual progress management
             const task = createTask('takeout', { chatIds: [chatId] }, emitter)
             activeTasks.set(task.taskId, task)
+            lastTask = task
             task.updateProgress(0, 'Starting incremental sync')
 
             let totalProcessed = 0
@@ -232,7 +260,7 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
                   batchSize,
                 }).debug('Processing backward fill batch')
 
-                emitter.emit('message:process', { messages, isTakeout: true, syncOptions })
+                emitter.emit('message:process', { messages, isTakeout: true, syncOptions, taskId: task.taskId })
                 messages = []
 
                 // Emit progress update after batch processing
@@ -294,7 +322,7 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
                   batchSize,
                 }).debug('Processing forward fill batch')
 
-                emitter.emit('message:process', { messages, isTakeout: true, syncOptions })
+                emitter.emit('message:process', { messages, isTakeout: true, syncOptions, taskId: task.taskId })
                 messages = []
 
                 // Emit progress update after batch processing
@@ -312,15 +340,16 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
 
             logger.withFields({ chatId, count: forwardMessageCount }).verbose('Forward fill completed')
 
-            // Mark as complete
+            // Mark takeout as complete, but keep task alive for processing
             task.updateProgress(100, 'Incremental sync completed')
-            activeTasks.delete(task.taskId)
+            // Don't delete task yet - wait for processing to complete
+            // activeTasks.delete(task.taskId) will be called when processing is done
           }
         }
       }
 
-      if (messages.length > 0) {
-        emitter.emit('message:process', { messages, isTakeout: true, syncOptions })
+      if (messages.length > 0 && lastTask) {
+        emitter.emit('message:process', { messages, isTakeout: true, syncOptions, taskId: lastTask.taskId })
       }
     })
 

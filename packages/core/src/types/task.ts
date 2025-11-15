@@ -21,10 +21,14 @@ export interface CoreTaskData<T extends CoreTaskType> {
   createdAt: Date
   updatedAt: Date
   abortController: AbortController
+  // Processing state for takeout tasks
+  processingProgress?: number
+  processingMessage?: string
 }
 
 export interface CoreTask<T extends CoreTaskType> extends CoreTaskData<T> {
   updateProgress: (progress: number, message?: string) => CoreTask<T>
+  updateProcessingProgress: (progress: number, message?: string) => CoreTask<T>
   updateError: (error: Error | unknown) => CoreTask<T>
   markStarted: () => CoreTask<T>
   markCompleted: () => CoreTask<T>

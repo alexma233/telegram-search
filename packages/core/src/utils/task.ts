@@ -40,6 +40,14 @@ export function createTask<T extends CoreTaskType>(
       return task
     },
 
+    updateProcessingProgress(progress: number, message?: string) {
+      state.processingProgress = progress
+      state.processingMessage = message
+      state.updatedAt = new Date()
+      emitUpdate()
+      return task
+    },
+
     updateError(error: Error | unknown) {
       state.progress = -1
       state.lastError = error instanceof Error ? error.message : String(error)
@@ -81,6 +89,8 @@ export function createTask<T extends CoreTaskType>(
         metadata: state.metadata,
         createdAt: state.createdAt,
         updatedAt: state.updatedAt,
+        processingProgress: state.processingProgress,
+        processingMessage: state.processingMessage,
       }
     },
   }

@@ -307,10 +307,16 @@ export interface MessageResolverEventToCore {
    * while still recording messages to storage. Consumers should be aware that setting `isTakeout`
    * changes event side effects.
    */
-  'message:process': (data: { messages: Api.Message[], isTakeout?: boolean, syncOptions?: SyncOptions }) => void
+  'message:process': (data: { messages: Api.Message[], isTakeout?: boolean, syncOptions?: SyncOptions, taskId?: string }) => void
 }
 
-export interface MessageResolverEventFromCore {}
+export interface MessageResolverEventFromCore {
+  /**
+   * Emitted when message processing progress changes during takeout.
+   * Includes queue state for tracking background processing.
+   */
+  'message:process:progress': (data: { taskId: string, processed: number, pending: number, active: number }) => void
+}
 
 // ============================================================================
 // Aggregated Event Types
