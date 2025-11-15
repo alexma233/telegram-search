@@ -1,5 +1,6 @@
 import type { CoreUserEntity } from '@tg-search/core'
 
+import { useConfig } from '@tg-search/common'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 
@@ -71,8 +72,8 @@ export const useAuthStore = defineStore('session', () => {
   }
 
   function init() {
-    // Auto login
-    // useConfig().api.telegram.autoReconnect && attemptLogin()
+    // Auto login - attempt to reconnect if autoReconnect is enabled
+    useConfig().api.telegram.autoReconnect && attemptLogin()
 
     // Initialize chat store to load dialogs from database regardless of authentication status
     useChatStore().init()
