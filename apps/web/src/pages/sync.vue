@@ -234,10 +234,10 @@ function handleAbort() {
 watch(currentTaskProgress, (progress) => {
   const task = currentTask.value
   const processingProgress = task?.processingProgress
-  
+
   // Sync is only complete when both takeout (progress) and processing (processingProgress) are done
   const isBothComplete = progress === 100 && (processingProgress === 100 || processingProgress === undefined)
-  
+
   if (isBothComplete) {
     toast.success(t('sync.syncCompleted'))
     NProgress.done()

@@ -21,20 +21,22 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
     // Listen for processing progress updates
     emitter.on('message:process:progress', ({ taskId, pending, active }) => {
       const task = activeTasks.get(taskId)
-      if (!task) return
-      
+      if (!task)
+        return
+
       // Update task with processing progress
       const totalInQueue = pending + active
       if (totalInQueue === 0) {
         // All processing complete
         task.updateProcessingProgress(100, 'Processing completed')
-        
+
         // Now we can truly mark the task as complete and clean up
         if (task.progress === 100) {
           logger.withFields({ taskId }).verbose('Takeout and processing both complete')
           activeTasks.delete(taskId)
         }
-      } else {
+      }
+      else {
         // Still processing - show queue state
         task.updateProcessingProgress(-1, `Processing messages (${active} active, ${pending} pending)`)
       }
