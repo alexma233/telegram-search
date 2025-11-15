@@ -1,23 +1,15 @@
 // https://github.com/moeru-ai/airi/blob/main/services/telegram-bot/src/models/stickers.ts
 
+import type { CoreTransaction } from '../db'
 import type { CoreMessageMediaSticker } from '../types/media'
+import type { DBInsertSticker } from './utils/sticker'
 
 import { Ok } from '@unbird/result'
-import { desc, eq, sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 
 import { withDb } from '../db'
-import { recentSentStickersTable } from '../schemas/recent_sent_stickers'
 import { stickersTable } from '../schemas/stickers'
 import { must0 } from './utils/must'
-
-export async function findStickerDescription(fileId: string) {
-  const sticker = (await findStickerByFileId(fileId))?.unwrap()
-  if (sticker == null) {
-    return ''
-  }
-
-  return Ok(sticker.description)
-}
 
 export async function findStickerByFileId(fileId: string) {
   const sticker = (await withDb(db => db
@@ -30,9 +22,9 @@ export async function findStickerByFileId(fileId: string) {
   return Ok(must0(sticker))
 }
 
-export async function recordStickers(stickers: CoreMessageMediaSticker[]) {
+export async function recordStickers(tx: CoreTransaction, stickers: CoreMessageMediaSticker[]): Promise<DBInsertSticker[]> {
   if (stickers.length === 0) {
-    return
+    return []
   }
 
   // Deduplicate the sticker array, using file_id as the unique identifier
@@ -50,10 +42,10 @@ export async function recordStickers(stickers: CoreMessageMediaSticker[]) {
     }))
 
   if (dataToInsert.length === 0) {
-    return
+    return []
   }
 
-  return withDb(async db => db
+  return tx
     .insert(stickersTable)
     .values(dataToInsert)
     .onConflictDoUpdate({
@@ -63,14 +55,5 @@ export async function recordStickers(stickers: CoreMessageMediaSticker[]) {
         updated_at: Date.now(),
       },
     })
-    .returning(),
-  )
-}
-
-export async function listRecentSentStickers() {
-  return withDb(db => db
-    .select()
-    .from(recentSentStickersTable)
-    .orderBy(desc(recentSentStickersTable.created_at)),
-  )
+    .returning()
 }

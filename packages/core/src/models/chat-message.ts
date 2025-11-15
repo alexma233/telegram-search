@@ -2,10 +2,11 @@
 
 import type { CorePagination } from '@tg-search/common'
 
+import type { CoreTransaction } from '../db'
 import type { StorageMessageContextParams } from '../types/events'
 import type { CoreMessageMediaPhoto, CoreMessageMediaSticker } from '../types/media'
 import type { CoreMessage } from '../types/message'
-import type { DBRetrievalMessages } from './utils/message'
+import type { DBRetrievalMessages, DBSelectMessage } from './utils/message'
 
 import { useLogger } from '@guiiai/logg'
 import { Ok } from '@unbird/result'
@@ -20,14 +21,14 @@ import { convertDBPhotoToCoreMessageMedia } from './utils/photos'
 import { retrieveJieba } from './utils/retrieve-jieba'
 import { retrieveVector } from './utils/retrieve-vector'
 
-export async function recordMessages(messages: CoreMessage[]) {
+async function recordMessages(tx: CoreTransaction, messages: CoreMessage[]): Promise<DBSelectMessage[]> {
   const dbMessages = messages.map(convertToDBInsertMessage)
 
   if (dbMessages.length === 0) {
-    return
+    return []
   }
 
-  return withDb(async db => db
+  return tx
     .insert(chatMessagesTable)
     .values(dbMessages)
     .onConflictDoUpdate({
@@ -60,8 +61,16 @@ export async function recordMessages(messages: CoreMessage[]) {
         updated_at: Date.now(),
       },
     })
-    .returning(),
-  )
+    .returning()
+}
+
+async function fetchMessages(tx: CoreTransaction, chatId: string, pagination: CorePagination): Promise<DBSelectMessage[]> {
+  return tx.select()
+    .from(chatMessagesTable)
+    .where(eq(chatMessagesTable.in_chat_id, chatId))
+    .orderBy(desc(chatMessagesTable.created_at))
+    .limit(pagination.limit)
+    .offset(pagination.offset)
 }
 
 export async function recordMessagesWithMedia(messages: CoreMessage[]): Promise<void> {
@@ -69,62 +78,49 @@ export async function recordMessagesWithMedia(messages: CoreMessage[]): Promise<
     return
   }
 
+  // Create a transaction
+  await withDb(db => db.transaction(async (tx) => {
   // First, record the messages
-  const dbMessages = (await recordMessages(messages))?.expect('Failed to record messages')
+    const dbMessages = await recordMessages(tx, messages)
 
-  // Then, collect and record photos that are linked to messages
-  const allPhotoMedia = messages
-    .filter(message => message.media && message.media.length > 0)
-    .flatMap((message) => {
+    // Then, collect and record photos that are linked to messages
+    const allPhotoMedia = messages
+      .filter(message => message.media && message.media.length > 0)
+      .flatMap((message) => {
       // Update media messageUUID to match the newly inserted message UUID
-      const dbMessage = dbMessages?.find(dbMsg =>
-        dbMsg.platform_message_id === message.platformMessageId
-        && dbMsg.in_chat_id === message.chatId,
-      )
+        const dbMessage = dbMessages.find(dbMsg =>
+          dbMsg.platform_message_id === message.platformMessageId
+          && dbMsg.in_chat_id === message.chatId,
+        )
 
-      useLogger().withFields({ dbMessageId: dbMessage?.id }).debug('DB message ID')
+        useLogger().withFields({ dbMessageId: dbMessage?.id }).debug('DB message ID')
 
-      return message.media?.filter(media => media.type === 'photo')
-        .map((media) => {
-          return {
-            ...media,
-            messageUUID: dbMessage?.id,
-          }
-        }) || []
-    }) satisfies CoreMessageMediaPhoto[]
+        return message.media?.filter(media => media.type === 'photo')
+          .map((media) => {
+            return {
+              ...media,
+              messageUUID: dbMessage?.id,
+            }
+          }) || []
+      }) satisfies CoreMessageMediaPhoto[]
 
-  const allStickerMedia = messages
-    .flatMap(message => message.media ?? [])
-    .filter(media => media.type === 'sticker')
-    .map((media) => {
+    const allStickerMedia = messages
+      .flatMap(message => message.media ?? [])
+      .filter(media => media.type === 'sticker')
+      .map((media) => {
       // const emoji = media.apiMedia?.document?.attributes?.find((attr: any) => attr.alt)?.alt ?? ''
 
-      return media
-    }) satisfies CoreMessageMediaSticker[]
+        return media
+      }) satisfies CoreMessageMediaSticker[]
 
-  if (allPhotoMedia.length > 0) {
-    (await recordPhotos(allPhotoMedia))?.expect('Failed to record photos')
-  }
+    if (allPhotoMedia.length > 0) {
+      await recordPhotos(tx, allPhotoMedia)
+    }
 
-  if (allStickerMedia.length > 0) {
-    (await recordStickers(allStickerMedia))?.expect('Failed to record stickers')
-  }
-}
-
-export async function fetchMessages(chatId: string, pagination: CorePagination) {
-  const dbMessagesResults = (await withDb(db => db
-    .select()
-    .from(chatMessagesTable)
-    .where(eq(chatMessagesTable.in_chat_id, chatId))
-    .orderBy(desc(chatMessagesTable.created_at))
-    .limit(pagination.limit)
-    .offset(pagination.offset),
-  )).expect('Failed to fetch messages')
-
-  return Ok({
-    dbMessagesResults,
-    coreMessages: dbMessagesResults.map(convertToCoreMessageFromDB),
-  })
+    if (allStickerMedia.length > 0) {
+      await recordStickers(tx, allStickerMedia)
+    }
+  }))
 }
 
 export async function fetchMessagesWithPhotos(chatId: string, pagination: CorePagination) {

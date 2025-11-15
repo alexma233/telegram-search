@@ -1,5 +1,6 @@
 // https://github.com/moeru-ai/airi/blob/main/services/telegram-bot/src/models/photos.ts
 
+import type { CoreTransaction } from '../db'
 import type { CoreMessageMediaPhoto } from '../types/media'
 import type { DBInsertPhoto } from './utils/photos'
 
@@ -25,9 +26,9 @@ export async function findPhotoByFileId(fileId: string) {
   return Ok(must0(photos))
 }
 
-export async function recordPhotos(media: CoreMessageMediaPhoto[]) {
+export async function recordPhotos(tx: CoreTransaction, media: CoreMessageMediaPhoto[]): Promise<DBInsertPhoto[]> {
   if (media.length === 0) {
-    return
+    return []
   }
 
   const dataToInsert = media
@@ -42,10 +43,10 @@ export async function recordPhotos(media: CoreMessageMediaPhoto[]) {
     )
 
   if (dataToInsert.length === 0) {
-    return
+    return []
   }
 
-  return withDb(async db => db
+  return tx
     .insert(photosTable)
     .values(dataToInsert)
     .onConflictDoUpdate({
@@ -55,8 +56,7 @@ export async function recordPhotos(media: CoreMessageMediaPhoto[]) {
         updated_at: Date.now(),
       },
     })
-    .returning(),
-  )
+    .returning()
 }
 
 export async function findPhotosByMessageId(messageUUID: string) {
