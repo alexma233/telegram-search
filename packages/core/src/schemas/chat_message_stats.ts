@@ -25,6 +25,7 @@ import { bigint, integer, pgView, text } from 'drizzle-orm/pg-core'
 
 export const chatMessageStatsView = pgView('chat_message_stats', {
   platform: text().notNull(),
+  owner_user_id: text().notNull(),
   chat_id: text().notNull(),
   chat_name: text().notNull(),
   message_count: integer().notNull(),
@@ -32,13 +33,12 @@ export const chatMessageStatsView = pgView('chat_message_stats', {
   first_message_at: bigint({ mode: 'number' }),
   latest_message_id: bigint({ mode: 'number' }),
   latest_message_at: bigint({ mode: 'number' }),
-  owner_user_id: text(),
 }).as(
   sql`
-    SELECT 
-      jc.platform, 
-      jc.chat_id, 
-      jc.chat_name, 
+    SELECT
+      jc.platform,
+      jc.chat_id,
+      jc.chat_name,
       COUNT(cm.id)::int AS message_count,
       MIN(cm.platform_message_id) AS first_message_id,
       MIN(cm.created_at) AS first_message_at,

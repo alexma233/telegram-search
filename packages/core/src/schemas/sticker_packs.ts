@@ -5,12 +5,12 @@ import { bigint, index, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-
 export const stickerPacksTable = pgTable('sticker_packs', {
   id: uuid().primaryKey().defaultRandom(),
   platform: text().notNull().default(''),
+  owner_user_id: text().notNull().default(''),
   platform_id: text().notNull().default(''),
   name: text().notNull().default(''),
   description: text().notNull().default(''),
   created_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),
   updated_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),
-  owner_user_id: text(),
 }, table => [
   uniqueIndex('sticker_packs_platform_platform_id_unique_index').on(table.platform, table.platform_id),
   index('sticker_packs_owner_user_id_index').on(table.owner_user_id),

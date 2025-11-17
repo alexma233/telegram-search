@@ -7,6 +7,7 @@ import { usersTable } from './users'
 export const chatMessagesTable = pgTable('chat_messages', {
   id: uuid().primaryKey().defaultRandom(),
   platform: text().notNull().default(''),
+  owner_user_id: text().notNull().default(''),
   platform_message_id: text().notNull().default(''),
   from_id: text().notNull().default(''),
   from_name: text().notNull().default(''),
@@ -24,7 +25,6 @@ export const chatMessagesTable = pgTable('chat_messages', {
   content_vector_1024: vector({ dimensions: 1024 }),
   content_vector_768: vector({ dimensions: 768 }),
   jieba_tokens: jsonb().notNull().default([]),
-  owner_user_id: text(),
 }, table => [
   uniqueIndex('chat_messages_platform_platform_message_id_in_chat_id_unique_index').on(table.platform, table.platform_message_id, table.in_chat_id),
   index('chat_messages_content_vector_1536_index').using('hnsw', table.content_vector_1536.op('vector_cosine_ops')),
