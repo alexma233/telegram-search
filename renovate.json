@@ -1,42 +1,19 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "automerge": false,
-  "dependencyDashboard": true,
   "extends": [
     "config:recommended",
     ":dependencyDashboard",
-    "schedule:weekly",
+    ":semanticPrefixFixDepsChoreOthers",
     ":prHourlyLimitNone",
     ":prConcurrentLimitNone",
-    ":semanticPrefixFixDepsChoreOthers",
+    ":ignoreModulesAndTests",
     "group:monorepos",
     "group:recommended",
+    "group:allNonMajor",
     "replacements:all",
     "workarounds:all"
   ],
-  "labels": [
-    "dependencies"
-  ],
-  "packageRules": [
-    {
-      "groupName": "all non-minor dependencies",
-      "groupSlug": "all-minor-patch",
-      "matchPackageNames": [
-        "*"
-      ],
-      "matchUpdateTypes": [
-        "patch"
-      ]
-    }
-  ],
-  "postUpdateOptions": [
-    "yarnDedupeHighest"
-  ],
-  "prConcurrentLimit": 30,
-  "prHourlyLimit": 0,
   "rangeStrategy": "bump",
-  "rebaseWhen": "conflicted",
-  "schedule": "on sunday before 6:00am",
-  "timezone": "UTC",
+  "labels": ["dependencies"],
   "ignoreDeps": ["telegram"]
 }

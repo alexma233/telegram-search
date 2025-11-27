@@ -21,7 +21,7 @@ export const usePWAStore = defineStore('pwa', () => {
     }
 
     if (isInitialized.value) {
-      useLogger('PWA').log('Already initialized, skipping')
+      useLogger('PWA').debug('Already initialized, skipping')
       return
     }
 

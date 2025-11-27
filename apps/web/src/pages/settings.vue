@@ -118,12 +118,12 @@ onMounted(() => {
             <label class="block text-sm text-muted-foreground font-medium">Connection URL</label>
             <input
               v-model="config.database.url"
-              type="text"
+              type="password"
               placeholder="postgresql://user:password@host:port/database"
               class="mt-1 block w-full border rounded-md bg-background px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
             <p class="mt-1 text-xs text-muted-foreground">
-              Optional: Use connection URL instead of individual fields below
+              Optional: Use connection URL instead of individual fields below (default: <code>postgresql://user:password@host:port/database</code>)
             </p>
           </div>
           <div v-if="isPostgresSelected" class="grid gap-4 md:grid-cols-2">

@@ -14,12 +14,12 @@ import App from './App.vue'
 import { i18n } from './modules/i18n'
 
 import '@unocss/reset/tailwind.css'
-import 'uno.css'
 import 'nprogress/nprogress.css'
+import 'uno.css'
 import 'vue-sonner/style.css'
 import './styles/main.css'
 
-initLogger(LoggerLevel.Verbose, LoggerFormat.Pretty)
+initLogger(import.meta.env.DEV ? LoggerLevel.Debug : LoggerLevel.Verbose, LoggerFormat.Pretty)
 
 const app = createApp(App)
 

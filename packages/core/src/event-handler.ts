@@ -1,10 +1,8 @@
 import type { Config } from '@tg-search/common'
 
 import type { CoreContext } from './context'
-import type { SessionService } from './services/session'
 
 import { useLogger } from '@guiiai/logg'
-import { isBrowser } from '@tg-search/common'
 
 import { useService } from './context'
 import { registerBasicEventHandlers } from './event-handlers/auth'
@@ -14,7 +12,6 @@ import { registerEntityEventHandlers } from './event-handlers/entity'
 import { registerGramEventsEventHandlers } from './event-handlers/gram-events'
 import { registerMessageEventHandlers } from './event-handlers/message'
 import { registerMessageResolverEventHandlers } from './event-handlers/message-resolver'
-import { registerSessionEventHandlers } from './event-handlers/session'
 import { registerStorageEventHandlers } from './event-handlers/storage'
 import { registerTakeoutEventHandlers } from './event-handlers/takeout'
 import { useMessageResolverRegistry } from './message-resolvers'
@@ -66,19 +63,7 @@ export function basicEventHandler(
   registerMessageResolverEventHandlers(ctx)(messageResolverService)
 
   ;(async () => {
-    let sessionService: SessionService
-
-    if (isBrowser()) {
-      const { createSessionService } = await import('./services/session.browser')
-      sessionService = useService(ctx, createSessionService)
-    }
-    else {
-      const { createSessionService } = await import('./services/session')
-      sessionService = useService(ctx, createSessionService)
-    }
-
-    registerBasicEventHandlers(ctx)(connectionService, sessionService)
-    registerSessionEventHandlers(ctx)(sessionService)
+    registerBasicEventHandlers(ctx)(connectionService)
   })()
 
   return () => {}
@@ -91,20 +76,26 @@ export function afterConnectedEventHandler(
   const { emitter } = ctx
 
   emitter.once('auth:connected', () => {
+    const entityService = useService(ctx, createEntityService)
     const messageService = useService(ctx, createMessageService)
     const dialogService = useService(ctx, createDialogService)
     const takeoutService = useService(ctx, createTakeoutService)
-    const entityService = useService(ctx, createEntityService)
     const gramEventsService = useService(ctx, createGramEventsService)
+
+    // Register entity handlers first so we can establish currentAccountId.
+    registerEntityEventHandlers(ctx)(entityService)
+
+    // Ensure current account ID is established before any dialog/storage access.
+    emitter.emit('entity:me:fetch')
 
     registerMessageEventHandlers(ctx)(messageService)
     registerDialogEventHandlers(ctx)(dialogService)
     registerTakeoutEventHandlers(ctx)(takeoutService)
-    registerEntityEventHandlers(ctx)(entityService)
     registerGramEventsEventHandlers(ctx)(gramEventsService)
 
-    // Init all entities
-    emitter.emit('dialog:fetch')
+    // Dialog bootstrap is now triggered from entity:me:fetch handler once
+    // currentAccountId has been established, to avoid races where dialog or
+    // storage handlers read account context too early.
     gramEventsService.registerGramEvents()
   })
 

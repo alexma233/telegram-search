@@ -44,7 +44,7 @@ describe('blob', () => {
         type: 'photo',
         platformId: 'test-id',
         mimeType: 'image/jpeg',
-        byte: { data: [5, 6, 7, 8] } as any,
+        byte: Buffer.from([5, 6, 7, 8]),
       }
 
       const result = createMediaBlob(media)
@@ -64,7 +64,7 @@ describe('blob', () => {
       const result = createMediaBlob(media)
 
       expect(pako.inflate).toHaveBeenCalledWith(expect.any(Uint8Array), { to: 'string' })
-      expect((result as any).tgsAnimationData).toBe('inflated-animation-data')
+      expect(result.tgsAnimationData).toBe('inflated-animation-data')
       expect(result.blobUrl).toBeUndefined()
       expect(result.byte).toBeUndefined()
     })

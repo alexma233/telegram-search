@@ -22,7 +22,7 @@ const { isLoggedIn } = storeToRefs(authStore)
 const state = ref({
   currentStep: 'phone' as LoginStep,
   showAdvancedSettings: false,
-  phoneNumber: websocketStore.getActiveSession()?.phoneNumber ?? '',
+  phoneNumber: '',
   verificationCode: '',
   twoFactorPassword: '',
 })

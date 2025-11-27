@@ -116,7 +116,20 @@ export default defineConfig({
   },
 
   optimizeDeps: {
-    exclude: ['@electric-sql/pglite'],
+    exclude: [
+      '@electric-sql/pglite',
+    ],
+    include: [
+      'virtua/vue',
+      'workbox-window',
+      'date-fns',
+      'echarts/charts',
+      'echarts/components',
+      'echarts/core',
+      'echarts/renderers',
+      'vue-echarts',
+      'lottie-web',
+    ],
   },
 
   build: {

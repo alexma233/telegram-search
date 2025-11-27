@@ -24,6 +24,13 @@ export const useMessageStore = defineStore('message', () => {
 
   const logger = useLogger('MessageStore')
 
+  function reset() {
+    logger.log('Resetting message store for account switch')
+    currentChatId.value = undefined
+    messageWindow.value?.clear()
+    messageWindow.value = undefined
+  }
+
   function replaceMessages(messages: CoreMessage[], options?: { chatId?: string, limit?: number }) {
     const previousChatId = currentChatId.value
     const nextChatId = options?.chatId ?? previousChatId
@@ -77,7 +84,7 @@ export const useMessageStore = defineStore('message', () => {
 
     const direction = determineMessageDirection(filteredMessages, messageWindow.value)
 
-    logger.log(`Push ${filteredMessages.length} messages (${direction})`, filteredMessages)
+    logger.debug(`Push ${filteredMessages.length} messages (${direction})`, filteredMessages)
 
     if (messages.length === 0) {
       return
@@ -159,6 +166,7 @@ export const useMessageStore = defineStore('message', () => {
     messageWindow: computed(() => messageWindow.value!),
 
     replaceMessages,
+    reset,
     pushMessages,
     useFetchMessages,
     loadMessageContext,

@@ -61,11 +61,11 @@ describe('message', () => {
       updatedAt: 0,
       deletedAt: undefined,
       media: undefined,
-      reply: undefined as any,
-      forward: undefined as any,
-      vectors: undefined as any,
+      reply: undefined,
+      forward: undefined,
+      vectors: undefined,
       jiebaTokens: [],
-    })
+    } as any)
 
     it('should return "initial" for empty messages array', () => {
       const messageWindow = new MessageWindow()

@@ -78,7 +78,10 @@ async function bootstrap() {
   const config = await initConfig(flags)
 
   try {
-    await initDrizzle(logger, config, { isDatabaseDebugMode: flags.isDatabaseDebugMode })
+    await initDrizzle(logger, config, {
+      isDatabaseDebugMode: flags.isDatabaseDebugMode,
+      disableMigrations: flags.disableMigrations,
+    })
     logger.log('Database initialized successfully')
   }
   catch (error) {

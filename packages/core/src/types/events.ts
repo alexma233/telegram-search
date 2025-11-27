@@ -15,7 +15,7 @@ export interface ClientInstanceEventToCore {
 }
 
 export interface ClientInstanceEventFromCore {
-  'core:error': (data: { error?: string | Error | unknown }) => void
+  'core:error': (data: { error: string, description?: string }) => void
 }
 
 // ============================================================================
@@ -23,7 +23,7 @@ export interface ClientInstanceEventFromCore {
 // ============================================================================
 
 export interface ConnectionEventToCore {
-  'auth:login': (data: { phoneNumber: string }) => void
+  'auth:login': (data: { phoneNumber?: string, session?: string }) => void
   'auth:logout': () => void
   'auth:code': (data: { code: string }) => void
   'auth:password': (data: { password: string }) => void
@@ -33,6 +33,7 @@ export interface ConnectionEventFromCore {
   'auth:code:needed': () => void
   'auth:password:needed': () => void
   'auth:connected': () => void
+  'auth:disconnected': () => void
   'auth:error': (data: { error: unknown }) => void
 }
 
@@ -40,12 +41,11 @@ export interface ConnectionEventFromCore {
 // Session Events
 // ============================================================================
 
-export interface SessionEventToCore {
-  'session:update': (data: { phoneNumber: string, session: string }) => void
-  'session:clean': (data: { phoneNumber: string }) => void
-}
+export interface SessionEventToCore {}
 
-export interface SessionEventFromCore {}
+export interface SessionEventFromCore {
+  'session:update': (data: { session: string }) => void
+}
 
 // ============================================================================
 // Config Events
@@ -173,8 +173,8 @@ export interface StorageEventToCore {
   'storage:fetch:messages': (data: { chatId: string, pagination: CorePagination }) => void
   'storage:record:messages': (data: { messages: CoreMessage[] }) => void
 
-  'storage:fetch:dialogs': () => void
-  'storage:record:dialogs': (data: { dialogs: CoreDialog[] }) => void
+  'storage:fetch:dialogs': (data: { accountId: string }) => void
+  'storage:record:dialogs': (data: { dialogs: CoreDialog[], accountId: string }) => void
 
   'storage:search:messages': (data: CoreMessageSearchParams) => void
 
@@ -339,7 +339,6 @@ export type ToCoreEvent = ClientInstanceEventToCore
   & DialogEventToCore
   & ConnectionEventToCore
   & TakeoutEventToCore
-  & SessionEventToCore
   & EntityEventToCore
   & StorageEventToCore
   & ConfigEventToCore

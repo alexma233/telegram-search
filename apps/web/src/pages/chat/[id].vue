@@ -24,6 +24,7 @@ const chatStore = useChatStore()
 const messageStore = useMessageStore()
 const websocketStore = useBridgeStore()
 const { debugMode } = storeToRefs(useSettingsStore())
+const { activeSessionId } = storeToRefs(websocketStore)
 
 const { sortedMessageIds, messageWindow, sortedMessageArray } = storeToRefs(messageStore)
 const currentChat = computed<CoreDialog | undefined>(() => chatStore.getChat(id.toString()))
@@ -73,6 +74,23 @@ onMounted(async () => {
     await loadOlderMessages()
   }
 })
+
+// When switching accounts while staying on the same chat route, reset the
+// message window and load the dialog history for the new account.
+watch(
+  () => activeSessionId.value,
+  async () => {
+    // If we don't have a chat id (should not happen here) or component
+    // is still mounting, just bail out.
+    if (!id)
+      return
+
+    isContextMode.value = false
+    resetPagination()
+    messageStore.replaceMessages([], { chatId: id.toString(), limit: messageLimit.value })
+    await loadOlderMessages()
+  },
+)
 
 // Load older messages when scrolling to top
 async function loadOlderMessages() {
