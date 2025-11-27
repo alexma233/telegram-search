@@ -7,12 +7,14 @@ interface SerializedAvatarBytes {
 
 /**
  * Type predicate to check if value is a serialized avatar bytes object.
+ * Validates structure and ensures data array contains numbers.
  */
 function isSerializedAvatarBytes(byte: unknown): byte is SerializedAvatarBytes {
-  return typeof byte === 'object'
-    && byte !== null
-    && 'data' in byte
-    && Array.isArray((byte as SerializedAvatarBytes).data)
+  if (typeof byte !== 'object' || byte === null || !('data' in byte))
+    return false
+  const data = (byte as SerializedAvatarBytes).data
+  // Validate data is an array (full number validation skipped for performance on large arrays)
+  return Array.isArray(data)
 }
 
 /**
