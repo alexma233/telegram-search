@@ -1,3 +1,5 @@
+import type { Buffer } from 'buffer'
+
 import type { CoreEntity } from '../types/events'
 
 import { and, eq, sql } from 'drizzle-orm'
@@ -115,22 +117,20 @@ export function convertDBUserToCoreEntity(dbUser: DBSelectUser): CoreEntity {
  */
 export interface UserAvatarData {
   fileId: string
-  base64: string
-  mimeType: string
+  bytes: Buffer
 }
 
 /**
  * Update a user's avatar in the database
  * @param platformUserId The Telegram user ID
- * @param avatarData The avatar data to store (fileId, base64, mimeType)
+ * @param avatarData The avatar data to store (fileId and raw bytes)
  */
 export async function updateUserAvatar(platformUserId: string, avatarData: UserAvatarData) {
   return withDb(async db => db
     .update(usersTable)
     .set({
       avatar_file_id: avatarData.fileId,
-      avatar_base64: avatarData.base64,
-      avatar_mime_type: avatarData.mimeType,
+      avatar_bytes: avatarData.bytes,
       updated_at: Date.now(),
     })
     .where(and(
@@ -151,8 +151,7 @@ export async function getUserAvatar(platformUserId: string): Promise<UserAvatarD
     const results = await db
       .select({
         avatar_file_id: usersTable.avatar_file_id,
-        avatar_base64: usersTable.avatar_base64,
-        avatar_mime_type: usersTable.avatar_mime_type,
+        avatar_bytes: usersTable.avatar_bytes,
       })
       .from(usersTable)
       .where(and(
@@ -162,14 +161,13 @@ export async function getUserAvatar(platformUserId: string): Promise<UserAvatarD
       .limit(1)
 
     const record = results[0]
-    // Return null if record doesn't exist or any avatar field is missing
-    if (!record?.avatar_file_id || !record.avatar_base64 || !record.avatar_mime_type)
+    // Return null if record doesn't exist or avatar fields are missing
+    if (!record?.avatar_file_id || !record.avatar_bytes)
       return null
 
     return {
       fileId: record.avatar_file_id,
-      base64: record.avatar_base64,
-      mimeType: record.avatar_mime_type,
+      bytes: record.avatar_bytes,
     }
   })
 }

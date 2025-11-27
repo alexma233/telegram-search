@@ -1,5 +1,7 @@
 import { bigint, index, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
+import { bytea } from './utils/type'
+
 export const usersTable = pgTable('users', {
   id: uuid().primaryKey().defaultRandom(),
   platform: text().notNull().default('telegram'),
@@ -9,10 +11,8 @@ export const usersTable = pgTable('users', {
   type: text().notNull().default('user').$type<'user' | 'chat' | 'channel'>(),
   // Avatar file ID from Telegram (photoId). Used to detect avatar changes.
   avatar_file_id: text(),
-  // Avatar data stored as base64-encoded string. Null if no avatar or not yet fetched.
-  avatar_base64: text(),
-  // Avatar MIME type (e.g., 'image/jpeg', 'image/png')
-  avatar_mime_type: text(),
+  // Avatar image bytes. MIME type is determined at runtime from the bytes.
+  avatar_bytes: bytea(),
   created_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),
   updated_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),
 }, table => [
