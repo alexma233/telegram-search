@@ -20,6 +20,6 @@ export interface SessionContext {
  */
 export interface StoredSession {
   uuid: string
-  metadata: SessionContext
+  metadata?: SessionContext
   sessionString?: string
 }
