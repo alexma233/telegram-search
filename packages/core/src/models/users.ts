@@ -161,13 +161,15 @@ export async function getUserAvatar(platformUserId: string): Promise<UserAvatarD
       ))
       .limit(1)
 
-    if (results.length === 0 || !results[0].avatar_file_id || !results[0].avatar_base64 || !results[0].avatar_mime_type)
+    const record = results[0]
+    // Return null if record doesn't exist or any avatar field is missing
+    if (!record?.avatar_file_id || !record.avatar_base64 || !record.avatar_mime_type)
       return null
 
     return {
-      fileId: results[0].avatar_file_id,
-      base64: results[0].avatar_base64,
-      mimeType: results[0].avatar_mime_type,
+      fileId: record.avatar_file_id,
+      base64: record.avatar_base64,
+      mimeType: record.avatar_mime_type,
     }
   })
 }

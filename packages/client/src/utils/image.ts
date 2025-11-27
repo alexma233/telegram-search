@@ -1,11 +1,27 @@
 /**
+ * Type guard: JSON-serialized avatar bytes from WebSocket have {data: number[]} format.
+ */
+interface SerializedAvatarBytes {
+  data: number[]
+}
+
+/**
+ * Type predicate to check if value is a serialized avatar bytes object.
+ */
+function isSerializedAvatarBytes(byte: unknown): byte is SerializedAvatarBytes {
+  return typeof byte === 'object'
+    && byte !== null
+    && 'data' in byte
+    && Array.isArray((byte as SerializedAvatarBytes).data)
+}
+
+/**
  * Reconstruct Uint8Array from JSON-safe payload (handles both Uint8Array and {data: number[]} formats).
  * DRY: Extracted from entity and dialog event handlers.
  */
-export function reconstructAvatarBytes(byte: Uint8Array | { data: number[] }): Uint8Array | undefined {
+export function reconstructAvatarBytes(byte: Uint8Array | SerializedAvatarBytes): Uint8Array | undefined {
   try {
-    // Type guard to check if byte is an object with data property
-    if (typeof byte === 'object' && 'data' in byte && Array.isArray(byte.data))
+    if (isSerializedAvatarBytes(byte))
       return new Uint8Array(byte.data)
     return byte as Uint8Array
   }

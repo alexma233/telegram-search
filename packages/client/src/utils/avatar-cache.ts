@@ -14,6 +14,16 @@ const DB_VERSION = 3 // Upgrade to version 3, add support for the fileId field
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const MAX_CACHE_BYTES_DEFAULT = 50 * 1024 * 1024 // 50 MB
 
+/**
+ * Result returned when loading avatar from cache.
+ * Contains URL (object URL), mimeType, and optional fileId for cache validation.
+ */
+export interface AvatarCacheResult {
+  url: string
+  mimeType: string
+  fileId?: string
+}
+
 export interface AvatarCacheRecord {
   /**
    * Deterministic primary key for a single avatar scope.
@@ -159,7 +169,7 @@ export async function persistChatAvatar(chatId: string | number, blob: Blob, mim
  * Handles DB access, expiration check, and memory cleanup.
  * DRY: Shared by loadUserAvatarFromCache and loadChatAvatarFromCache.
  */
-async function loadAvatarFromCacheByScopeKey(scopeKey: string, logLabel: string): Promise<{ url: string, mimeType: string, fileId?: string } | undefined> {
+async function loadAvatarFromCacheByScopeKey(scopeKey: string, logLabel: string): Promise<AvatarCacheResult | undefined> {
   const db = await openDb()
   if (!db)
     return undefined
@@ -186,7 +196,7 @@ async function loadAvatarFromCacheByScopeKey(scopeKey: string, logLabel: string)
   }
   try {
     const url = URL.createObjectURL(latest.blob)
-    const result = { url, mimeType: latest.mimeType, fileId: latest.fileId }
+    const result: AvatarCacheResult = { url, mimeType: latest.mimeType, fileId: latest.fileId }
 
     // Clean reference to original Blob to help GC reclaim memory
     latest.blob = new Blob()
@@ -204,7 +214,7 @@ async function loadAvatarFromCacheByScopeKey(scopeKey: string, logLabel: string)
  * Load latest valid user avatar from cache and return an object URL, mimeType and fileId.
  * Returns undefined if not found or expired.
  */
-export async function loadUserAvatarFromCache(userId: string | number | undefined): Promise<{ url: string, mimeType: string, fileId?: string } | undefined> {
+export async function loadUserAvatarFromCache(userId: string | number | undefined): Promise<AvatarCacheResult | undefined> {
   if (!userId)
     return undefined
   const scopeKey = scopeKeyForUser(String(userId))
@@ -214,7 +224,7 @@ export async function loadUserAvatarFromCache(userId: string | number | undefine
 /**
  * Load latest valid chat avatar by primary key and return an object URL + mimeType + fileId.
  */
-export async function loadChatAvatarFromCache(chatId: string | number | undefined): Promise<{ url: string, mimeType: string, fileId?: string } | undefined> {
+export async function loadChatAvatarFromCache(chatId: string | number | undefined): Promise<AvatarCacheResult | undefined> {
   if (!chatId)
     return undefined
   const scopeKey = scopeKeyForChat(String(chatId))
