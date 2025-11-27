@@ -1,5 +1,7 @@
 import type { Buffer } from 'node:buffer'
 
+import type { Result } from '@unbird/result'
+
 import type { CoreEntity } from '../types/events'
 
 import { and, eq, sql } from 'drizzle-orm'
@@ -146,7 +148,7 @@ export async function updateUserAvatar(platformUserId: string, avatarData: UserA
  * @param platformUserId The Telegram user ID
  * @returns Avatar data or null if not found
  */
-export async function getUserAvatar(platformUserId: string): Promise<UserAvatarData | null> {
+export async function getUserAvatar(platformUserId: string): Promise<Result<UserAvatarData | null>> {
   return withDb(async (db) => {
     const results = await db
       .select({
