@@ -87,7 +87,20 @@ function isSelected(id: number): boolean {
   return selectedChatsSet.value.has(id)
 }
 
-function toggleSelection(id: number): void {
+/**
+ * Check if a chat is currently active (focused for visualization)
+ */
+function isActive(id: number): boolean {
+  return activeChatId.value === id
+}
+
+/**
+ * Toggle selection for adding to sync queue
+ * This is triggered by the queue button, not the chat item itself
+ */
+function toggleSelection(id: number, event: Event): void {
+  event.stopPropagation()
+
   const newSelection = [...selectedChats.value]
   const index = newSelection.indexOf(id)
 
@@ -97,8 +110,13 @@ function toggleSelection(id: number): void {
     newSelection.splice(index, 1)
 
   selectedChats.value = newSelection
+}
 
-  // Always focus the chat that was interacted with so status panel switches accordingly
+/**
+ * Select a chat to display in the visualization panel
+ * Clicking the chat item now only focuses it without toggling selection
+ */
+function selectChat(id: number): void {
   activeChatId.value = id
 }
 </script>
@@ -146,19 +164,15 @@ function toggleSelection(id: number): void {
         class="h-full"
       >
         <template #default="{ item: chat }">
-          <label
+          <div
             :key="chat.id"
             class="group flex cursor-pointer items-center gap-3 border-b px-4 py-3 transition-colors last:border-b-0 hover:bg-accent"
             :class="{
-              'bg-primary/5': isSelected(chat.id),
+              'bg-primary/10 ring-1 ring-primary/30': isActive(chat.id),
+              'bg-primary/5': isSelected(chat.id) && !isActive(chat.id),
             }"
+            @click="selectChat(chat.id)"
           >
-            <input
-              type="checkbox"
-              :checked="isSelected(chat.id)"
-              class="h-4 w-4 cursor-pointer border-2 rounded text-primary transition-all focus:ring-2 focus:ring-offset-2 focus:ring-ring"
-              @change="toggleSelection(chat.id)"
-            >
             <div class="min-w-0 flex-1">
               <p class="truncate text-sm text-foreground font-medium">
                 {{ chat.title }}
@@ -167,7 +181,21 @@ function toggleSelection(id: number): void {
                 {{ chat.subtitle }}
               </p>
             </div>
-          </label>
+            <button
+              type="button"
+              class="flex shrink-0 items-center justify-center rounded-md p-2 transition-all"
+              :class="isSelected(chat.id)
+                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'"
+              :title="isSelected(chat.id) ? t('chatSelector.removeFromQueue') : t('chatSelector.addToQueue')"
+              @click="toggleSelection(chat.id, $event)"
+            >
+              <span
+                :class="isSelected(chat.id) ? 'i-lucide-check' : 'i-lucide-plus'"
+                class="h-4 w-4"
+              />
+            </button>
+          </div>
         </template>
       </VList>
     </div>

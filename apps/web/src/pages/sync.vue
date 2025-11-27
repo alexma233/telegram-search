@@ -27,6 +27,9 @@ const syncOptions = ref<SyncOptions>({
   maxMediaSize: 0,
 })
 
+// Selected range from chart visualization
+const selectedRange = ref<{ start: number, end: number } | null>(null)
+
 const sessionStore = useAuthStore()
 const { isLoggedIn } = storeToRefs(sessionStore)
 const websocketStore = useBridgeStore()
@@ -184,12 +187,27 @@ const localizedTaskMessage = computed(() => {
   }
 })
 
+/**
+ * Get the effective sync options, merging the selected range if available
+ */
+function getEffectiveSyncOptions(): SyncOptions {
+  const options = { ...syncOptions.value }
+
+  // If a range is selected from the chart, use it
+  if (selectedRange.value) {
+    options.minMessageId = selectedRange.value.start
+    options.maxMessageId = selectedRange.value.end
+  }
+
+  return options
+}
+
 function handleSync() {
   increase.value = true
   websocketStore.sendEvent('takeout:run', {
     chatIds: selectedChats.value.map(id => id.toString()),
     increase: true,
-    syncOptions: syncOptions.value,
+    syncOptions: getEffectiveSyncOptions(),
   })
 
   NProgress.start()
@@ -200,7 +218,7 @@ function handleResync() {
   websocketStore.sendEvent('takeout:run', {
     chatIds: selectedChats.value.map(id => id.toString()),
     increase: false,
-    syncOptions: syncOptions.value,
+    syncOptions: getEffectiveSyncOptions(),
   })
 
   NProgress.start()
@@ -217,11 +235,20 @@ function handleAbort() {
   }
 }
 
+/**
+ * Handle range selection from the chart
+ */
+function handleRangeSelect(range: { start: number, end: number }) {
+  selectedRange.value = range
+}
+
 watch(currentTaskProgress, (progress) => {
   if (progress === 100) {
     toast.success(t('sync.syncCompleted'))
     NProgress.done()
     increase.value = true
+    // Clear selected range after sync completes
+    selectedRange.value = null
   }
   else if (progress < 0 && currentTask.value?.lastError) {
     // Check if task was cancelled
@@ -394,6 +421,14 @@ watch(activeChatId, (chatId) => {
               </div>
 
               <div class="flex items-center gap-3">
+                <!-- Queue Status -->
+                <div v-if="selectedChats.length > 0 || isTaskInProgress" class="flex items-center gap-2 rounded-full bg-muted px-4 py-2">
+                  <span v-if="isTaskInProgress" class="i-lucide-loader-2 h-4 w-4 animate-spin text-primary" />
+                  <span v-else class="i-lucide-list-todo h-4 w-4 text-primary" />
+                  <span class="text-sm text-foreground font-medium">
+                    {{ t('sync.queueStatus', { syncing: isTaskInProgress ? 1 : 0, total: selectedChats.length }) }}
+                  </span>
+                </div>
                 <div class="flex items-center gap-2 rounded-full bg-muted px-4 py-2">
                   <span class="i-lucide-check-circle h-4 w-4 text-primary" />
                   <span class="text-sm text-foreground font-medium">
@@ -422,9 +457,11 @@ watch(activeChatId, (chatId) => {
 
             <!-- Status panel under the list, inside the same card -->
             <SyncVisualization
+              v-model:selected-range="selectedRange"
               :stats="chatStats"
               :loading="chatStatsLoading"
               :chat-label="activeChat ? (activeChat.name || t('chatSelector.chat', { id: activeChat.id })) : ''"
+              @range-select="handleRangeSelect"
             />
           </div>
         </div>
