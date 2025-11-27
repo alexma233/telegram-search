@@ -98,7 +98,7 @@ function isActive(id: number): boolean {
  * Toggle selection for adding to sync queue
  * This is triggered by the queue button, not the chat item itself
  */
-function toggleSelection(id: number, event: Event): void {
+function toggleSelection(id: number, event: MouseEvent): void {
   event.stopPropagation()
 
   const newSelection = [...selectedChats.value]

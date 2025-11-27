@@ -59,7 +59,7 @@ const chartSegments = computed<ChartSegment[]>(() => {
   if (!props.stats)
     return []
 
-  const { firstMessageId, latestMessageId, syncedRanges, totalMessages } = props.stats
+  const { firstMessageId, latestMessageId, syncedRanges, totalMessages, syncedMessages } = props.stats
 
   // If no messages at all, return empty
   if (totalMessages === 0)
@@ -67,15 +67,14 @@ const chartSegments = computed<ChartSegment[]>(() => {
 
   const segments: ChartSegment[] = []
 
-  // For simplicity, we assume message IDs range from 1 to totalMessages
-  // The synced range is from firstMessageId to latestMessageId
-  const minId = 1
+  // Use totalMessages as the upper bound for the message ID range
+  // Note: Message IDs in Telegram may have gaps, so count is approximate
   const maxId = totalMessages
 
   if (syncedRanges.length === 0 || (firstMessageId === 0 && latestMessageId === 0)) {
     // No synced messages - entire range is unsynced
     segments.push({
-      start: minId,
+      start: 1,
       end: maxId,
       type: 'unsynced',
       count: totalMessages,
@@ -83,32 +82,38 @@ const chartSegments = computed<ChartSegment[]>(() => {
   }
   else {
     // We have synced ranges - create segments for before, synced, and after
+    // Note: Message counts are estimates since IDs may have gaps
 
     // Before first synced message (older messages not synced)
-    if (firstMessageId > minId) {
+    if (firstMessageId > 1) {
+      // Estimate count based on proportion of total messages
+      const estimatedCount = Math.max(0, Math.round((firstMessageId - 1) / maxId * totalMessages))
       segments.push({
-        start: minId,
+        start: 1,
         end: firstMessageId - 1,
         type: 'unsynced',
-        count: firstMessageId - minId,
+        count: estimatedCount,
       })
     }
 
-    // Synced range
+    // Synced range - use actual synced message count from stats
     segments.push({
       start: firstMessageId,
       end: latestMessageId,
       type: 'synced',
-      count: latestMessageId - firstMessageId + 1,
+      count: syncedMessages,
     })
 
     // After latest synced message (newer messages not synced)
     if (latestMessageId < maxId) {
+      // Estimate count: total minus synced minus estimated before
+      const estimatedBefore = firstMessageId > 1 ? Math.round((firstMessageId - 1) / maxId * totalMessages) : 0
+      const estimatedCount = Math.max(0, totalMessages - syncedMessages - estimatedBefore)
       segments.push({
         start: latestMessageId + 1,
         end: maxId,
         type: 'unsynced',
-        count: maxId - latestMessageId,
+        count: estimatedCount,
       })
     }
   }
