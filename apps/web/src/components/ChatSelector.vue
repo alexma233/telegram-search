@@ -12,19 +12,42 @@ const props = defineProps<{
   listeningChatIds?: number[]
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const selectedChats = defineModel<number[]>('selectedChats', {
   required: true,
 })
 
-const chatTypeOptions = ref([
-  { label: t('chatSelector.user'), value: 'user' },
-  { label: t('chatSelector.group'), value: 'group' },
-  { label: t('chatSelector.channel'), value: 'channel' },
-])
+// Currently focused chat for status/visualization panel
+const activeChatId = defineModel<number | null>('activeChatId', {
+  default: null,
+})
+
+/**
+ * Build chat type options localized by current language.
+ * Returns localized labels with corresponding values for the dropdown.
+ */
+function getLocalizedChatTypeOptions(): Array<{ label: string, value: string }> {
+  return [
+    { label: t('chatSelector.user'), value: 'user' },
+    { label: t('chatSelector.group'), value: 'group' },
+    { label: t('chatSelector.channel'), value: 'channel' },
+  ]
+}
+
+// Use computed so options react to language changes; depend on locale explicitly.
+const chatTypeOptions = computed(() => {
+  void locale.value
+  return getLocalizedChatTypeOptions()
+})
 const selectedType = ref<string>('user')
 const searchQuery = ref('')
+
+/**
+ * Performance optimization: Use Set for O(1) lookup instead of O(N) array.includes()
+ * This significantly improves performance when dealing with large numbers of chats
+ */
+const selectedChatsSet = computed(() => new Set(selectedChats.value))
 
 const filteredChats = computed(() => {
   let filtered = props.chats
@@ -46,8 +69,9 @@ const filteredChats = computed(() => {
     subtitle: t('chatSelector.id', { id: chat.id }),
     type: chat.type,
   })).sort((a, b) => {
-    const aSelected = selectedChats.value.includes(a.id)
-    const bSelected = selectedChats.value.includes(b.id)
+    // Use optimized Set lookup for better performance
+    const aSelected = selectedChatsSet.value.has(a.id)
+    const bSelected = selectedChatsSet.value.has(b.id)
     if (aSelected && !bSelected)
       return -1
     if (!aSelected && bSelected)
@@ -56,8 +80,12 @@ const filteredChats = computed(() => {
   })
 })
 
+/**
+ * Check if a chat is selected using optimized Set lookup
+ * Time complexity: O(1) instead of O(N) with array.includes()
+ */
 function isSelected(id: number): boolean {
-  return selectedChats.value.includes(id)
+  return selectedChatsSet.value.has(id)
 }
 
 function isListening(id: number): boolean {
@@ -74,6 +102,9 @@ function toggleSelection(id: number): void {
     newSelection.splice(index, 1)
 
   selectedChats.value = newSelection
+
+  // Always focus the chat that was interacted with so status panel switches accordingly
+  activeChatId.value = id
 }
 </script>
 
@@ -95,7 +126,7 @@ function toggleSelection(id: number): void {
         <input
           v-model="searchQuery"
           type="text"
-          class="h-10 w-full border rounded-lg bg-background px-3 pl-10 text-sm transition-all duration-200 focus:border-primary placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          class="h-10 w-full border rounded-lg bg-background px-3 pl-10 text-sm transition-all duration-200 focus:border-primary placeholder:text-muted-foreground focus:outline-none"
           :placeholder="t('chatSelector.search')"
         >
       </div>
