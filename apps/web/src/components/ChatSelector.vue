@@ -88,8 +88,11 @@ function isSelected(id: number): boolean {
   return selectedChatsSet.value.has(id)
 }
 
+/**
+ * Check if a chat is being listened to
+ */
 function isListening(id: number): boolean {
-  return props.listeningChatIds?.includes(id) || false
+  return props.listeningChatIds?.includes(id) ?? false
 }
 
 function toggleSelection(id: number): void {
@@ -156,7 +159,7 @@ function toggleSelection(id: number): void {
             class="group flex cursor-pointer items-center gap-3 border-b px-4 py-3 transition-colors last:border-b-0 hover:bg-accent"
             :class="{
               'bg-primary/5': isSelected(chat.id) && !isListening(chat.id),
-              'bg-green-500/10 border-green-500/20': isListening(chat.id),
+              'bg-green-500/10 border-green-500/30': isListening(chat.id),
             }"
           >
             <input
@@ -166,21 +169,20 @@ function toggleSelection(id: number): void {
               @change="toggleSelection(chat.id)"
             >
             <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2">
-                <p class="truncate text-sm text-foreground font-medium">
-                  {{ chat.title }}
-                </p>
-                <span
-                  v-if="isListening(chat.id)"
-                  class="inline-flex items-center gap-1 rounded-full bg-green-500/20 px-2 py-0.5 text-xs text-green-700 font-medium dark:text-green-400"
-                >
-                  <span class="i-lucide-radio h-3 w-3" />
-                  {{ t('chatSelector.listening') }}
-                </span>
-              </div>
+              <p class="truncate text-sm text-foreground font-medium">
+                {{ chat.title }}
+              </p>
               <p class="truncate text-xs text-muted-foreground">
                 {{ chat.subtitle }}
               </p>
+            </div>
+            <!-- Listening indicator badge -->
+            <div
+              v-if="isListening(chat.id)"
+              class="flex shrink-0 items-center gap-1 rounded-full bg-green-500/20 px-2 py-1"
+            >
+              <span class="i-lucide-radio h-3 w-3 text-green-600 dark:text-green-400" />
+              <span class="text-xs text-green-700 font-medium dark:text-green-300">{{ t('chatSelector.listening') }}</span>
             </div>
           </label>
         </template>

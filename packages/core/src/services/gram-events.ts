@@ -21,7 +21,6 @@ export function createGramEventsService(ctx: CoreContext) {
       return
     }
 
-    // Register a generic event handler that checks config dynamically
     eventHandler = (event) => {
       if (!event.message)
         return
