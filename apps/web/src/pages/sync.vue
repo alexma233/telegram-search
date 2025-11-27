@@ -16,7 +16,6 @@ import SyncVisualization from '../components/SyncVisualization.vue'
 import Dialog from '../components/ui/Dialog.vue'
 
 import { Button } from '../components/ui/Button'
-import { Progress } from '../components/ui/Progress'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -381,11 +380,6 @@ watch(activeChatId, (chatId) => {
               </div>
             </div>
 
-            <Progress
-              v-if="!currentTask?.lastError"
-              :progress="currentTaskProgress"
-            />
-
             <div class="flex justify-end gap-2">
               <Button
                 v-if="currentTask?.lastError"
@@ -460,6 +454,8 @@ watch(activeChatId, (chatId) => {
               v-model:selected-range="selectedRange"
               :stats="chatStats"
               :loading="chatStatsLoading"
+              :progress="isTaskInProgress ? currentTaskProgress : undefined"
+              :progress-message="isTaskInProgress ? localizedTaskMessage : undefined"
               :chat-label="activeChat ? (activeChat.name || t('chatSelector.chat', { id: activeChat.id })) : ''"
               @range-select="handleRangeSelect"
             />

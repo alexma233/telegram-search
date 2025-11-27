@@ -24,6 +24,8 @@ interface Props {
   stats?: ChatSyncStats
   loading?: boolean
   chatLabel?: string
+  progress?: number
+  progressMessage?: string
 }
 
 /**
@@ -381,6 +383,26 @@ watch(() => props.stats?.chatId, () => {
                 {{ t('sync.unsyncedMessages') }}
               </div>
             </div>
+          </div>
+
+          <!-- Real-time Progress Bar (shown during sync) -->
+          <div v-if="props.progress !== undefined" class="space-y-2">
+            <div class="flex items-center justify-between text-sm">
+              <div class="flex items-center gap-2">
+                <span class="i-lucide-loader-2 h-4 w-4 animate-spin text-primary" />
+                <span class="text-foreground font-medium">{{ t('sync.syncing') }}</span>
+              </div>
+              <span class="text-muted-foreground">{{ props.progress }}%</span>
+            </div>
+            <div class="relative h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                class="h-full bg-primary transition-all duration-300 ease-out"
+                :style="{ width: `${props.progress}%` }"
+              />
+            </div>
+            <p v-if="props.progressMessage" class="text-xs text-muted-foreground">
+              {{ props.progressMessage }}
+            </p>
           </div>
 
           <!-- Message ID Range Info -->
