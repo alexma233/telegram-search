@@ -1,4 +1,20 @@
 /**
+ * Reconstruct Uint8Array from JSON-safe payload (handles both Uint8Array and {data: number[]} formats).
+ * DRY: Extracted from entity and dialog event handlers.
+ */
+export function reconstructAvatarBytes(byte: Uint8Array | { data: number[] }): Uint8Array | undefined {
+  try {
+    // Type guard to check if byte is an object with data property
+    if (typeof byte === 'object' && 'data' in byte && Array.isArray(byte.data))
+      return new Uint8Array(byte.data)
+    return byte as Uint8Array
+  }
+  catch {
+    return undefined
+  }
+}
+
+/**
  * Convert raw bytes and mime type to a Blob.
  * Designed for browser environments where avatar images arrive as Uint8Array.
  * Use precise ArrayBuffer slicing to avoid entire block copying and reduce memory usage.

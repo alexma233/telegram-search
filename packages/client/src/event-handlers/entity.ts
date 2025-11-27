@@ -4,7 +4,7 @@ import { useBridgeStore } from '../composables/useBridge'
 import { useAvatarStore } from '../stores/useAvatar'
 import { useBootstrapStore } from '../stores/useBootstrap'
 import { persistUserAvatar } from '../utils/avatar-cache'
-import { bytesToBlob, canDecodeAvatar } from '../utils/image'
+import { bytesToBlob, canDecodeAvatar, reconstructAvatarBytes } from '../utils/image'
 
 /**
  * Register entity-related client event handlers.
@@ -31,20 +31,9 @@ export function registerEntityEventHandlers(
   registerEventHandler('entity:avatar:data', async (data: { userId: string, byte: Uint8Array | { data: number[] }, mimeType: string, fileId?: string }) => {
     const avatarStore = useAvatarStore()
 
-    let buffer: Uint8Array | undefined
-    try {
-      // Type guard to check if byte is an object with data property
-      if (typeof data.byte === 'object' && 'data' in data.byte && Array.isArray(data.byte.data))
-        buffer = new Uint8Array(data.byte.data)
-      else buffer = data.byte as Uint8Array
-    }
-    catch (error) {
-      // Warn-only logging to comply with lint rules
-      console.warn('[Avatar] Failed to reconstruct user avatar byte', { userId: data.userId }, error)
-    }
-
+    let buffer: Uint8Array | undefined = reconstructAvatarBytes(data.byte)
     if (!buffer) {
-      // Clear in-flight flag to avoid repeated sends
+      console.warn('[Avatar] Failed to reconstruct user avatar byte', { userId: data.userId })
       avatarStore.markUserFetchCompleted(data.userId)
       return
     }

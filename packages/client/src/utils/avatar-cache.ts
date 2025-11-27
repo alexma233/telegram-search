@@ -155,30 +155,26 @@ export async function persistChatAvatar(chatId: string | number, blob: Blob, mim
 }
 
 /**
- * Load latest valid user avatar from cache and return an object URL, mimeType and fileId.
- * Returns undefined if not found or expired.
- * Note: For backwards compatibility, old records without fileId will still be loaded but fileId will be undefined.
- * Optimization: Add memory cleaning to ensure that original blob references are released and prevent memory leaks.
+ * Internal helper to load avatar from cache by scope key.
+ * Handles DB access, expiration check, and memory cleanup.
+ * DRY: Shared by loadUserAvatarFromCache and loadChatAvatarFromCache.
  */
-export async function loadUserAvatarFromCache(userId: string | number | undefined): Promise<{ url: string, mimeType: string, fileId?: string } | undefined> {
-  if (!userId)
-    return undefined
+async function loadAvatarFromCacheByScopeKey(scopeKey: string, logLabel: string): Promise<{ url: string, mimeType: string, fileId?: string } | undefined> {
   const db = await openDb()
   if (!db)
     return undefined
-  const id = String(userId)
   let latest: AvatarCacheRecord | undefined
   try {
     latest = await new Promise<AvatarCacheRecord | undefined>((resolve, reject) => {
       const tx = db.transaction(AVATAR_STORE, 'readonly')
       const store = tx.objectStore(AVATAR_STORE)
-      const req = store.get(scopeKeyForUser(id))
+      const req = store.get(scopeKey)
       req.onsuccess = () => resolve(req.result as AvatarCacheRecord | undefined)
       req.onerror = () => reject(req.error)
     })
   }
   catch (err) {
-    console.warn('[AvatarCache] loadUserAvatarFromCache failed', err)
+    console.warn(`[AvatarCache] ${logLabel} failed`, err)
     return undefined
   }
 
@@ -205,51 +201,24 @@ export async function loadUserAvatarFromCache(userId: string | number | undefine
 }
 
 /**
+ * Load latest valid user avatar from cache and return an object URL, mimeType and fileId.
+ * Returns undefined if not found or expired.
+ */
+export async function loadUserAvatarFromCache(userId: string | number | undefined): Promise<{ url: string, mimeType: string, fileId?: string } | undefined> {
+  if (!userId)
+    return undefined
+  const scopeKey = scopeKeyForUser(String(userId))
+  return loadAvatarFromCacheByScopeKey(scopeKey, 'loadUserAvatarFromCache')
+}
+
+/**
  * Load latest valid chat avatar by primary key and return an object URL + mimeType + fileId.
- * Optimization: Add memory cleaning to ensure that original blob references are released and prevent memory leaks.
  */
 export async function loadChatAvatarFromCache(chatId: string | number | undefined): Promise<{ url: string, mimeType: string, fileId?: string } | undefined> {
   if (!chatId)
     return undefined
-  const db = await openDb()
-  if (!db)
-    return undefined
-  const id = String(chatId)
-  let latest: AvatarCacheRecord | undefined
-  try {
-    latest = await new Promise<AvatarCacheRecord | undefined>((resolve, reject) => {
-      const tx = db.transaction(AVATAR_STORE, 'readonly')
-      const store = tx.objectStore(AVATAR_STORE)
-      const req = store.get(scopeKeyForChat(id))
-      req.onsuccess = () => resolve(req.result as AvatarCacheRecord | undefined)
-      req.onerror = () => reject(req.error)
-    })
-  }
-  catch (err) {
-    console.warn('[AvatarCache] loadChatAvatarFromCache failed', err)
-    return undefined
-  }
-
-  if (!latest) {
-    return undefined
-  }
-  if (latest.expiresAt && Date.now() > latest.expiresAt) {
-    return undefined
-  }
-  try {
-    const url = URL.createObjectURL(latest.blob)
-    const result = { url, mimeType: latest.mimeType, fileId: latest.fileId }
-
-    // Clean reference to original Blob to help GC reclaim memory
-    latest.blob = new Blob()
-    latest = undefined
-
-    return result
-  }
-  catch (err) {
-    console.warn('[AvatarCache] objectURL failed', err)
-    return undefined
-  }
+  const scopeKey = scopeKeyForChat(String(chatId))
+  return loadAvatarFromCacheByScopeKey(scopeKey, 'loadChatAvatarFromCache')
 }
 
 /**

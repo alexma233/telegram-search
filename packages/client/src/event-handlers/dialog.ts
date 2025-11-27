@@ -3,7 +3,7 @@ import type { ClientRegisterEventHandlerFn } from '.'
 import { useAvatarStore } from '../stores/useAvatar'
 import { useChatStore } from '../stores/useChat'
 import { persistChatAvatar } from '../utils/avatar-cache'
-import { bytesToBlob, canDecodeAvatar } from '../utils/image'
+import { bytesToBlob, canDecodeAvatar, reconstructAvatarBytes } from '../utils/image'
 
 /**
  * Register dialog-related client event handlers.
@@ -37,22 +37,10 @@ export function registerDialogEventHandlers(
       return
     }
 
-    // Reconstruct buffer from JSON-safe payload
-    let buffer: Uint8Array | undefined
-    try {
-      // Type guard to check if byte is an object with data property
-      if (typeof data.byte === 'object' && 'data' in data.byte && Array.isArray(data.byte.data))
-        buffer = new Uint8Array(data.byte.data)
-      else buffer = data.byte as Uint8Array
-    }
-    catch (error) {
-      // Warn-only logging to comply with lint rules
-      console.warn('[Avatar] Failed to reconstruct chat avatar byte', { chatId: data.chatId }, error)
-    }
-
+    // Reconstruct buffer from JSON-safe payload using shared helper
+    let buffer: Uint8Array | undefined = reconstructAvatarBytes(data.byte)
     if (!buffer) {
-      // Use warn to comply with lint rule: allow only warn/error
-      console.warn('[Avatar] Missing byte for chat avatar')
+      console.warn('[Avatar] Missing byte for chat avatar', { chatId: data.chatId })
       return
     }
 

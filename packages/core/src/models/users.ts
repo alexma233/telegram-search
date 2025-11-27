@@ -109,3 +109,65 @@ export function convertDBUserToCoreEntity(dbUser: DBSelectUser): CoreEntity {
     }
   }
 }
+
+/**
+ * Avatar data structure for database storage
+ */
+export interface UserAvatarData {
+  fileId: string
+  base64: string
+  mimeType: string
+}
+
+/**
+ * Update a user's avatar in the database
+ * @param platformUserId The Telegram user ID
+ * @param avatarData The avatar data to store (fileId, base64, mimeType)
+ */
+export async function updateUserAvatar(platformUserId: string, avatarData: UserAvatarData) {
+  return withDb(async db => db
+    .update(usersTable)
+    .set({
+      avatar_file_id: avatarData.fileId,
+      avatar_base64: avatarData.base64,
+      avatar_mime_type: avatarData.mimeType,
+      updated_at: Date.now(),
+    })
+    .where(and(
+      eq(usersTable.platform, 'telegram'),
+      eq(usersTable.platform_user_id, platformUserId),
+    ))
+    .returning(),
+  )
+}
+
+/**
+ * Get a user's avatar from the database
+ * @param platformUserId The Telegram user ID
+ * @returns Avatar data or null if not found
+ */
+export async function getUserAvatar(platformUserId: string): Promise<UserAvatarData | null> {
+  return withDb(async (db) => {
+    const results = await db
+      .select({
+        avatar_file_id: usersTable.avatar_file_id,
+        avatar_base64: usersTable.avatar_base64,
+        avatar_mime_type: usersTable.avatar_mime_type,
+      })
+      .from(usersTable)
+      .where(and(
+        eq(usersTable.platform, 'telegram'),
+        eq(usersTable.platform_user_id, platformUserId),
+      ))
+      .limit(1)
+
+    if (results.length === 0 || !results[0].avatar_file_id || !results[0].avatar_base64 || !results[0].avatar_mime_type)
+      return null
+
+    return {
+      fileId: results[0].avatar_file_id,
+      base64: results[0].avatar_base64,
+      mimeType: results[0].avatar_mime_type,
+    }
+  })
+}
