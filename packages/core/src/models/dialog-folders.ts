@@ -25,7 +25,7 @@ export async function recordDialogFolders(accountId: string, folders: CoreDialog
         .returning()
 
       const folderIdByTelegramId = new Map<number, string>()
-      insertedFolders.forEach(folder => {
+      insertedFolders.forEach((folder) => {
         folderIdByTelegramId.set(folder.telegram_folder_id, folder.id)
       })
 
