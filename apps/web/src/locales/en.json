@@ -44,20 +44,17 @@
     "send": "Send",
     "typeAMessage": "Type a message..."
   },
-  "chatGroups": {
-    "channel": "Channels",
-    "group": "Groups",
-    "user": "Users"
-  },
   "chatSelector": {
-    "channel": "Channel",
+    "folderLabel": "Folder",
+    "allChats": "All chats",
     "chat": "Chat {id}",
-    "group": "Group",
     "id": "ID: {id}",
     "noChatsFound": "No chats found",
-    "search": "Search",
-    "type": "Type",
-    "user": "User"
+    "search": "Search"
+  },
+  "chatFolders": {
+    "all": "All chats",
+    "empty": "No custom folders found. Showing every dialog."
   },
   "errors": {
     "floodWait": "Rate limited. Please wait {seconds} seconds.",

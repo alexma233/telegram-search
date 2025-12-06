@@ -148,6 +148,13 @@
       "when": 1764758796311,
       "tag": "0020_silent_stellaris",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1765060800000,
+      "tag": "0021_structured_folders",
+      "breakpoints": true
     }
   ]
 }

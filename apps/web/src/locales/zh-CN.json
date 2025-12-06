@@ -44,20 +44,17 @@
     "send": "发送",
     "typeAMessage": "输入消息..."
   },
-  "chatGroups": {
-    "channel": "频道",
-    "group": "群组",
-    "user": "用户"
-  },
   "chatSelector": {
-    "channel": "频道",
+    "folderLabel": "文件夹",
+    "allChats": "全部聊天",
     "chat": "聊天 {id}",
-    "group": "群组",
     "id": "ID: {id}",
     "noChatsFound": "没有找到聊天",
-    "search": "搜索",
-    "type": "类型",
-    "user": "用户"
+    "search": "搜索"
+  },
+  "chatFolders": {
+    "all": "全部聊天",
+    "empty": "尚未配置 Telegram 文件夹，默认显示全部对话。"
   },
   "errors": {
     "floodWait": "请求过于频繁，请等待 {seconds} 秒后再试。",

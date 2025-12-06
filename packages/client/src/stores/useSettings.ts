@@ -1,6 +1,3 @@
-// https://github.com/moeru-ai/airi/blob/d4a1e9f5f67201f7a25960956ce97e20edfecdfa/packages/stage/src/stores/settings.ts
-import type { DialogType } from '@tg-search/core'
-
 import { useLocalStorage } from '@vueuse/core'
 import { converter } from 'culori'
 import { acceptHMRUpdate, defineStore } from 'pinia'
@@ -11,12 +8,10 @@ export const DEFAULT_THEME_COLORS_HUE = 220.44
 const convert = converter('oklch')
 const getHueFrom = (color?: string) => color ? convert(color)?.h : DEFAULT_THEME_COLORS_HUE
 
-export type ChatGroup = DialogType | ''
-
 export const useSettingsStore = defineStore('settings', () => {
   const disableSettings = ref(import.meta.env.VITE_DISABLE_SETTINGS === 'true')
   const debugMode = useLocalStorage<boolean>('settings/debug', false)
-  const selectedGroup = useLocalStorage<ChatGroup>('settings/group-selected', 'user')
+  const selectedFolderId = useLocalStorage<string>('settings/folder-selected', 'all')
   const useCachedMessage = useLocalStorage<boolean>('settings/use-cached-message-v2', true)
 
   const theme = useLocalStorage<string>('settings/theme', 'default')
@@ -74,7 +69,7 @@ export const useSettingsStore = defineStore('settings', () => {
     themeColorsHueDynamic,
     isColorSelectedForPrimary,
     applyPrimaryColorFrom,
-    selectedGroup,
+    selectedFolderId,
     useCachedMessage,
     debugMode,
     language,

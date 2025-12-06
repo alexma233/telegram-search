@@ -14,6 +14,8 @@ export function registerStorageEventHandlers(
   registerEventHandler('storage:dialogs', (data) => {
     const chatStore = useChatStore()
     chatStore.chats = data.dialogs
+    if (data.folders)
+      chatStore.setFolders(data.folders)
     // Prefill avatars from persistent cache concurrently for better initial UX
     Promise.resolve().then(async () => {
       try {

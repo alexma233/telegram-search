@@ -1,17 +1,18 @@
 <script setup lang="ts">
-import type { CoreDialog } from '@tg-search/core/types'
+import type { CoreDialog, CoreDialogFolder } from '@tg-search/core/types'
 
 import { VList } from 'virtua/vue'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import SelectDropdown from './ui/SelectDropdown.vue'
 
 const props = defineProps<{
   chats: CoreDialog[]
+  folders?: CoreDialogFolder[]
 }>()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const selectedChats = defineModel<number[]>('selectedChats', {
   required: true,
@@ -22,25 +23,45 @@ const activeChatId = defineModel<number | null>('activeChatId', {
   default: null,
 })
 
-/**
- * Build chat type options localized by current language.
- * Returns localized labels with corresponding values for the dropdown.
- */
-function getLocalizedChatTypeOptions(): Array<{ label: string, value: string }> {
-  return [
-    { label: t('chatSelector.user'), value: 'user' },
-    { label: t('chatSelector.group'), value: 'group' },
-    { label: t('chatSelector.channel'), value: 'channel' },
-  ]
-}
-
-// Use computed so options react to language changes; depend on locale explicitly.
-const chatTypeOptions = computed(() => {
-  void locale.value
-  return getLocalizedChatTypeOptions()
-})
-const selectedType = ref<string>('user')
+const selectedFolder = ref<string>('all')
 const searchQuery = ref('')
+
+const folderOptions = computed(() => {
+  const options: Array<{ label: string, value: string }> = [
+    { label: t('chatSelector.allChats'), value: 'all' },
+  ]
+  if (props.folders?.length) {
+    options.push(
+      ...props.folders.map(folder => ({
+        label: folder.emoticon ? `${folder.emoticon} ${folder.title}` : folder.title,
+        value: folder.id.toString(),
+      })),
+    )
+  }
+  return options
+})
+
+const folderChatMap = computed(() => {
+  const map = new Map<string, Set<number>>()
+  props.folders?.forEach((folder) => {
+    map.set(folder.id.toString(), new Set(folder.chatIds))
+  })
+  return map
+})
+
+watch(
+  () => props.folders,
+  (folders) => {
+    if (!folders?.length) {
+      selectedFolder.value = 'all'
+      return
+    }
+
+    if (selectedFolder.value !== 'all' && !folders.some(folder => folder.id.toString() === selectedFolder.value))
+      selectedFolder.value = folders[0].id.toString()
+  },
+  { immediate: true, deep: true },
+)
 
 /**
  * Performance optimization: Use Set for O(1) lookup instead of O(N) array.includes()
@@ -51,8 +72,13 @@ const selectedChatsSet = computed(() => new Set(selectedChats.value))
 const filteredChats = computed(() => {
   let filtered = props.chats
 
-  if (selectedType.value)
-    filtered = filtered.filter(chat => chat.type === selectedType.value)
+  if (selectedFolder.value !== 'all') {
+    const allowedChats = folderChatMap.value.get(selectedFolder.value)
+    if (allowedChats?.size)
+      filtered = filtered.filter(chat => allowedChats.has(chat.id))
+    else
+      filtered = []
+  }
 
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
@@ -110,8 +136,9 @@ function toggleSelection(id: number): void {
       <!-- Type Selection -->
       <div class="w-full md:w-48">
         <SelectDropdown
-          v-model="selectedType"
-          :options="chatTypeOptions"
+          v-model="selectedFolder"
+          :options="folderOptions"
+          :label="t('chatSelector.folderLabel')"
         />
       </div>
 

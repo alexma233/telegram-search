@@ -1,4 +1,4 @@
-import type { CoreDialog } from '@tg-search/core'
+import type { CoreDialog, CoreDialogFolder } from '@tg-search/core'
 
 import { useLogger } from '@guiiai/logg'
 import { useLocalStorage } from '@vueuse/core'
@@ -9,7 +9,9 @@ import { useBridgeStore } from '../composables/useBridge'
 
 export const useChatStore = defineStore('chat', () => {
   const computedChatKey = computed(() => `chat/chats/${useBridgeStore().activeSessionId}`)
+  const computedFolderKey = computed(() => `chat/folders/${useBridgeStore().activeSessionId}`)
   const chats = useLocalStorage<CoreDialog[]>(computedChatKey, [])
+  const folders = useLocalStorage<CoreDialogFolder[]>(computedFolderKey, [])
 
   const getChat = (id: string) => {
     return chats.value.find(chat => chat.id === Number(id))
@@ -30,10 +32,16 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function setFolders(nextFolders: CoreDialogFolder[]) {
+    folders.value = nextFolders
+  }
+
   return {
     init,
     getChat,
     chats,
+    folders,
+    setFolders,
   }
 })
 

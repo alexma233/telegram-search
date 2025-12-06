@@ -13,3 +13,10 @@ export interface CoreDialog {
   avatarUpdatedAt?: Date
   avatarBlobUrl?: string
 }
+
+export interface CoreDialogFolder {
+  id: number
+  title: string
+  emoticon?: string
+  chatIds: number[]
+}

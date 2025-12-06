@@ -2,7 +2,7 @@ import type { Result } from '@unbird/result'
 import type { Dialog } from 'telegram/tl/custom/dialog'
 
 import type { CoreContext } from '../context'
-import type { CoreDialog, DialogType } from '../types/dialog'
+import type { CoreDialog, CoreDialogFolder, DialogType } from '../types/dialog'
 
 import { useLogger } from '@guiiai/logg'
 import { circularObject } from '@tg-search/common'
@@ -87,6 +87,26 @@ export function createDialogService(ctx: CoreContext) {
     })
   }
 
+  async function resolvePeersToChatIds(
+    peers: Api.TypeInputPeer[] | undefined,
+    bucket: Set<number>,
+  ) {
+    if (!peers?.length)
+      return
+
+    for (const peer of peers) {
+      try {
+        const peerId = await getClient().getPeerId(peer)
+        const numericId = typeof peerId === 'bigint' ? Number(peerId) : Number(peerId)
+        if (!Number.isNaN(numericId))
+          bucket.add(numericId)
+      }
+      catch (error) {
+        logger.withError(error).warn('Failed to resolve dialog folder peer', { peer: circularObject(peer) })
+      }
+    }
+  }
+
   /**
    * Fetch dialogs and emit base data. Then asynchronously fetch avatars.
    *
@@ -150,6 +170,40 @@ export function createDialogService(ctx: CoreContext) {
     await avatarHelper.fetchDialogAvatar(chatId)
   }
 
+  async function fetchDialogFolders(): Promise<Result<CoreDialogFolder[]>> {
+    try {
+      const response = await getClient().invoke(new Api.messages.GetDialogFilters())
+      if (!(response instanceof Api.messages.DialogFilters)) {
+        logger.warn('Unsupported dialog folder response type')
+        return Ok([])
+      }
+
+      const folders: CoreDialogFolder[] = []
+      for (const filter of response.filters) {
+        if (!(filter instanceof Api.DialogFilter))
+          continue
+
+        const chatIds = new Set<number>()
+        await resolvePeersToChatIds(filter.includePeers, chatIds)
+        await resolvePeersToChatIds(filter.pinnedPeers, chatIds)
+
+        folders.push({
+          id: filter.id,
+          title: filter.title,
+          emoticon: filter.emoticon ?? undefined,
+          chatIds: Array.from(chatIds),
+        })
+      }
+
+      emitter.emit('dialog:folders', { folders })
+      return Ok(folders)
+    }
+    catch (error) {
+      logger.withError(error).warn('Failed to fetch dialog folders')
+      return Err('Failed to fetch dialog folders')
+    }
+  }
+
   return {
     fetchDialogs,
     // Delegated to AvatarHelper
@@ -157,5 +211,6 @@ export function createDialogService(ctx: CoreContext) {
       await avatarHelper.fetchDialogAvatars(dialogs)
     },
     fetchSingleDialogAvatar,
+    fetchDialogFolders,
   }
 }

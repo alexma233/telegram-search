@@ -8,11 +8,13 @@ import { useLogger } from '@guiiai/logg'
 import {
   convertToCoreRetrievalMessages,
   fetchChatsByAccountId,
+  fetchDialogFoldersByAccountId,
   fetchMessageContextWithPhotos,
   fetchMessagesWithPhotos,
   getChatMessagesStats,
   isChatAccessibleByAccount,
   recordChats,
+  recordDialogFolders,
   recordMessagesWithMedia,
   retrieveMessages,
 } from '../models'
@@ -125,7 +127,9 @@ export function registerStorageEventHandlers(ctx: CoreContext) {
       } satisfies CoreDialog
     })
 
-    emitter.emit('storage:dialogs', { dialogs })
+    const folders = (await fetchDialogFoldersByAccountId(accountId))?.unwrap() ?? []
+
+    emitter.emit('storage:dialogs', { dialogs, folders })
   })
 
   emitter.on('storage:record:dialogs', async ({ dialogs, accountId }) => {
@@ -144,6 +148,15 @@ export function registerStorageEventHandlers(ctx: CoreContext) {
 
     const result = (await recordChats(dialogs, accountId))?.expect('Failed to record dialogs')
     logger.withFields({ recorded: result.length }).verbose('Successfully recorded dialogs')
+  })
+
+  emitter.on('storage:record:dialog-folders', async ({ folders, accountId }) => {
+    logger.withFields({
+      size: folders.length,
+      accountId,
+    }).verbose('Recording dialog folders')
+
+    await recordDialogFolders(accountId, folders)?.expect('Failed to record dialog folders')
   })
 
   emitter.on('storage:search:messages', async (params) => {

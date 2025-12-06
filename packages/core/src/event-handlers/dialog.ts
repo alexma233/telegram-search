@@ -12,11 +12,13 @@ export function registerDialogEventHandlers(ctx: CoreContext) {
       logger.verbose('Fetching dialogs')
 
       const dialogs = (await dialogService.fetchDialogs()).expect('Failed to fetch dialogs')
+      const folders = (await dialogService.fetchDialogFolders()).expect('Failed to fetch dialog folders')
 
       // Get current account ID from context
       const accountId = ctx.getCurrentAccountId()
 
       emitter.emit('storage:record:dialogs', { dialogs, accountId })
+      emitter.emit('storage:record:dialog-folders', { folders, accountId })
     })
 
     // Prioritized single-avatar fetch for viewport-visible items

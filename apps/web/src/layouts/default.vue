@@ -1,5 +1,4 @@
 <script lang="ts" setup>
-import type { ChatGroup } from '@tg-search/client'
 import type { CoreDialog } from '@tg-search/core/types'
 
 import buildTime from '~build/time'
@@ -22,7 +21,7 @@ import UserDropdown from '../components/layout/UserDropdown.vue'
 import { Button } from '../components/ui/Button'
 
 const settingsStore = useSettingsStore()
-const { theme, disableSettings } = storeToRefs(settingsStore)
+const { theme, disableSettings, selectedFolderId } = storeToRefs(settingsStore)
 const isDark = useDark()
 
 const websocketStore = useBridgeStore()
@@ -63,25 +62,85 @@ const mobileDrawerOpen = ref(false)
 const userDropdownOpen = ref(false)
 
 const chatStore = useChatStore()
-const chats = computed(() => chatStore.chats)
+const { chats, folders } = storeToRefs(chatStore)
 const chatsFiltered = computed(() => {
-  return chats.value.filter(chat => chat.name.toLowerCase().includes(searchParams.value.toLowerCase()))
+  const keyword = searchParams.value.toLowerCase()
+  return chats.value.filter(chat => chat.name.toLowerCase().includes(keyword))
 })
 
-const { selectedGroup } = storeToRefs(useSettingsStore())
-const activeChatGroup = computed(() => {
-  if (route.params.chatId) {
-    const currentChat = chatStore.getChat(route.params.chatId.toString())
-    if (currentChat) {
-      return currentChat.type
-    }
+const chatMap = computed(() => {
+  const map = new Map<number, CoreDialog>()
+  chats.value.forEach(chat => map.set(chat.id, chat))
+  return map
+})
+
+const folderChatMap = computed(() => {
+  const map = new Map<string, CoreDialog[]>()
+  folders.value.forEach((folder) => {
+    const entries: CoreDialog[] = []
+    folder.chatIds.forEach((chatId) => {
+      const chat = chatMap.value.get(chatId)
+      if (chat)
+        entries.push(chat)
+    })
+    map.set(folder.id.toString(), entries)
+  })
+  return map
+})
+
+const hasCustomFolders = computed(() => folders.value.length > 0)
+
+watch(folders, (nextFolders) => {
+  if (!nextFolders.length) {
+    selectedFolderId.value = 'all'
+    return
   }
-  return selectedGroup.value
+
+  if (selectedFolderId.value !== 'all' && !nextFolders.some(folder => folder.id.toString() === selectedFolderId.value))
+    selectedFolderId.value = nextFolders[0].id.toString()
+}, { immediate: true })
+
+watch(() => route.params.chatId, (chatId) => {
+  if (!chatId || !folders.value.length)
+    return
+
+  const numericChatId = Number(chatId)
+  if (Number.isNaN(numericChatId))
+    return
+
+  const ownerFolder = folders.value.find(folder => folder.chatIds.includes(numericChatId))
+  if (ownerFolder)
+    selectedFolderId.value = ownerFolder.id.toString()
+}, { immediate: true })
+
+const activeFolderId = computed(() => {
+  if (!hasCustomFolders.value)
+    return 'all'
+
+  if (selectedFolderId.value === 'all')
+    return 'all'
+
+  if (folderChatMap.value.has(selectedFolderId.value))
+    return selectedFolderId.value
+
+  return folders.value[0]?.id.toString() ?? 'all'
 })
 
-// Filtered chats by active group
-const activeGroupChats = computed(() => {
-  return chatsFiltered.value.filter(chat => chat.type === activeChatGroup.value)
+const folderButtons = computed(() => {
+  return folders.value.map(folder => ({
+    id: folder.id.toString(),
+    label: folder.title,
+    emoji: folder.emoticon,
+  }))
+})
+
+const activeFolderChats = computed(() => {
+  if (!hasCustomFolders.value || activeFolderId.value === 'all')
+    return chatsFiltered.value
+
+  const visibleIds = new Set(chatsFiltered.value.map(chat => chat.id))
+  const folderChats = folderChatMap.value.get(activeFolderId.value) ?? []
+  return folderChats.filter(chat => visibleIds.has(chat.id))
 })
 
 // Computed classes for responsive design
@@ -113,8 +172,8 @@ watch(route, () => {
   }
 })
 
-function toggleActiveChatGroup(group: ChatGroup) {
-  selectedGroup.value = group
+function setActiveFolder(folderId: string) {
+  selectedFolderId.value = folderId
 }
 
 function toggleSidebar() {
@@ -154,8 +213,8 @@ async function prioritizeVisibleAvatars(list: CoreDialog[], count = 50) {
   await prefillChatAvatarsParallel(top)
 }
 
-// Prioritize visible avatars on group change and initial render
-watch(activeGroupChats, (list) => {
+// Prioritize visible avatars on folder change and initial render
+watch(activeFolderChats, (list) => {
   if (!list?.length)
     return
   void prioritizeVisibleAvatars(list)
@@ -238,45 +297,45 @@ watch(activeGroupChats, (list) => {
         />
       </div>
 
-      <!-- Chat groups -->
+      <!-- Chat folders -->
       <div
         v-if="!isMobile || mobileDrawerOpen"
         class="min-h-0 flex flex-1 flex-col border-t"
       >
-        <!-- Tab selector -->
-        <div class="flex items-center gap-1 border-b p-2">
+        <!-- Folder selector -->
+        <div class="flex flex-wrap gap-1 border-b p-2">
           <button
-            :class="{ 'bg-accent text-accent-foreground': activeChatGroup === 'user' }"
-            class="flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
-            @click="toggleActiveChatGroup('user')"
+            :class="{ 'bg-accent text-accent-foreground': activeFolderId === 'all' }"
+            class="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+            @click="setActiveFolder('all')"
           >
-            <span class="i-lucide-user h-4 w-4" />
-            <span>{{ t('chatGroups.user') }}</span>
+            <span class="i-lucide-folders h-4 w-4" />
+            <span>{{ t('chatFolders.all') }}</span>
           </button>
 
           <button
-            :class="{ 'bg-accent text-accent-foreground': activeChatGroup === 'group' }"
-            class="flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
-            @click="toggleActiveChatGroup('group')"
+            v-for="folder in folderButtons"
+            :key="folder.id"
+            :class="{ 'bg-accent text-accent-foreground': activeFolderId === folder.id }"
+            class="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+            @click="setActiveFolder(folder.id)"
           >
-            <span class="i-lucide-users h-4 w-4" />
-            <span>{{ t('chatGroups.group') }}</span>
+            <span v-if="folder.emoji" class="text-base leading-none">{{ folder.emoji }}</span>
+            <span class="truncate">{{ folder.label }}</span>
           </button>
+        </div>
 
-          <button
-            :class="{ 'bg-accent text-accent-foreground': activeChatGroup === 'channel' }"
-            class="flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
-            @click="toggleActiveChatGroup('channel')"
-          >
-            <span class="i-lucide-message-circle h-4 w-4" />
-            <span>{{ t('chatGroups.channel') }}</span>
-          </button>
+        <div
+          v-if="!hasCustomFolders"
+          class="border-b px-3 py-2 text-xs text-muted-foreground"
+        >
+          {{ t('chatFolders.empty') }}
         </div>
 
         <!-- Chat list -->
         <div class="min-h-0 flex-1 overflow-hidden">
           <VList
-            :data="activeGroupChats"
+            :data="activeFolderChats"
             class="h-full py-2"
           >
             <template #default="{ item: chat }">

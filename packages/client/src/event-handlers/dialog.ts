@@ -17,6 +17,10 @@ export function registerDialogEventHandlers(
     useChatStore().chats = data.dialogs
   })
 
+  registerEventHandler('dialog:folders', (data) => {
+    useChatStore().setFolders(data.folders)
+  })
+
   /**
    * Incremental avatar updates.
    *
