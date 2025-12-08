@@ -28,6 +28,11 @@ catalogs:
       specifier: ^0.4.0-beta.10
       version: 0.4.0-beta.10
 
+patchedDependencies:
+  vite-node:
+    hash: f958fbbeba871752c0cfdd21510651e7957681ffec3a1f8e14142f91ff2cc499
+    path: patches/vite-node.patch
+
 importers:
 
   .:
@@ -108,7 +113,7 @@ importers:
         version: 0.17.0(synckit@0.11.11)(typescript@5.9.3)(unplugin-unused@0.5.6)(vue-tsc@3.1.6(typescript@5.9.3))
       vite-node:
         specifier: ^5.2.0
-        version: 5.2.0(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.20.6)(yaml@2.8.2)
+        version: 5.2.0(patch_hash=f958fbbeba871752c0cfdd21510651e7957681ffec3a1f8e14142f91ff2cc499)(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.20.6)(yaml@2.8.2)
 
   apps/web:
     dependencies:
@@ -12020,7 +12025,7 @@ snapshots:
     dependencies:
       vite: rolldown-vite@7.2.10(@types/node@24.10.1)(esbuild@0.25.12)(jiti@2.6.1)(terser@5.44.1)(tsx@4.20.6)(yaml@2.8.2)
 
-  vite-node@5.2.0(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.20.6)(yaml@2.8.2):
+  vite-node@5.2.0(patch_hash=f958fbbeba871752c0cfdd21510651e7957681ffec3a1f8e14142f91ff2cc499)(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.20.6)(yaml@2.8.2):
     dependencies:
       cac: 6.7.14
       es-module-lexer: 1.7.0

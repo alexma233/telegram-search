@@ -19,12 +19,11 @@ export function createEmbeddingResolver(ctx: CoreContext): MessageResolver {
 
       // Skip embedding if API key is empty
       if (!embeddingSettings.apiKey || embeddingSettings.apiKey.trim() === '') {
-        logger.verbose('Skipping embedding: API key is empty')
         return Ok([])
       }
 
       if (opts.messages.length === 0)
-        return Err('No messages')
+        return Ok([])
 
       const messages: CoreMessage[] = opts.messages.filter(
         message => message.content
@@ -34,7 +33,7 @@ export function createEmbeddingResolver(ctx: CoreContext): MessageResolver {
       )
 
       if (messages.length === 0)
-        return Err('No messages to embed')
+        return Ok([])
 
       logger.withFields({ messages: messages.length }).verbose('Embedding messages')
 

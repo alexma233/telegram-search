@@ -27,3 +27,6 @@ onlyBuiltDependencies:
   - utf-8-validate
   - vue-demi
   - websocket
+
+patchedDependencies:
+  vite-node: patches/vite-node.patch

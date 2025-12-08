@@ -14,14 +14,14 @@ export function createJiebaResolver(): MessageResolver {
       logger.verbose('Executing jieba resolver')
 
       if (opts.messages.length === 0)
-        return Err('No messages')
+        return Ok([])
 
       const messages: CoreMessage[] = opts.messages.filter(
         message => message.content && message.jiebaTokens.length === 0,
       )
 
       if (messages.length === 0)
-        return Err('No messages to parse')
+        return Ok([])
 
       // Initialize jieba asynchronously
       const jieba = await ensureJieba()

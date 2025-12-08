@@ -1,0 +1,12 @@
+diff --git a/dist/cli.mjs b/dist/cli.mjs
+index 68a0c8555e0b05e0470dca685f242a4f2f17373b..84758a9f41d5dd64d8b4345a8530164415fc639a 100755
+--- a/dist/cli.mjs
++++ b/dist/cli.mjs
+@@ -101,6 +101,7 @@ async function run(files, options = {}) {
+ 		process.on("uncaughtException", (err) => {
+ 			console.error(C.red("[vite-node] Failed to execute file: \n"), err);
+ 		});
++		console.log(process.env)
+ 		if (process.env.VITE_TEST_WATCHER_DEBUG) {
+ 			const nodePath = await import("node:path");
+ 			async function waitForWatched(files$1) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createCoreContext } from './context'
+import { createCoreContext } from '../context'
 
 describe('coreContext account management', () => {
   it('should set and get current account id', () => {

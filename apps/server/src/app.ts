@@ -1,3 +1,4 @@
+import type { Logger } from '@guiiai/logg'
 import type { Config, RuntimeFlags } from '@tg-search/common'
 
 import process from 'node:process'
@@ -22,6 +23,14 @@ function setupErrorHandlers(logger: ReturnType<typeof useLogger>): void {
 
   process.on('uncaughtException', error => handleError(error, 'Uncaught exception'))
   process.on('unhandledRejection', error => handleError(error, 'Unhandled rejection'))
+}
+
+interface HotData {
+  metricsRegistered: boolean
+}
+
+const hotData: HotData = import.meta.hot?.data || {
+  metricsRegistered: false,
 }
 
 function configureServer(logger: ReturnType<typeof useLogger>, flags: RuntimeFlags, config: Config) {
@@ -62,7 +71,11 @@ function configureServer(logger: ReturnType<typeof useLogger>, flags: RuntimeFla
     return Response.json({ success: true })
   }))
 
-  collectDefaultMetrics()
+  if (!hotData.metricsRegistered) {
+    collectDefaultMetrics()
+    hotData.metricsRegistered = true
+  }
+
   app.get('/metrics', defineEventHandler(async () => {
     const metrics = await register.metrics()
     return new Response(metrics, {
@@ -74,6 +87,29 @@ function configureServer(logger: ReturnType<typeof useLogger>, flags: RuntimeFla
   setupWsRoutes(app, config)
 
   return app
+}
+
+async function startServer(app: H3, logger: Logger) {
+  const port = process.env.PORT ? Number(process.env.PORT) : 3000
+  const hostname = process.env.HOST || '0.0.0.0'
+
+  const server = await serve(app, {
+    port,
+    hostname,
+    plugins: [
+      // @ts-expect-error - the .crossws property wasn't extended in types
+      wsPlugin({ resolve: async req => (await app.fetch(req)).crossws }),
+    ],
+    reusePort: true,
+    gracefulShutdown: {
+      forceTimeout: 500,
+      gracefulTimeout: 500,
+    },
+  })
+
+  logger.withFields({ port, hostname }).log('Server started')
+
+  return server
 }
 
 async function bootstrap() {
@@ -102,26 +138,35 @@ async function bootstrap() {
 
   setupErrorHandlers(logger)
 
-  const app = configureServer(logger, flags, config)
+  let app = configureServer(logger, flags, config)
 
-  const port = process.env.PORT ? Number(process.env.PORT) : 3000
-  const hostname = process.env.HOST || '0.0.0.0'
+  const server = await startServer(app, logger)
 
-  const server = serve(app, {
-    port,
-    hostname,
-    plugins: [
-      // @ts-expect-error - the .crossws property wasn't extended in types
-      wsPlugin({ resolve: async req => (await app.fetch(req)).crossws }),
-    ],
-    reusePort: true,
-    gracefulShutdown: {
-      forceTimeout: 500,
-      gracefulTimeout: 500,
-    },
-  })
+  if (import.meta.hot) {
+    // Self-accept
+    import.meta.hot.accept((newModule) => {
+      useLogger('HMR').withFields({ newModule }).log('Reloading routes...')
 
-  logger.withFields({ port, hostname }).log('Server started')
+      app = configureServer(logger, flags, config)
+
+      useLogger('HMR').log('Routes reloaded')
+    })
+
+    import.meta.hot.acceptExports([
+      '@tg-search/core',
+      '@tg-search/common',
+    ], () => {
+      logger.log('[HMR] Workspace package changed, reloading...')
+      app = configureServer(logger, flags, config)
+    })
+
+    // Clear callback, if should shutdown server
+    import.meta.hot.dispose(() => {
+      useLogger('HMR').log('Shutting down server...')
+      server.close()
+      register.clear()
+    })
+  }
 
   const shutdown = () => {
     logger.log('Shutting down server gracefully...')
