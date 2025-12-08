@@ -10,6 +10,7 @@ import type {
 import type { ClientEventHandlerMap, ClientEventHandlerQueueMap } from '../event-handlers'
 import type { StoredSession } from '../types/session'
 
+import { deserializeWsMessage, serializeWsMessage } from '@tg-search/common'
 import { useLogger } from '@guiiai/logg'
 import { useLocalStorage, useWebSocket } from '@vueuse/core'
 import { acceptHMRUpdate, defineStore } from 'pinia'
@@ -21,6 +22,8 @@ import { getRegisterEventHandler } from '../event-handlers'
 import { registerAllEventHandlers } from '../event-handlers/register'
 import { drainEventQueue, enqueueEventHandler } from '../utils/event-queue'
 import { createSessionStore } from '../utils/session-store'
+
+const MAX_EVENT_DATA_BYTES = 1024 * 1024
 
 export type ClientSendEventFn = <T extends keyof WsEventToServer>(event: T, data?: WsEventToServerData<T>) => void
 export type ClientCreateWsMessageFn = <T extends keyof WsEventToServer>(event: T, data?: WsEventToServerData<T>) => WsMessageToServer
@@ -65,7 +68,7 @@ export const useWebsocketStore = defineStore('websocket', () => {
   const eventHandlersQueue: ClientEventHandlerQueueMap = new Map()
   const isInitialized = ref(false)
 
-  let wsSocket: ReturnType<typeof useWebSocket<keyof WsMessageToClient>>
+  let wsSocket: ReturnType<typeof useWebSocket<ArrayBuffer | Uint8Array | string | Blob>>
 
   const createWsMessage: ClientCreateWsMessageFn = (type, data) => {
     return { type, data } as WsMessageToServer
@@ -79,7 +82,26 @@ export const useWebsocketStore = defineStore('websocket', () => {
     if (!wsSocket)
       return
 
-    wsSocket.send(JSON.stringify(createWsMessage(event, data)))
+    try {
+      const payload = serializeWsMessage(
+        createWsMessage(event, data),
+        {
+          maxDataBytes: MAX_EVENT_DATA_BYTES,
+          onDrop: ({ length, reason }) => {
+            logger.withFields({ event, length, reason }).warn('Dropped outbound event payload')
+          },
+        },
+      )
+
+      const baseBuffer = payload.buffer as ArrayBuffer
+      const wirePayload: ArrayBuffer = (payload.byteOffset === 0 && payload.byteLength === baseBuffer.byteLength
+        ? baseBuffer
+        : payload.slice().buffer)
+      wsSocket.send(wirePayload)
+    }
+    catch (error) {
+      logger.withError(error).error('Failed to serialize websocket payload')
+    }
   }
 
   const registerEventHandler = getRegisterEventHandler(eventHandlers, sendEvent)
@@ -95,7 +117,7 @@ export const useWebsocketStore = defineStore('websocket', () => {
     registerAllEventHandlers(registerEventHandler)
   }
 
-  wsSocket = useWebSocket<keyof WsMessageToClient>(wsUrlComputed, {
+  wsSocket = useWebSocket<ArrayBuffer | Uint8Array | string | Blob>(wsUrlComputed, {
     onConnected: handleWsConnected,
     onDisconnected: () => {
       logger.log('Disconnected')
@@ -159,44 +181,68 @@ export const useWebsocketStore = defineStore('websocket', () => {
     })
   }
 
+  function dispatchMessage(message: WsMessageToClient) {
+    if (eventHandlers.has(message.type)) {
+      logger.debug('Message received', message)
+
+      const fn = eventHandlers.get(message.type)
+      try {
+        fn?.(message.data)
+      }
+      catch (error) {
+        logger.withError(error).withFields({ message: message || 'unknown' }).error('Error handling event')
+      }
+    }
+
+    if (eventHandlersQueue.has(message.type)) {
+      drainEventQueue(
+        eventHandlersQueue,
+        message.type,
+        message.data,
+        (error) => {
+          logger.withError(error).withFields({ message: message || 'unknown' }).error('Error handling queued event')
+        },
+      )
+    }
+  }
+
+  function processRawPayload(raw: string | ArrayBuffer | Uint8Array) {
+    try {
+      const decoded = deserializeWsMessage<WsMessageToClient>(raw) as WsMessageToClient
+      dispatchMessage(decoded)
+      return
+    }
+    catch (error) {
+      if (typeof raw === 'string') {
+        try {
+          dispatchMessage(JSON.parse(raw) as WsMessageToClient)
+          return
+        }
+        catch (jsonError) {
+          logger.withError(jsonError).error('Invalid websocket message payload')
+          return
+        }
+      }
+
+      logger.withError(error).error('Invalid websocket message payload')
+    }
+  }
+
   // https://github.com/moeru-ai/airi/blob/b55a76407d6eb725d74c5cd4bcb17ef7d995f305/apps/realtime-audio/src/pages/index.vue#L95-L123
   watch(wsSocket.data, (rawMessage) => {
     if (!rawMessage)
       return
 
-    try {
-      const message = JSON.parse(rawMessage) as WsMessageToClient
-
-      if (eventHandlers.has(message.type)) {
-        logger.debug('Message received', message)
-      }
-
-      if (eventHandlers.has(message.type)) {
-        const fn = eventHandlers.get(message.type)
-
-        try {
-          if (fn)
-            fn(message.data)
-        }
-        catch (error) {
-          logger.withError(error).withFields({ message: message || 'unknown' }).error('Error handling event')
-        }
-      }
-
-      if (eventHandlersQueue.has(message.type)) {
-        drainEventQueue(
-          eventHandlersQueue,
-          message.type,
-          message.data,
-          (error) => {
-            logger.withError(error).withFields({ message: message || 'unknown' }).error('Error handling queued event')
-          },
-        )
-      }
+    if (rawMessage instanceof Blob) {
+      rawMessage.arrayBuffer()
+        .then(buffer => processRawPayload(buffer))
+        .catch((error) => {
+          logger.withError(error).error('Failed to read websocket blob payload')
+        })
+      return
     }
-    catch (error) {
-      logger.error('Invalid message', rawMessage, error)
-    }
+
+    processRawPayload(rawMessage)
   })
 
   return {

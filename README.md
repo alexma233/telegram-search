@@ -207,6 +207,7 @@ This project is a **monorepo** with event-driven architecture:
 **Key Technologies:**
 - Event-driven with `CoreContext` (EventEmitter3)
 - Real-time communication via WebSocket
+- Protobuf-JS envelopes for WebSocket payloads (1 MiB cap)
 - PostgreSQL + pgvector OR PGlite (in-browser)
 - Message processing pipeline: Embedding, Jieba, Link, Media, User resolvers
 

@@ -38,6 +38,7 @@ import type { H3 } from 'h3'
 import type { WsMessageToServer } from './ws-events'
 
 import { useLogger } from '@guiiai/logg'
+import { deserializeWsMessage } from '@tg-search/common'
 import { createCoreInstance, destroyCoreInstance } from '@tg-search/core'
 import { defineWebSocketHandler } from 'h3'
 
@@ -211,7 +212,50 @@ export function setupWsRoutes(app: H3, config: Config) {
         return
       }
 
-      const event = message.json<WsMessageToServer>()
+      let event: WsMessageToServer | null = null
+      const directBinary = normalizeBinaryPayload((message as any)?.data)
+
+      try {
+        const binaryFromHelper = typeof (message as any)?.binary === 'function'
+          ? normalizeBinaryPayload(await (message as any).binary())
+          : undefined
+        const candidate = directBinary || binaryFromHelper
+
+        if (candidate) {
+          event = deserializeWsMessage<WsMessageToServer>(candidate) as WsMessageToServer
+        }
+      }
+      catch (error) {
+        logger.withError(error).warn('Failed to decode protobuf payload, falling back to JSON')
+      }
+
+      if (!event) {
+        try {
+          event = message.json<WsMessageToServer>()
+        }
+        catch (jsonError) {
+          try {
+            const textReader = (message as any)?.text
+            if (typeof textReader === 'function') {
+              const rawText = await textReader.call(message)
+              if (typeof rawText === 'string' && rawText.length > 0)
+                event = JSON.parse(rawText) as WsMessageToServer
+            }
+            else {
+              throw jsonError
+            }
+          }
+          catch (parseError) {
+            logger.withError(parseError).warn('Invalid websocket payload')
+            return
+          }
+        }
+      }
+
+      if (!event) {
+        logger.warn('Ignoring empty websocket payload')
+        return
+      }
 
       try {
         if (event.type === 'server:event:register') {
@@ -390,4 +434,24 @@ export function setupWsRoutes(app: H3, config: Config) {
       }
     },
   }))
+
+  function normalizeBinaryPayload(payload: unknown): Uint8Array | undefined {
+    if (!payload) {
+      return undefined
+    }
+
+    if (payload instanceof Uint8Array) {
+      return payload
+    }
+
+    if (payload instanceof ArrayBuffer) {
+      return new Uint8Array(payload)
+    }
+
+    if (ArrayBuffer.isView(payload)) {
+      return new Uint8Array(payload.buffer)
+    }
+
+    return undefined
+  }
 }

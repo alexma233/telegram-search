@@ -2,6 +2,7 @@ import type { FromCoreEvent, ToCoreEvent } from '@tg-search/core'
 import type { Peer } from 'crossws'
 
 import { useLogger } from '@guiiai/logg'
+import { serializeWsMessage } from '@tg-search/common'
 
 export interface WsEventFromServer {
   'server:connected': (data: { sessionId: string, accountReady: boolean }) => void
@@ -31,31 +32,22 @@ export type WsMessageToServer = {
   }
 }[keyof WsEventToServer]
 
+const MAX_EVENT_DATA_BYTES = 1024 * 1024
+
 export function sendWsEvent<T extends keyof WsEventToClient>(
   peer: Peer,
   event: T,
   data: WsEventToClientData<T>,
 ) {
-  peer.send(createWsMessage(event, data))
-}
+  const payload = serializeWsMessage(
+    { type: event, data },
+    {
+      maxDataBytes: MAX_EVENT_DATA_BYTES,
+      onDrop: ({ length }) => {
+        useLogger().withFields({ type: event, length }).warn('Dropped event data')
+      },
+    },
+  )
 
-export function createWsMessage<T extends keyof WsEventToClient>(
-  type: T,
-  data: WsEventToClientData<T>,
-): Extract<WsMessageToClient, { type: T }> {
-  try {
-    // ensure args[0] can be stringified
-    const stringifiedData = JSON.stringify(data)
-    if (stringifiedData.length > 1024 * 1024) {
-      useLogger().withFields({ type, length: stringifiedData.length }).warn('Dropped event data')
-      return { type, data: undefined } as Extract<WsMessageToClient, { type: T }>
-    }
-
-    return { type, data } as Extract<WsMessageToClient, { type: T }>
-  }
-  catch {
-    useLogger().withFields({ type }).warn('Dropped event data')
-
-    return { type, data: undefined } as Extract<WsMessageToClient, { type: T }>
-  }
+  peer.send(payload)
 }
