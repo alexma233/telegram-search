@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "vite-node src/app.ts",
+    "inspect": "vite-node --inspect src/app.ts",
     "build": "tsdown",
     "start": "node dist/app.mjs",
     "typecheck": "tsc --noEmit"
