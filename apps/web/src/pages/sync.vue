@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SyncOptions } from '@tg-search/core'
+import type { ChatSyncStats, SyncOptions } from '@tg-search/core'
 
 import NProgress from 'nprogress'
 
@@ -14,9 +14,11 @@ import ChatSelector from '../components/ChatSelector.vue'
 import SyncOptionsComponent from '../components/SyncOptions.vue'
 import SyncVisualization from '../components/SyncVisualization.vue'
 import Dialog from '../components/ui/Dialog.vue'
+import SelectDropdown from '../components/ui/SelectDropdown.vue'
 
 import { Button } from '../components/ui/Button'
 import { Progress } from '../components/ui/Progress'
+import { buildMessageReprocessBatches } from '../utils/reprocess'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -26,6 +28,10 @@ const syncOptions = ref<SyncOptions>({
   syncMedia: true,
   maxMediaSize: 0,
 })
+const selectedResolver = ref<'all' | 'media' | 'user' | 'link' | 'embedding' | 'jieba'>('all')
+const isReprocessing = ref(false)
+
+const REPROCESS_BATCH_SIZE = 100
 
 const sessionStore = useAuthStore()
 const { isLoggedIn } = storeToRefs(sessionStore)
@@ -81,6 +87,19 @@ const shouldShowTaskStatus = computed(() => {
 // Disable buttons during sync or when no chats selected
 const isButtonDisabled = computed(() => {
   return selectedChats.value.length === 0 || !isLoggedIn.value || isTaskInProgress.value
+})
+
+const resolverOptions = computed(() => [
+  { label: t('sync.reprocessAllResolvers'), value: 'all' },
+  { label: t('settings.mediaResolver'), value: 'media' },
+  { label: t('settings.userResolver'), value: 'user' },
+  { label: t('settings.linkResolver'), value: 'link' },
+  { label: t('settings.embeddingResolver'), value: 'embedding' },
+  { label: t('settings.jiebaResolver'), value: 'jieba' },
+])
+
+const isReprocessDisabled = computed(() => {
+  return selectedChats.value.length === 0 || !isLoggedIn.value || isTaskInProgress.value || isReprocessing.value
 })
 
 /**
@@ -147,6 +166,91 @@ function handleSelectAll() {
     selectAllCount.value = count
     isSelectAllWarning.value = count >= SELECT_ALL_WARNING_THRESHOLD
     isSelectAllDialogOpen.value = true
+  }
+}
+
+function getChatLabel(chatId: number) {
+  const chat = chats.value.find(item => item.id === chatId)
+  return chat?.name || t('chatSelector.chat', { id: chatId })
+}
+
+function getEstimatedSyncedCount(stats?: ChatSyncStats) {
+  if (!stats)
+    return 0
+
+  if (stats.syncedMessages && stats.syncedMessages > 0)
+    return stats.syncedMessages
+
+  return stats.syncedRanges?.reduce((sum, range) => {
+    return sum + Math.abs(range.end - range.start) + 1
+  }, 0) ?? 0
+}
+
+async function fetchChatStatsForReprocess(chatId: number): Promise<ChatSyncStats | undefined> {
+  const chatIdStr = chatId.toString()
+
+  if (chatStats.value?.chatId === chatIdStr)
+    return chatStats.value
+
+  websocketStore.sendEvent('takeout:stats:fetch', {
+    chatId: chatIdStr,
+  })
+
+  try {
+    const stats = await Promise.race([
+      websocketStore.waitForEvent('takeout:stats:data'),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000)),
+    ])
+
+    if (stats.chatId === chatIdStr)
+      return stats
+  }
+  catch (error) {
+    console.error('Failed to fetch chat stats for reprocess', error)
+  }
+
+  return undefined
+}
+
+async function handleReprocess() {
+  if (isReprocessDisabled.value)
+    return
+
+  isReprocessing.value = true
+  const resolverList = selectedResolver.value === 'all' ? undefined : [selectedResolver.value]
+  const toastId = toast.loading(t('sync.reprocessInProgress'))
+
+  try {
+    for (const chatId of selectedChats.value) {
+      const stats = await fetchChatStatsForReprocess(chatId)
+      const targetCount = getEstimatedSyncedCount(stats)
+      if (!stats || targetCount === 0 || !stats.syncedRanges?.length) {
+        toast.info(t('sync.reprocessNoMessages', { chat: getChatLabel(chatId) }))
+        continue
+      }
+
+      const batches = buildMessageReprocessBatches(stats.syncedRanges, REPROCESS_BATCH_SIZE, targetCount)
+      if (batches.length === 0) {
+        toast.info(t('sync.reprocessNoMessages', { chat: getChatLabel(chatId) }))
+        continue
+      }
+
+      for (const batch of batches) {
+        websocketStore.sendEvent('message:reprocess', {
+          chatId: chatId.toString(),
+          messageIds: batch,
+          resolvers: resolverList,
+        })
+      }
+    }
+
+    toast.success(t('sync.reprocessQueued'), { id: toastId })
+  }
+  catch (error) {
+    toast.error(t('sync.reprocessFailed', { error: getErrorMessage(error, (key, params) => t(key, params || {})) }), { id: toastId })
+  }
+  finally {
+    isReprocessing.value = false
   }
 }
 
@@ -265,6 +369,21 @@ watch(activeChatId, (chatId) => {
       </div>
 
       <div class="flex items-center gap-2">
+        <div class="w-44">
+          <SelectDropdown
+            v-model="selectedResolver"
+            :options="resolverOptions"
+          />
+        </div>
+        <Button
+          icon="i-lucide-repeat-2"
+          variant="outline"
+          size="sm"
+          :disabled="isReprocessDisabled"
+          @click="handleReprocess"
+        >
+          {{ t('sync.reprocess') }}
+        </Button>
         <Button
           icon="i-lucide-refresh-cw"
           variant="ghost"
