@@ -15,6 +15,10 @@ const models = {
   chatMessageStatsModels: {
     getChatMessageStatsByChatId: mockGetChatMessageStatsByChatId,
   },
+  chatModels: {
+    // Default no-op; migration is exercised in model tests.
+    migrateChatId: vi.fn(async () => ({ isErr: () => false, value: { movedMessages: 0, deletedDuplicates: 0, mergedJoinedChats: false } })),
+  },
 } as unknown as Models
 
 interface MockTask {
@@ -74,6 +78,10 @@ describe('takeout event handlers', () => {
 
     const ctx = createCoreContext(getMockEmptyDB, models, logger)
     ctx.setCurrentAccountId('acc-1')
+    // Provide a minimal client stub; incremental handler may query entities for migration checks.
+    ctx.setClient({ getEntity: async () => ({}) } as any)
+    // Provide a minimal client stub; incremental handler may query entities for migration checks.
+    ctx.setClient({ getEntity: async () => ({}) } as any)
 
     const takeoutMessages = async function* () {
       for (let i = 1; i <= 51; i++) {
@@ -81,7 +89,7 @@ describe('takeout event handlers', () => {
       }
     }
 
-    registerTakeoutEventHandlers(ctx, logger, models.chatMessageStatsModels)(makeTakeoutService({ takeoutMessages }))
+    registerTakeoutEventHandlers(ctx, logger, models)(makeTakeoutService({ takeoutMessages }))
 
     const batches: Array<{ messages: any[], isTakeout: boolean, syncOptions: any }> = []
     const done = new Promise<void>((resolve) => {
@@ -126,6 +134,10 @@ describe('takeout event handlers', () => {
 
     const ctx = createCoreContext(getMockEmptyDB, models, logger)
     ctx.setCurrentAccountId('acc-1')
+    // Provide a minimal client stub; incremental handler may query entities for migration checks.
+    ctx.setClient({ getEntity: async () => ({}) } as any)
+    // Provide a minimal client stub; incremental handler may query entities for migration checks.
+    ctx.setClient({ getEntity: async () => ({}) } as any)
 
     const takeoutMessages = async function* (_chatId: string, opts: any) {
       // Keep yielding until aborted; yield slowly to allow abort event to be processed.
@@ -137,7 +149,7 @@ describe('takeout event handlers', () => {
       }
     }
 
-    registerTakeoutEventHandlers(ctx, logger, models.chatMessageStatsModels)(makeTakeoutService({ takeoutMessages }))
+    registerTakeoutEventHandlers(ctx, logger, models)(makeTakeoutService({ takeoutMessages }))
 
     ctx.emitter.emit('takeout:run', {
       chatIds: ['123'],
@@ -175,7 +187,7 @@ describe('takeout event handlers', () => {
     const ctx = createCoreContext(getMockEmptyDB, models, logger)
     ctx.setCurrentAccountId('acc-1')
 
-    registerTakeoutEventHandlers(ctx, logger, models.chatMessageStatsModels)(
+    registerTakeoutEventHandlers(ctx, logger, models)(
       makeTakeoutService({
         getTotalMessageCount: async () => 120,
       }),
@@ -213,7 +225,7 @@ describe('takeout event handlers', () => {
     const ctx = createCoreContext(getMockEmptyDB, models, logger)
     ctx.setCurrentAccountId('acc-1')
 
-    registerTakeoutEventHandlers(ctx, logger, models.chatMessageStatsModels)(
+    registerTakeoutEventHandlers(ctx, logger, models)(
       makeTakeoutService({
         getTotalMessageCount: async () => 0,
       }),
@@ -271,7 +283,7 @@ describe('takeout event handlers', () => {
       takeoutMessages,
     })
 
-    registerTakeoutEventHandlers(ctx, logger, models.chatMessageStatsModels)(service)
+    registerTakeoutEventHandlers(ctx, logger, models)(service)
 
     const processed = new Promise<any>((resolve) => {
       ctx.emitter.on('message:process', payload => resolve(payload))
@@ -327,7 +339,7 @@ describe('takeout event handlers', () => {
       yield ({ id: 2 })
     }
 
-    registerTakeoutEventHandlers(ctx, logger, models.chatMessageStatsModels)(makeTakeoutService({ takeoutMessages }))
+    registerTakeoutEventHandlers(ctx, logger, models)(makeTakeoutService({ takeoutMessages }))
 
     const processed = new Promise<any>((resolve) => {
       ctx.emitter.on('message:process', payload => resolve(payload))

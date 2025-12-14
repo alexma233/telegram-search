@@ -1,16 +1,16 @@
 import type { Logger } from '@guiiai/logg'
-import type { Api } from 'telegram'
 
 import type { CoreContext } from '../context'
-import type { ChatMessageStatsModels } from '../models/chat-message-stats'
+import type { Models } from '../models'
 import type { TakeoutService } from '../services'
 
 import { usePagination } from '@tg-search/common'
+import { Api } from 'telegram'
 
 import { MESSAGE_PROCESS_BATCH_SIZE } from '../constants'
 import { createTask } from '../utils/task'
 
-export function registerTakeoutEventHandlers(ctx: CoreContext, logger: Logger, chatMessageStatsModels: ChatMessageStatsModels) {
+export function registerTakeoutEventHandlers(ctx: CoreContext, logger: Logger, dbModels: Pick<Models, 'chatMessageStatsModels' | 'chatModels'>) {
   logger = logger.withContext('core:takeout:event')
 
   // Store active tasks by taskId for abort handling
@@ -21,10 +21,65 @@ export function registerTakeoutEventHandlers(ctx: CoreContext, logger: Logger, c
       logger.withFields({ chatIds, increase, syncOptions }).verbose('Running takeout')
       const pagination = usePagination()
 
+      /**
+       * Resolve Telegram "migrated" chats (group -> supergroup/channel) and keep local DB consistent.
+       *
+       * Why:
+       * If a chat was migrated, the old chat id will stop receiving new messages.
+       * Incremental sync using the old id will look like a no-op/skip.
+       */
+      const normalizedChatIds = increase
+        ? await Promise.all(chatIds.map(async (chatId) => {
+          try {
+            const entity = await ctx.getClient().getEntity(chatId)
+            if (entity instanceof Api.Chat && (entity as unknown as { migratedTo?: Api.InputChannel }).migratedTo) {
+              const migratedTo = (entity as unknown as { migratedTo?: Api.InputChannel }).migratedTo
+              const toChatId = migratedTo?.channelId ? String(migratedTo.channelId) : ''
+              if (!toChatId || toChatId === chatId)
+                return chatId
+
+              // Best-effort fetch destination entity for name/type.
+              let toChatName: string | undefined
+              let toChatType: 'group' | 'channel' | undefined
+              try {
+                const toEntity = await ctx.getClient().getEntity(toChatId)
+                if (toEntity instanceof Api.Channel) {
+                  toChatName = (toEntity as unknown as { title?: string }).title
+                  // Telegram supergroups are channels with `megagroup = true`
+                  toChatType = (toEntity as unknown as { megagroup?: boolean }).megagroup ? 'group' : 'channel'
+                }
+              }
+              catch {}
+
+              const migrateResult = await dbModels.chatModels.migrateChatId(ctx.getDB(), {
+                fromChatId: chatId,
+                toChatId,
+                toChatName,
+                toChatType,
+              })
+
+              if (migrateResult.isErr()) {
+                logger.withError(migrateResult.error).warn('Failed to migrate chat id; continuing with new id anyway')
+              }
+              else {
+                logger.withFields({ from: chatId, to: toChatId, ...migrateResult.value }).verbose('Migrated chat id for takeout')
+              }
+
+              return toChatId
+            }
+          }
+          catch (error) {
+            // Non-fatal: keep original id.
+            logger.withError(error as Error).debug('Failed to resolve chat entity; keeping original chatId')
+          }
+          return chatId
+        }))
+        : chatIds
+
       // Get chat message stats for incremental sync
       const increaseOptions: { chatId: string, firstMessageId: number, latestMessageId: number, messageCount: number }[] = await Promise.all(
-        chatIds.map(async (chatId) => {
-          const stats = (await chatMessageStatsModels.getChatMessageStatsByChatId(ctx.getDB(), ctx.getCurrentAccountId(), chatId))?.unwrap()
+        normalizedChatIds.map(async (chatId) => {
+          const stats = (await dbModels.chatMessageStatsModels.getChatMessageStatsByChatId(ctx.getDB(), ctx.getCurrentAccountId(), chatId))?.unwrap()
           return {
             chatId,
             firstMessageId: stats?.first_message_id ?? 0, // First synced message ID
@@ -38,7 +93,7 @@ export function registerTakeoutEventHandlers(ctx: CoreContext, logger: Logger, c
 
       let messages: Api.Message[] = []
 
-      for (const chatId of chatIds) {
+      for (const chatId of normalizedChatIds) {
         const stats = increaseOptions.find(item => item.chatId === chatId)
 
         if (!increase) {
@@ -340,7 +395,7 @@ export function registerTakeoutEventHandlers(ctx: CoreContext, logger: Logger, c
 
       try {
         // Get chat message stats from DB
-        const stats = (await chatMessageStatsModels.getChatMessageStatsByChatId(ctx.getDB(), ctx.getCurrentAccountId(), chatId))?.unwrap()
+        const stats = (await dbModels.chatMessageStatsModels.getChatMessageStatsByChatId(ctx.getDB(), ctx.getCurrentAccountId(), chatId))?.unwrap()
 
         // Get total message count from Telegram
         const totalMessageCount = (await takeoutService.getTotalMessageCount(chatId)) ?? 0

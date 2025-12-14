@@ -1,11 +1,14 @@
 import type { CoreDialog } from '../../types/dialog'
 
 import { describe, expect, it } from 'vitest'
+import { eq } from 'drizzle-orm'
 
 import { mockDB } from '../../db/mock'
 import { accountJoinedChatsTable } from '../../schemas/account-joined-chats'
 import { accountsTable } from '../../schemas/accounts'
+import { chatMessagesTable } from '../../schemas/chat-messages'
 import { joinedChatsTable } from '../../schemas/joined-chats'
+import { usersTable } from '../../schemas/users'
 import { chatModels } from '../chats'
 
 async function setupDb() {
@@ -184,5 +187,96 @@ describe('models/chats', () => {
 
     expect(okForAccount1).toBe(true)
     expect(okForAccount2).toBe(false)
+  })
+
+  it('migrateChatId moves chat_messages and updates joined_chats chat_id (dedup-safe)', async () => {
+    const db = await mockDB({
+      accountsTable,
+      joinedChatsTable,
+      accountJoinedChatsTable,
+      chatMessagesTable,
+      usersTable,
+    })
+
+    const [account] = await db.insert(accountsTable).values({
+      platform: 'telegram',
+      platform_user_id: 'user-1',
+    }).returning()
+
+    // Create joined chat row + link for old id.
+    await chatModels.recordChats(db, [{
+      id: 111,
+      name: 'Old Group',
+      type: 'group',
+      lastMessageDate: new Date('2024-01-01T00:00:00Z'),
+    }], account.id)
+
+    // Seed messages under old id and one overlapping message under new id (dup case).
+    await db.insert(chatMessagesTable).values([
+      {
+        platform: 'telegram',
+        platform_message_id: '1',
+        from_id: 'u',
+        from_name: 'u',
+        in_chat_id: '111',
+        in_chat_type: 'group',
+        content: 'a',
+        is_reply: false,
+        reply_to_name: '',
+        reply_to_id: '',
+        platform_timestamp: 1,
+        created_at: 1,
+      },
+      {
+        platform: 'telegram',
+        platform_message_id: '2',
+        from_id: 'u',
+        from_name: 'u',
+        in_chat_id: '111',
+        in_chat_type: 'group',
+        content: 'b',
+        is_reply: false,
+        reply_to_name: '',
+        reply_to_id: '',
+        platform_timestamp: 2,
+        created_at: 2,
+      },
+      // Duplicate (same platform_message_id) already exists under destination id.
+      {
+        platform: 'telegram',
+        platform_message_id: '2',
+        from_id: 'u',
+        from_name: 'u',
+        in_chat_id: '222',
+        in_chat_type: 'group',
+        content: 'b-dup',
+        is_reply: false,
+        reply_to_name: '',
+        reply_to_id: '',
+        platform_timestamp: 2,
+        created_at: 2,
+      },
+    ])
+
+    const res = await chatModels.migrateChatId(db, {
+      fromChatId: '111',
+      toChatId: '222',
+      toChatName: 'New Supergroup',
+      toChatType: 'group',
+    })
+    const out = res.unwrap()
+
+    // Row counts are driver-dependent; assert behavior via resulting state.
+    expect(out.movedMessages).toBeGreaterThanOrEqual(0)
+
+    const msgs = await db.select().from(chatMessagesTable)
+    expect(msgs.filter(m => m.in_chat_id === '111')).toHaveLength(0)
+    expect(msgs.filter(m => m.in_chat_id === '222')).toHaveLength(2)
+
+    const [chat] = await db.select().from(joinedChatsTable).where(eq(joinedChatsTable.chat_id, '222'))
+    expect(chat.chat_name).toBe('New Supergroup')
+
+    const links = await db.select().from(accountJoinedChatsTable).where(eq(accountJoinedChatsTable.account_id, account.id))
+    expect(links).toHaveLength(1)
   })
 })

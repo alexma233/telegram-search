@@ -26,7 +26,6 @@ import { createMediaResolver } from './message-resolvers/media-resolver'
 import { createUserResolver } from './message-resolvers/user-resolver'
 import { models } from './models'
 import { accountModels } from './models/accounts'
-import { chatMessageStatsModels } from './models/chat-message-stats'
 import { photoModels } from './models/photos'
 import { stickerModels } from './models/stickers'
 import { userModels } from './models/users'
@@ -102,7 +101,7 @@ export function afterConnectedEventHandler(ctx: CoreContext): EventHandler {
     registerEntityEventHandlers(ctx, logger)(entityService)
     registerMessageEventHandlers(ctx, logger)(messageService)
     registerDialogEventHandlers(ctx, logger)(dialogService)
-    registerTakeoutEventHandlers(ctx, logger, chatMessageStatsModels)(takeoutService)
+    registerTakeoutEventHandlers(ctx, logger, models)(takeoutService)
     registerGramEventsEventHandlers(ctx, logger)(gramEventsService)
 
     // Dialog bootstrap is now triggered from account:me:fetch handler once
