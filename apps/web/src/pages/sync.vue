@@ -202,9 +202,10 @@ async function fetchChatStatsForReprocess(chatId: number): Promise<ChatSyncStats
   })
 
   try {
+    const timeoutError = new Error(`Chat statistics fetch timed out after ${STATS_FETCH_TIMEOUT_MS}ms`)
     const stats = await Promise.race([
       websocketStore.waitForEvent('takeout:stats:data'),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Chat statistics fetch timed out after ${STATS_FETCH_TIMEOUT_MS}ms`)), STATS_FETCH_TIMEOUT_MS)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(timeoutError), STATS_FETCH_TIMEOUT_MS)),
     ])
 
     if (stats.chatId === chatIdStr)
