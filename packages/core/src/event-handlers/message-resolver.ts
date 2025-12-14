@@ -76,7 +76,7 @@ export function registerMessageResolverEventHandlers(ctx: CoreContext, logger: L
             pendingBatches -= 1
             updateProcessProgress()
 
-            if (pendingBatches === 0 && totalMessagesProcessed >= totalMessagesQueued) {
+            if (pendingBatches === 0 && totalMessagesProcessed === totalMessagesQueued) {
               processTask?.updateProgress(
                 100,
                 `Processed ${totalMessagesProcessed}/${totalMessagesQueued} messages`,
