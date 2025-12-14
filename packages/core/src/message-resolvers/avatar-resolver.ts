@@ -283,7 +283,7 @@ function createAvatarHelper(
 
       if (mediaBinaryProvider) {
         const location = await mediaBinaryProvider.save(
-          { uuid: fileId ?? uuidv4(), kind: 'avatar' },
+          { uuid: uuidv4(), kind: 'avatar' },
           new Uint8Array(result.byte),
           result.mimeType,
         )

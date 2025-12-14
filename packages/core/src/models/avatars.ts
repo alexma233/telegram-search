@@ -23,6 +23,7 @@ export interface AvatarRecordForUpsert {
 }
 
 async function upsertAvatar(db: CoreDB, avatar: AvatarRecordForUpsert): Promise<DBInsertAvatar[]> {
+  // Prefer persisting an opaque storage path when available; otherwise fall back to inline bytes.
   const dataToInsert: DBInsertAvatar = {
     platform: 'telegram',
     entity_type: avatar.entityType,
