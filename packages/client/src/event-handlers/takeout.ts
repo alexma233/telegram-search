@@ -6,7 +6,8 @@ export function registerTakeoutEventHandlers(
   registerEventHandler: ClientRegisterEventHandler,
 ) {
   registerEventHandler('takeout:task:progress', (data) => {
-    useSyncTaskStore().currentTask = data
+    const store = useSyncTaskStore()
+    store.upsertTask(data)
   })
 
   registerEventHandler('takeout:stats:data', (data) => {

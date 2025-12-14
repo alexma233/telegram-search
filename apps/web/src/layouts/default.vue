@@ -4,7 +4,7 @@ import type { CoreDialog } from '@tg-search/core/types'
 
 import buildTime from '~build/time'
 
-import { prefillChatAvatarIntoStore, useBridgeStore, useChatStore, useSettingsStore } from '@tg-search/client'
+import { prefillChatAvatarIntoStore, useBridgeStore, useChatStore, useSettingsStore, useSyncTaskStore } from '@tg-search/client'
 import { breakpointsTailwind, useBreakpoints, useDark } from '@vueuse/core'
 import { abbreviatedSha as gitShortSha } from '~build/git'
 import { version as pkgVersion } from '~build/package'
@@ -18,6 +18,7 @@ import EntityAvatar from '../components/avatar/EntityAvatar.vue'
 import LanguageSelector from '../components/layout/LanguageSelector.vue'
 import SidebarSelector from '../components/layout/SidebarSelector.vue'
 import UserDropdown from '../components/layout/UserDropdown.vue'
+import TaskDrawer from '../components/TaskDrawer.vue'
 
 import { Button } from '../components/ui/Button'
 
@@ -28,10 +29,13 @@ const isDark = useDark()
 const websocketStore = useBridgeStore()
 const route = useRoute()
 const router = useRouter()
+const syncTaskStore = useSyncTaskStore()
 
 const { t } = useI18n()
+const { isDrawerOpen, runningTasks } = storeToRefs(syncTaskStore)
 
 const searchParams = ref('')
+const runningTaskCount = computed(() => runningTasks.value.length)
 
 // --- Build info using unplugin-info ---
 const buildVersionLabel = computed(() => {
@@ -357,6 +361,27 @@ watch(activeGroupChats, (list) => {
       :class="{ 'ml-0': isMobile }"
     >
       <RouterView :key="$route.fullPath" />
+
+      <Button
+        icon="i-lucide-rows-3"
+        size="sm"
+        variant="secondary"
+        class="fixed bottom-16 right-3 z-20 shadow-lg"
+        :class="{ 'bg-primary text-primary-foreground': runningTaskCount > 0 }"
+        @click="isDrawerOpen = true"
+      >
+        <span class="flex items-center gap-2">
+          {{ t('sync.backgroundTasks') }}
+          <span
+            v-if="runningTaskCount"
+            class="bg-background font-semibold rounded-full px-2 py-0.5 text-foreground text-xs"
+          >
+            {{ runningTaskCount }}
+          </span>
+        </span>
+      </Button>
+
+      <TaskDrawer v-model:open="isDrawerOpen" />
 
       <!-- Version info -->
       <div class="pointer-events-none fixed bottom-3 right-3 z-10 flex items-center gap-2 text-xs text-muted-foreground opacity-50">

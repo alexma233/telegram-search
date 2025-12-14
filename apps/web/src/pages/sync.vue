@@ -35,7 +35,20 @@ const chatsStore = useChatStore()
 const { chats } = storeToRefs(chatsStore)
 
 const syncTaskStore = useSyncTaskStore()
-const { currentTask, currentTaskProgress, increase, chatStats, chatStatsLoading } = storeToRefs(syncTaskStore)
+const {
+  tasks,
+  currentTask,
+  currentTaskProgress,
+  batchProgress,
+  totalChats,
+  latestErrorTask,
+  runningTasks,
+  isDrawerOpen,
+  increase,
+  chatStats,
+  chatStatsLoading,
+} = storeToRefs(syncTaskStore)
+const { setActiveBatch, clearFinishedTasks, removeTask } = syncTaskStore
 
 // Currently focused chat id for status panel; independent from multi-selection
 const activeChatId = ref<number | null>(null)
@@ -49,6 +62,23 @@ const activeChat = computed(() => {
   return chats.value.find(chat => chat.id === activeChatId.value)
 })
 
+const hasRunningTasks = computed(() => runningTasks.value.length > 0)
+const hasTasks = computed(() => tasks.value.length > 0)
+
+const displayedTask = computed(() => latestErrorTask.value || currentTask.value)
+
+const displayedChatId = computed(() => {
+  const chatId = displayedTask.value?.chatId ?? displayedTask.value?.metadata?.chatIds?.[0]
+  return chatId ? Number(chatId) : null
+})
+
+const displayedChatLabel = computed(() => {
+  if (!displayedChatId.value)
+    return ''
+  const chat = chats.value.find(item => item.id === displayedChatId.value)
+  return chat?.name || t('chatSelector.chat', { id: displayedChatId.value })
+})
+
 // Default to incremental sync
 if (increase.value === undefined || increase.value === null) {
   increase.value = true
@@ -56,12 +86,12 @@ if (increase.value === undefined || increase.value === null) {
 
 // Task in progress status
 const isTaskInProgress = computed(() => {
-  return !!currentTask.value && currentTaskProgress.value >= 0 && currentTaskProgress.value < 100
+  return hasRunningTasks.value
 })
 
 // Get i18n error message from raw error
 const errorMessage = computed(() => {
-  const task = currentTask.value
+  const task = latestErrorTask.value
   if (!task?.rawError)
     return task?.lastError
   return getErrorMessage(task.rawError, (key, params) => t(key, params || {}))
@@ -69,13 +99,13 @@ const errorMessage = computed(() => {
 
 // Check if task was cancelled (not an error)
 const isTaskCancelled = computed(() => {
-  const task = currentTask.value
+  const task = latestErrorTask.value
   return task?.lastError === 'Task aborted'
 })
 
 // Show task status area (includes in-progress and error states, but not cancelled)
 const shouldShowTaskStatus = computed(() => {
-  return !!currentTask.value && (isTaskInProgress.value || (currentTask.value.lastError && !isTaskCancelled.value))
+  return hasTasks.value && (hasRunningTasks.value || (!!latestErrorTask.value && !isTaskCancelled.value))
 })
 
 // Disable buttons during sync or when no chats selected
@@ -156,7 +186,7 @@ function handleSelectAll() {
  * Parses "Processed X/Y messages" and maps known status strings.
  */
 const localizedTaskMessage = computed(() => {
-  const msg = currentTask.value?.lastMessage || ''
+  const msg = displayedTask.value?.lastMessage || ''
   if (!msg)
     return ''
 
@@ -186,6 +216,8 @@ const localizedTaskMessage = computed(() => {
 
 function handleSync() {
   increase.value = true
+  setActiveBatch(selectedChats.value.map(id => id.toString()))
+  isDrawerOpen.value = true
   websocketStore.sendEvent('takeout:run', {
     chatIds: selectedChats.value.map(id => id.toString()),
     increase: true,
@@ -197,6 +229,8 @@ function handleSync() {
 
 function handleResync() {
   increase.value = false
+  setActiveBatch(selectedChats.value.map(id => id.toString()))
+  isDrawerOpen.value = true
   websocketStore.sendEvent('takeout:run', {
     chatIds: selectedChats.value.map(id => id.toString()),
     increase: false,
@@ -207,9 +241,10 @@ function handleResync() {
 }
 
 function handleAbort() {
-  if (currentTask.value) {
+  const taskToAbort = runningTasks.value[0] || currentTask.value
+  if (taskToAbort) {
     websocketStore.sendEvent('takeout:task:abort', {
-      taskId: currentTask.value.taskId,
+      taskId: taskToAbort.taskId,
     })
   }
   else {
@@ -217,26 +252,29 @@ function handleAbort() {
   }
 }
 
-watch(currentTaskProgress, (progress) => {
-  if (progress === 100) {
+function dismissTask(taskId?: string) {
+  if (taskId)
+    removeTask(taskId)
+}
+
+watch(batchProgress, (progress, prev) => {
+  if (!totalChats.value)
+    return
+
+  if (progress >= 100 && prev < 100 && !hasRunningTasks.value) {
     toast.success(t('sync.syncCompleted'))
     NProgress.done()
+    clearFinishedTasks()
     increase.value = true
-  }
-  else if (progress < 0 && currentTask.value?.lastError) {
-    // Check if task was cancelled
-    if (isTaskCancelled.value) {
-      // Task was cancelled, just clear the task and stop progress
-      NProgress.done()
-      currentTask.value = undefined
-    }
-    else {
-      // Real error - progress bar UI will show it
-      NProgress.done()
-    }
   }
   else if (progress >= 0 && progress < 100) {
     NProgress.set(progress / 100)
+  }
+})
+
+watch(currentTaskProgress, (progress) => {
+  if (progress < 0 && displayedTask.value?.lastError) {
+    NProgress.done()
   }
 })
 
@@ -330,7 +368,7 @@ watch(activeChatId, (chatId) => {
         <div
           class="flex flex-1 flex-col border rounded-2xl bg-card p-6 shadow-sm transition-all"
           :class="shouldShowTaskStatus
-            ? (currentTask?.lastError ? 'border-destructive/20 bg-destructive/5' : 'border-primary/20 bg-primary/5')
+            ? (displayedTask?.lastError ? 'border-destructive/20 bg-destructive/5' : 'border-primary/20 bg-primary/5')
             : 'border-border'"
         >
           <div
@@ -340,32 +378,41 @@ watch(activeChatId, (chatId) => {
             <div class="flex items-center gap-4">
               <div
                 class="h-12 w-12 flex shrink-0 items-center justify-center rounded-full"
-                :class="currentTask?.lastError ? 'bg-destructive/10' : 'bg-primary/10'"
+                :class="displayedTask?.lastError ? 'bg-destructive/10' : 'bg-primary/10'"
               >
-                <div v-if="currentTask?.lastError" class="i-lucide-alert-circle h-6 w-6 text-destructive" />
+                <div v-if="displayedTask?.lastError" class="i-lucide-alert-circle h-6 w-6 text-destructive" />
                 <div v-else class="i-lucide-loader-2 h-6 w-6 animate-spin text-primary" />
               </div>
               <div class="flex flex-1 flex-col gap-1">
                 <span class="text-base text-foreground font-semibold">
-                  {{ currentTask?.lastError ? t('sync.syncFailed') : t('sync.syncing') }}
+                  {{ displayedTask?.lastError ? t('sync.syncFailed') : t('sync.syncing') }}
                 </span>
-                <span v-if="currentTask?.lastError" class="text-sm text-destructive">{{ errorMessage }}</span>
+                <span v-if="displayedTask?.lastError" class="text-sm text-destructive">{{ errorMessage }}</span>
                 <span v-else-if="localizedTaskMessage" class="text-sm text-muted-foreground">{{ localizedTaskMessage }}</span>
               </div>
             </div>
 
-            <Progress
-              v-if="!currentTask?.lastError"
-              :progress="currentTaskProgress"
-            />
+            <div v-if="!displayedTask?.lastError" class="space-y-3">
+              <div class="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{{ t('sync.totalChatsProgress', { count: totalChats || selectedChats.length }) }}</span>
+                <span>{{ Math.round(batchProgress) }}%</span>
+              </div>
+              <Progress :progress="batchProgress" />
+
+              <div class="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{{ t('sync.currentChatProgress', { chat: displayedChatLabel || t('sync.currentChatPlaceholder') }) }}</span>
+                <span>{{ Math.max(0, Math.round(currentTaskProgress)) }}%</span>
+              </div>
+              <Progress :progress="Math.max(0, currentTaskProgress)" />
+            </div>
 
             <div class="flex justify-end gap-2">
               <Button
-                v-if="currentTask?.lastError"
+                v-if="displayedTask?.lastError"
                 icon="i-lucide-x"
                 size="sm"
                 variant="outline"
-                @click="syncTaskStore.currentTask = undefined"
+                @click="dismissTask(displayedTask?.taskId)"
               >
                 {{ t('sync.dismiss') }}
               </Button>
