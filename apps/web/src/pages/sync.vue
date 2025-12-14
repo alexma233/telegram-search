@@ -32,6 +32,7 @@ const selectedResolver = ref<'all' | 'media' | 'user' | 'link' | 'embedding' | '
 const isReprocessing = ref(false)
 
 const REPROCESS_BATCH_SIZE = 100
+const STATS_FETCH_TIMEOUT_MS = 10_000
 
 const sessionStore = useAuthStore()
 const { isLoggedIn } = storeToRefs(sessionStore)
@@ -199,7 +200,7 @@ async function fetchChatStatsForReprocess(chatId: number): Promise<ChatSyncStats
   try {
     const stats = await Promise.race([
       websocketStore.waitForEvent('takeout:stats:data'),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), STATS_FETCH_TIMEOUT_MS)),
     ])
 
     if (stats.chatId === chatIdStr)
