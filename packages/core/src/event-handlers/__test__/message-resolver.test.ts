@@ -86,4 +86,49 @@ describe('message-resolver event handlers', () => {
       forceRefetch: true,
     })
   })
+
+  it('should emit process task progress for takeout queue', async () => {
+    const ctx = createCoreContext(getMockEmptyDB, models, logger)
+    const emitted: any[] = []
+    ctx.emitter.on('takeout:task:progress', (data) => {
+      emitted.push(data)
+    })
+
+    const service: MessageResolverService = {
+      processMessages: vi.fn(async () => {
+        await new Promise(resolve => setTimeout(resolve, 0))
+      }),
+    } as unknown as MessageResolverService
+
+    const registerHandlers = registerMessageResolverEventHandlers(ctx, logger)
+    registerHandlers(service)
+
+    const firstBatch = new Api.Message({
+      id: 111,
+      peerId: new Api.PeerUser({ userId: bigInt(222) }),
+      message: 'Batch 1',
+      date: Math.floor(Date.now() / 1000),
+    })
+    const secondBatch = new Api.Message({
+      id: 333,
+      peerId: new Api.PeerUser({ userId: bigInt(444) }),
+      message: 'Batch 2',
+      date: Math.floor(Date.now() / 1000),
+    })
+
+    ctx.emitter.emit('message:process', {
+      messages: [firstBatch],
+      isTakeout: true,
+    })
+    ctx.emitter.emit('message:process', {
+      messages: [secondBatch],
+      isTakeout: true,
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 20))
+
+    const processEvents = emitted.filter(event => event.type === 'takeout:process')
+    expect(processEvents.length).toBeGreaterThan(0)
+    expect(processEvents[processEvents.length - 1].progress).toBe(100)
+  })
 })

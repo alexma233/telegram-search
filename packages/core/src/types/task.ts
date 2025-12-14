@@ -1,11 +1,13 @@
-export type CoreTaskType = 'takeout' | 'getMessage' | 'embed'
+export type CoreTaskType = 'takeout' | 'takeout:process' | 'getMessage' | 'embed'
 
 export interface TakeoutTaskMetadata {
   chatIds: string[]
+  phase?: 'fetch' | 'process'
 }
 
 export interface CoreTasks {
   takeout: TakeoutTaskMetadata
+  'takeout:process': TakeoutTaskMetadata
   getMessage: undefined
   embed: undefined
 }

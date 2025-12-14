@@ -267,7 +267,7 @@ export interface ChatSyncStats {
 }
 
 export interface TakeoutEventFromCore {
-  'takeout:task:progress': (data: CoreTaskData<'takeout'>) => void
+  'takeout:task:progress': (data: CoreTaskData<'takeout' | 'takeout:process'>) => void
   'takeout:stats:data': (data: ChatSyncStats) => void
 }
 

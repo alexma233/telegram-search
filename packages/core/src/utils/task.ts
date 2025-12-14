@@ -29,7 +29,7 @@ export function createTask<T extends CoreTaskType>(
   let task: CoreTask<T>
 
   const emitUpdate = () => {
-    if (type === 'takeout') {
+    if (type === 'takeout' || type === 'takeout:process') {
       emitter.emit('takeout:task:progress', task.toJSON() as any)
     }
   }

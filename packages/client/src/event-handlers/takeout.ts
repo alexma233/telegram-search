@@ -6,7 +6,17 @@ export function registerTakeoutEventHandlers(
   registerEventHandler: ClientRegisterEventHandler,
 ) {
   registerEventHandler('takeout:task:progress', (data) => {
-    useSyncTaskStore().currentTask = data
+    const store = useSyncTaskStore()
+
+    if (data.type === 'takeout:process') {
+      store.currentTask = data
+      return
+    }
+
+    if (store.currentTask?.type === 'takeout:process' && (store.currentTask.progress ?? 0) < 100)
+      return
+
+    store.currentTask = data
   })
 
   registerEventHandler('takeout:stats:data', (data) => {

@@ -72,6 +72,21 @@ describe('utils/task - createTask', () => {
     expect(emitter.emit).toHaveBeenCalledTimes(1)
   })
 
+  it('should emit takeout progress events for takeout:process task type', () => {
+    const emitter = { emit: vi.fn() } as unknown as CoreEmitter
+
+    const task = createTask('takeout:process', { chatIds: ['x'], phase: 'process' }, emitter, logger)
+    task.updateProgress(42)
+
+    expect(emitter.emit).toHaveBeenCalledWith(
+      'takeout:task:progress',
+      expect.objectContaining({
+        type: 'takeout:process',
+        progress: 42,
+      }),
+    )
+  })
+
   it('should not emit takeout progress events for non-takeout task types', () => {
     const emitter = { emit: vi.fn() } as unknown as CoreEmitter
 

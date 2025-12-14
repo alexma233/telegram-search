@@ -5,7 +5,7 @@ import { computed, ref } from 'vue'
 
 export const useSyncTaskStore = defineStore('sync-task', () => {
   const increase = ref(false)
-  const currentTask = ref<CoreTaskData<'takeout'>>()
+  const currentTask = ref<CoreTaskData<'takeout' | 'takeout:process'>>()
   const chatStats = ref<ChatSyncStats>()
   const chatStatsLoading = ref(false)
 
