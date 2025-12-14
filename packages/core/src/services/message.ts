@@ -6,6 +6,8 @@ import type { FetchMessageOpts } from '../types/events'
 import { Err, Ok } from '@unbird/result'
 import { Api } from 'telegram'
 
+import { resolvePeerByChatId } from '../utils/peer'
+
 export type MessageService = ReturnType<typeof createMessageService>
 
 export function createMessageService(ctx: CoreContext, logger: Logger) {
@@ -33,8 +35,9 @@ export function createMessageService(ctx: CoreContext, logger: Logger) {
 
     try {
       logger.withFields({ limit }).debug('Fetching messages from Telegram server')
+      const peer = await resolvePeerByChatId(ctx, chatId)
       const messages = await ctx.getClient()
-        .getMessages(chatId, {
+        .getMessages(peer, {
           limit,
           minId,
           maxId,
@@ -61,9 +64,10 @@ export function createMessageService(ctx: CoreContext, logger: Logger) {
   }
 
   async function sendMessage(chatId: string, content: string) {
+    const peer = await resolvePeerByChatId(ctx, chatId)
     const message = await ctx.getClient()
       .invoke(new Api.messages.SendMessage({
-        peer: chatId,
+        peer,
         message: content,
       }))
 
@@ -84,7 +88,8 @@ export function createMessageService(ctx: CoreContext, logger: Logger) {
       logger.withFields({ chatId, count: messageIds.length }).debug('Fetching specific messages from Telegram')
 
       // Telegram API getMessages can accept an array of message IDs
-      const messages = await ctx.getClient().getMessages(chatId, {
+      const peer = await resolvePeerByChatId(ctx, chatId)
+      const messages = await ctx.getClient().getMessages(peer, {
         ids: messageIds,
       })
 

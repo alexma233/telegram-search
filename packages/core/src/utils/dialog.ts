@@ -18,6 +18,7 @@ export function resolveDialog(dialog: Dialog): Result<{
   type: DialogType
   avatarFileId?: string
   avatarUpdatedAt?: Date
+  accessHash?: string
 }> {
   const { isGroup, isChannel, isUser } = dialog
   let type: DialogType
@@ -56,11 +57,21 @@ export function resolveDialog(dialog: Dialog): Result<{
   }
   catch {}
 
+  // Extract access hash (required for InputPeer resolution across restarts)
+  let accessHash: string | undefined
+  try {
+    if (dialog.entity instanceof Api.User || dialog.entity instanceof Api.Channel) {
+      accessHash = (dialog.entity as any).accessHash?.toString?.() ?? undefined
+    }
+  }
+  catch {}
+
   return Ok({
     id: id.toJSNumber(),
     name,
     type,
     avatarFileId,
     avatarUpdatedAt: undefined,
+    accessHash,
   })
 }

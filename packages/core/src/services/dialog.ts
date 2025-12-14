@@ -65,6 +65,7 @@ export function createDialogService(ctx: CoreContext, logger: Logger) {
         id: result.id,
         name: result.name,
         type: result.type,
+        accessHash: result.accessHash,
         unreadCount,
         messageCount,
         lastMessage,

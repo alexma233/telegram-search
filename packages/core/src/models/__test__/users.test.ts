@@ -22,6 +22,7 @@ describe('models/users', () => {
       id: '123',
       name: 'Alice',
       username: 'alice',
+      accessHash: '999',
     }
 
     const result = await userModels.recordUser(db, coreUser)
@@ -32,6 +33,7 @@ describe('models/users', () => {
     expect(user.name).toBe('Alice')
     expect(user.username).toBe('alice')
     expect(user.type).toBe('user')
+    expect(user.access_hash).toBe('999')
 
     const rows = await db.select().from(usersTable)
     expect(rows).toHaveLength(1)
@@ -45,6 +47,7 @@ describe('models/users', () => {
       id: '123',
       name: 'Alice',
       username: 'alice',
+      accessHash: '111',
     }
 
     const first = await userModels.recordUser(db, coreUser)
@@ -53,6 +56,7 @@ describe('models/users', () => {
       ...coreUser,
       name: 'Alice Updated',
       username: 'alice_new',
+      accessHash: '222',
     }
 
     const second = await userModels.recordUser(db, updatedUser)
@@ -60,6 +64,7 @@ describe('models/users', () => {
     expect(second.id).toBe(first.id)
     expect(second.name).toBe('Alice Updated')
     expect(second.username).toBe('alice_new')
+    expect(second.access_hash).toBe('222')
   })
 
   it('findUserByPlatformId and findUserByUUID return the correct user', async () => {
@@ -70,12 +75,14 @@ describe('models/users', () => {
       id: '123',
       name: 'Alice',
       username: 'alice',
+      accessHash: '777',
     }
 
     const created = await userModels.recordUser(db, coreUser)
 
     const byPlatform = (await userModels.findUserByPlatformId(db, 'telegram', '123')).unwrap()
     expect(byPlatform?.id).toBe(created.id)
+    expect(byPlatform?.access_hash).toBe('777')
 
     const byUuid = (await userModels.findUserByUUID(db, created.id)).unwrap()
     expect(byUuid?.id).toBe(created.id)
@@ -87,6 +94,7 @@ describe('models/users', () => {
       id: '1',
       name: 'User Name',
       username: 'username',
+      accessHash: '123456',
     }
 
     const chatEntity: CoreEntity = {
@@ -99,6 +107,7 @@ describe('models/users', () => {
       type: 'channel',
       id: '3',
       name: 'Channel Name',
+      accessHash: '888',
     }
 
     const userDb = convertCoreEntityToDBUser(userEntity)
@@ -108,6 +117,7 @@ describe('models/users', () => {
       name: 'User Name',
       username: 'username',
       type: 'user',
+      access_hash: '123456',
     })
 
     const chatDb = convertCoreEntityToDBUser(chatEntity)
@@ -117,6 +127,7 @@ describe('models/users', () => {
       name: 'Chat Name',
       username: '2',
       type: 'chat',
+      access_hash: '',
     })
 
     const channelDb = convertCoreEntityToDBUser(channelEntity)
@@ -126,6 +137,7 @@ describe('models/users', () => {
       name: 'Channel Name',
       username: '3',
       type: 'channel',
+      access_hash: '888',
     })
   })
 
@@ -137,6 +149,7 @@ describe('models/users', () => {
       id: '1',
       name: 'User Name',
       username: 'username',
+      accessHash: '123',
     }
 
     const chatEntity: CoreEntity = {
@@ -149,6 +162,7 @@ describe('models/users', () => {
       type: 'channel',
       id: '3',
       name: 'Channel Name',
+      accessHash: '456',
     }
 
     const [userRow] = await db.insert(usersTable).values(convertCoreEntityToDBUser(userEntity)).returning()

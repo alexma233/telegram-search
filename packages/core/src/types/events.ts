@@ -165,6 +165,11 @@ export interface CoreBaseEntity {
 export interface CoreUserEntity extends CoreBaseEntity {
   type: 'user'
   username: string
+  /**
+   * Telegram access hash. Required to construct InputPeerUser reliably when the
+   * entity isn't present in the client's in-memory entity cache (e.g. after restart).
+   */
+  accessHash?: string
 }
 
 export interface CoreChatEntity extends CoreBaseEntity {
@@ -173,6 +178,11 @@ export interface CoreChatEntity extends CoreBaseEntity {
 
 export interface CoreChannelEntity extends CoreBaseEntity {
   type: 'channel'
+  /**
+   * Telegram access hash. Required to construct InputPeerChannel reliably when the
+   * entity isn't present in the client's in-memory entity cache (e.g. after restart).
+   */
+  accessHash?: string
 }
 
 export type CoreEntity = CoreUserEntity | CoreChatEntity | CoreChannelEntity

@@ -8,10 +8,13 @@ import type { TakeoutOpts } from '../types/events'
 import bigInt from 'big-integer'
 
 import { Err, Ok } from '@unbird/result'
+import { and, eq } from 'drizzle-orm'
 import { Api } from 'telegram'
 
 import { TELEGRAM_HISTORY_INTERVAL_MS } from '../constants'
+import { joinedChatsTable } from '../schemas/joined-chats'
 import { createMinIntervalWaiter } from '../utils/min-interval'
+import { resolvePeerByChatId } from '../utils/peer'
 
 export type TakeoutService = ReturnType<typeof createTakeoutService>
 
@@ -48,9 +51,11 @@ export function createTakeoutService(ctx: CoreContext, logger: Logger) {
 
   async function getHistoryWithMessagesCount(chatId: EntityLike): Promise<Result<Api.messages.TypeMessages & { count: number }>> {
     try {
+      // Ensure peer is resolvable even when gramjs cache is cold.
+      const peer = typeof chatId === 'string' ? await resolvePeerByChatId(ctx, chatId) : chatId
       const history = await ctx.getClient()
         .invoke(new Api.messages.GetHistory({
-          peer: chatId,
+          peer,
           limit: 1,
           offsetId: 0,
           offsetDate: 0,
@@ -121,9 +126,10 @@ export function createTakeoutService(ctx: CoreContext, logger: Logger) {
         const hashBigInt = id ^ (id >> 21n) ^ (id << 35n) ^ (id >> 4n) + id
         const hash = bigInt(hashBigInt.toString())
 
-        const peer = await ctx.getClient().getInputEntity(chatId)
-        const historyQuery = new Api.messages.GetHistory({
-          peer,
+        const peer = await resolvePeerByChatId(ctx, chatId)
+
+        const buildHistoryQuery = (p: EntityLike) => new Api.messages.GetHistory({
+          peer: p,
           offsetId,
           addOffset: 0,
           offsetDate: 0,
@@ -132,6 +138,8 @@ export function createTakeoutService(ctx: CoreContext, logger: Logger) {
           minId,
           hash,
         })
+
+        const historyQuery = buildHistoryQuery(peer)
 
         logger.withFields(historyQuery).verbose('Historical messages query')
 
@@ -143,12 +151,47 @@ export function createTakeoutService(ctx: CoreContext, logger: Logger) {
           logger.verbose('Aborted during rate-limit wait')
           break
         }
-        const result = await ctx.getClient().invoke(
-          new Api.InvokeWithTakeout({
-            takeoutId: takeoutSession.id,
-            query: historyQuery,
-          }),
-        ) as unknown as Api.messages.MessagesSlice
+        let result: Api.messages.MessagesSlice
+        try {
+          result = await ctx.getClient().invoke(
+            new Api.InvokeWithTakeout({
+              takeoutId: takeoutSession.id,
+              query: historyQuery,
+            }),
+          ) as unknown as Api.messages.MessagesSlice
+        }
+        catch (error) {
+          // Retry once on CHANNEL_INVALID / PEER_ID_INVALID by forcing a fresh peer resolution.
+          const msg = error instanceof Error ? error.message : String(error)
+          if (msg.includes('CHANNEL_INVALID') || msg.includes('PEER_ID_INVALID')) {
+            logger.withFields({ chatId }).warn('Peer invalid during GetHistory; retrying with freshly resolved peer')
+            const freshPeer = await ctx.getClient().getInputEntity(chatId)
+            // Best-effort backfill so future runs stop failing.
+            try {
+              const accessHash = (freshPeer as any)?.accessHash?.toString?.()
+              if (accessHash) {
+                await ctx.getDB()
+                  .update(joinedChatsTable)
+                  .set({ access_hash: accessHash })
+                  .where(and(
+                    eq(joinedChatsTable.platform, 'telegram'),
+                    eq(joinedChatsTable.chat_id, chatId),
+                  ))
+              }
+            }
+            catch {}
+
+            result = await ctx.getClient().invoke(
+              new Api.InvokeWithTakeout({
+                takeoutId: takeoutSession.id,
+                query: buildHistoryQuery(freshPeer),
+              }),
+            ) as unknown as Api.messages.MessagesSlice
+          }
+          else {
+            throw error
+          }
+        }
 
         // Type safe check
         if (!('messages' in result)) {

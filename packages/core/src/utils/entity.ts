@@ -8,11 +8,13 @@ import { Api } from 'telegram'
 
 export function resolveEntity(entity: Entity): Result<CoreEntity> {
   if (entity instanceof Api.User) {
+    const accessHash = (entity as any).accessHash?.toString?.() ?? undefined
     return Ok({
       type: 'user',
       id: entity.id.toString(),
       name: [entity.firstName, entity.lastName].filter(Boolean).join(' ').trim(),
       username: entity.username ?? entity.id.toString(),
+      accessHash,
     })
   }
 
@@ -25,10 +27,12 @@ export function resolveEntity(entity: Entity): Result<CoreEntity> {
   }
 
   if (entity instanceof Api.Channel) {
+    const accessHash = (entity as any).accessHash?.toString?.() ?? undefined
     return Ok({
       type: 'channel',
       id: entity.id.toString(),
       name: entity.title,
+      accessHash,
     })
   }
 

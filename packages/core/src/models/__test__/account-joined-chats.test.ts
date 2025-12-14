@@ -28,6 +28,7 @@ describe('models/account-joined-chats', () => {
       chat_id: 'chat-1',
       chat_name: 'Test Chat',
       chat_type: 'user',
+      access_hash: '',
     }).returning()
 
     const rows = await accountJoinedChatModels.linkAccountToJoinedChat(db, account.id, chat.id)
@@ -53,6 +54,7 @@ describe('models/account-joined-chats', () => {
       chat_id: 'chat-1',
       chat_name: 'Test Chat',
       chat_type: 'user',
+      access_hash: '',
     }).returning()
 
     await accountJoinedChatModels.linkAccountToJoinedChat(db, account.id, chat.id)
@@ -75,6 +77,7 @@ describe('models/account-joined-chats', () => {
       chat_id: 'chat-1',
       chat_name: 'Test Chat 1',
       chat_type: 'user',
+      access_hash: '',
     }).returning()
 
     const [chat2] = await db.insert(joinedChatsTable).values({
@@ -82,6 +85,7 @@ describe('models/account-joined-chats', () => {
       chat_id: 'chat-2',
       chat_name: 'Test Chat 2',
       chat_type: 'group',
+      access_hash: '',
     }).returning()
 
     await accountJoinedChatModels.linkAccountToJoinedChat(db, account.id, chat1.id)
@@ -111,6 +115,7 @@ describe('models/account-joined-chats', () => {
       chat_id: 'chat-1',
       chat_name: 'Test Chat',
       chat_type: 'group',
+      access_hash: '',
     }).returning()
 
     await accountJoinedChatModels.linkAccountToJoinedChat(db, account1.id, chat.id)

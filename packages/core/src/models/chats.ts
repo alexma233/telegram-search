@@ -26,6 +26,7 @@ async function recordChats(db: CoreDB, chats: CoreDialog[], accountId: string): 
         chat_id: chat.id.toString(),
         chat_name: chat.name,
         chat_type: chat.type,
+        access_hash: chat.accessHash ?? '',
         dialog_date: parseDate(chat.lastMessageDate),
       })))
       .onConflictDoUpdate({
@@ -33,6 +34,7 @@ async function recordChats(db: CoreDB, chats: CoreDialog[], accountId: string): 
         set: {
           chat_name: sql`excluded.chat_name`,
           chat_type: sql`excluded.chat_type`,
+          access_hash: sql`excluded.access_hash`,
           dialog_date: sql`excluded.dialog_date`,
           updated_at: Date.now(),
         },
@@ -76,6 +78,7 @@ async function fetchChatsByAccountId(db: CoreDB, accountId: string): PromiseResu
       chat_id: joinedChatsTable.chat_id,
       chat_name: joinedChatsTable.chat_name,
       chat_type: joinedChatsTable.chat_type,
+      access_hash: joinedChatsTable.access_hash,
       dialog_date: joinedChatsTable.dialog_date,
       created_at: joinedChatsTable.created_at,
       updated_at: joinedChatsTable.updated_at,

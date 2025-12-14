@@ -11,6 +11,11 @@ export const joinedChatsTable = pgTable('joined_chats', () => {
     chat_id: text().notNull().default('').unique(),
     chat_name: text().notNull().default(''),
     chat_type: text().notNull().default('user').$type<JoinedChatType>(),
+    /**
+     * Telegram access hash for user/channel-like dialogs.
+     * Stored as text to keep it portable across Postgres/PGlite.
+     */
+    access_hash: text().notNull().default(''),
     dialog_date: bigint({ mode: 'number' }).notNull().default(0),
     created_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),
     updated_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),

@@ -23,6 +23,7 @@ async function recordUser(db: CoreDB, user: CoreEntity): Promise<DBSelectUser> {
         name: sql`excluded.name`,
         username: sql`excluded.username`,
         type: sql`excluded.type`,
+        access_hash: sql`excluded.access_hash`,
         updated_at: Date.now(),
       },
     })

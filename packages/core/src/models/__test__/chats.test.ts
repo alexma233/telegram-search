@@ -30,6 +30,7 @@ describe('models/chats', () => {
         id: 1,
         name: 'Chat 1',
         type: 'user',
+        accessHash: '111',
         lastMessageDate: new Date('2024-01-01T00:00:00Z'),
       },
       {
@@ -66,6 +67,7 @@ describe('models/chats', () => {
         id: 1,
         name: 'Old Name',
         type: 'user',
+        accessHash: 'aaa',
         lastMessageDate: new Date('2024-01-01T00:00:00Z'),
       },
     ]
@@ -77,6 +79,7 @@ describe('models/chats', () => {
         id: 1,
         name: 'New Name',
         type: 'user',
+        accessHash: 'bbb',
         lastMessageDate: new Date('2024-02-01T00:00:00Z'),
       },
     ]
@@ -86,6 +89,7 @@ describe('models/chats', () => {
     const [chat] = await db.select().from(joinedChatsTable)
 
     expect(chat.chat_name).toBe('New Name')
+    expect(chat.access_hash).toBe('bbb')
   })
 
   it('fetchChats returns all telegram chats ordered by dialog_date desc', async () => {
@@ -97,6 +101,7 @@ describe('models/chats', () => {
         chat_id: '1',
         chat_name: 'Chat 1',
         chat_type: 'user',
+        access_hash: '',
         dialog_date: 1,
       },
       {
@@ -104,6 +109,7 @@ describe('models/chats', () => {
         chat_id: '2',
         chat_name: 'Chat 2',
         chat_type: 'group',
+        access_hash: '',
         dialog_date: 2,
       },
     ])
@@ -132,6 +138,7 @@ describe('models/chats', () => {
         id: 1,
         name: 'Account1 Chat',
         type: 'user',
+        accessHash: '1',
         lastMessageDate: new Date('2024-01-01T00:00:00Z'),
       },
     ]
@@ -141,6 +148,7 @@ describe('models/chats', () => {
         id: 2,
         name: 'Account2 Chat',
         type: 'user',
+        accessHash: '2',
         lastMessageDate: new Date('2024-01-01T00:00:00Z'),
       },
     ]

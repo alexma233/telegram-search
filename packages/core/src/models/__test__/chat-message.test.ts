@@ -61,6 +61,7 @@ describe('models/chat-message', () => {
       chat_id: 'chat-private',
       chat_name: 'Private Chat',
       chat_type: 'user',
+      access_hash: '',
     }).returning()
 
     const [groupChat] = await db.insert(joinedChatsTable).values({
@@ -68,6 +69,7 @@ describe('models/chat-message', () => {
       chat_id: 'chat-group',
       chat_name: 'Group Chat',
       chat_type: 'group',
+      access_hash: '',
     }).returning()
 
     const messages: CoreMessage[] = [
@@ -123,6 +125,7 @@ describe('models/chat-message', () => {
       chat_id: 'chat-1',
       chat_name: 'Private Chat',
       chat_type: 'user',
+      access_hash: '',
     }).returning()
 
     await db.insert(chatMessagesTable).values([
@@ -201,6 +204,7 @@ describe('models/chat-message', () => {
       chat_id: 'chat-1',
       chat_name: 'Chat with photos',
       chat_type: 'user',
+      access_hash: '',
     }).returning()
 
     const messageUuid = uuidv4()
@@ -254,6 +258,7 @@ describe('models/chat-message', () => {
       chat_id: 'chat-ctx',
       chat_name: 'Context Chat',
       chat_type: 'user',
+      access_hash: '',
     }).returning()
 
     const coreMessages: CoreMessage[] = [

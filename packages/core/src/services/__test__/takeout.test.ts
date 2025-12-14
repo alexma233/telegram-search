@@ -53,6 +53,7 @@ function createTask() {
 describe('takeout service', () => {
   it('getTotalMessageCount should return count from telegram history', async () => {
     const client = {
+      getInputEntity: vi.fn(async (chatId: string) => chatId),
       invoke: vi.fn(async (query: any) => {
         if (query instanceof Api.messages.GetHistory) {
           return {
@@ -74,6 +75,7 @@ describe('takeout service', () => {
 
   it('getTotalMessageCount should return 0 on failure', async () => {
     const client = {
+      getInputEntity: vi.fn(async (chatId: string) => chatId),
       invoke: vi.fn(async () => {
         throw new Error('fail')
       }),

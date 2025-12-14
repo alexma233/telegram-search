@@ -24,7 +24,20 @@ export function createUserResolver(ctx: CoreContext, logger: Logger, userModels:
     run: async (opts: MessageResolverOpts) => {
       logger.verbose('Executing user resolver')
 
-      const { messages } = opts
+      const { messages, rawMessages } = opts
+
+      // Build a best-effort in-batch sender cache from raw Telegram messages.
+      // This avoids extra Telegram API calls and gives us access_hash for InputPeer.
+      const senderEntityByFromId = new Map<string, Entity>()
+      for (const raw of rawMessages) {
+        try {
+          const sender = (raw as any).sender as Entity | undefined
+          const senderId = (sender as any)?.id?.toString?.()
+          if (sender && senderId)
+            senderEntityByFromId.set(String(senderId), sender)
+        }
+        catch {}
+      }
 
       for (const message of messages) {
         const cacheKey = `telegram:${message.fromId}`
@@ -50,15 +63,22 @@ export function createUserResolver(ctx: CoreContext, logger: Logger, userModels:
           }
 
           if (!entities.has(message.fromId)) {
-            try {
-              const entity = await ctx.getClient().getEntity(message.fromId)
-              entities.set(message.fromId, entity)
-              logger.withFields(entity).debug('Resolved entity from Telegram API')
+            // Prefer using already-resolved sender entity from raw messages.
+            const senderEntity = senderEntityByFromId.get(message.fromId)
+            if (senderEntity) {
+              entities.set(message.fromId, senderEntity)
+              logger.withFields({ fromId: message.fromId }).debug('Resolved entity from raw message sender')
             }
-            catch {
-              // TODO: is there needs access_hash?
-              userBlockedList.add(message.fromId)
-              logger.withFields({ fromId: message.fromId }).warn('Failed to get entity from Telegram API')
+            else {
+              try {
+                const entity = await ctx.getClient().getEntity(message.fromId)
+                entities.set(message.fromId, entity)
+                logger.withFields(entity).debug('Resolved entity from Telegram API')
+              }
+              catch {
+                userBlockedList.add(message.fromId)
+                logger.withFields({ fromId: message.fromId }).warn('Failed to get entity from Telegram API')
+              }
             }
           }
 

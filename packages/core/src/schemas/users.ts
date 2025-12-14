@@ -7,6 +7,11 @@ export const usersTable = pgTable('users', {
   name: text().notNull().default(''),
   username: text().notNull().default(''),
   type: text().notNull().default('user').$type<'user' | 'chat' | 'channel'>(),
+  /**
+   * Telegram access hash for user/channel entities.
+   * Stored as text to avoid JS/DB bigint portability issues.
+   */
+  access_hash: text().notNull().default(''),
   created_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),
   updated_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),
 }, table => [

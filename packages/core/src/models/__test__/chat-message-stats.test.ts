@@ -35,6 +35,7 @@ describe('models/chat-message-stats', () => {
       chat_id: 'private-chat-1',
       chat_name: 'Private Chat',
       chat_type: 'user',
+      access_hash: '',
     }).returning()
 
     const [groupChat] = await db.insert(joinedChatsTable).values({
@@ -42,6 +43,7 @@ describe('models/chat-message-stats', () => {
       chat_id: 'group-chat-1',
       chat_name: 'Group Chat',
       chat_type: 'group',
+      access_hash: '',
     }).returning()
 
     await db.insert(chatMessagesTable).values([
@@ -145,6 +147,7 @@ describe('models/chat-message-stats', () => {
       chat_id: 'private-chat-1',
       chat_name: 'Private Chat',
       chat_type: 'user',
+      access_hash: '',
     }).returning()
 
     await db.insert(chatMessagesTable).values([
