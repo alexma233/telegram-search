@@ -1,37 +1,37 @@
+import type { Logger } from '@guiiai/logg'
 import type { Api } from 'telegram'
 
 import type { CoreContext } from '../context'
 import type { MessageResolverRegistryFn } from '../message-resolvers'
-
-import { useLogger } from '@guiiai/logg'
-import { useConfig } from '@tg-search/common'
+import type { SyncOptions } from '../types/events'
 
 import { convertToCoreMessage } from '../utils/message'
 
-export interface MessageResolverEventToCore {
-  /**
-   * Processes messages. If `isTakeout` is true, suppresses 'message:data' emissions (browser-facing)
-   * while still recording messages to storage. Consumers should be aware that setting `isTakeout`
-   * changes event side effects.
-   */
-  'message:process': (data: { messages: Api.Message[], isTakeout?: boolean }) => void
-}
-
-export interface MessageResolverEventFromCore {}
-
-export type MessageResolverEvent = MessageResolverEventFromCore & MessageResolverEventToCore
-
 export type MessageResolverService = ReturnType<ReturnType<typeof createMessageResolverService>>
 
-export function createMessageResolverService(ctx: CoreContext) {
-  const logger = useLogger('core:message-resolver:service')
+export function createMessageResolverService(ctx: CoreContext, logger: Logger) {
+  logger = logger.withContext('core:message-resolver:service')
 
   return (resolvers: MessageResolverRegistryFn) => {
-    const { emitter } = ctx
-
     // TODO: worker_threads?
-    async function processMessages(messages: Api.Message[], options: { takeout?: boolean } = {}) {
-      logger.withFields({ count: messages.length }).verbose('Process messages')
+    async function processMessages(
+      messages: Api.Message[],
+      options: {
+        takeout?: boolean
+        syncOptions?: SyncOptions
+        forceRefetch?: boolean
+      } = {},
+    ) {
+      const start = performance.now()
+      logger.withFields({
+        count: messages.length,
+        takeout: options.takeout,
+        syncOptions: options.syncOptions,
+        forceRefetch: options.forceRefetch,
+      }).verbose('Process messages')
+
+      // Sort by message ID in reverse order to process in reverse.
+      messages = messages.sort((a, b) => Number(b.id) - Number(a.id))
 
       const coreMessages = messages
         .map(message => convertToCoreMessage(message).orUndefined())
@@ -41,15 +41,17 @@ export function createMessageResolverService(ctx: CoreContext) {
 
       // TODO: Query user database to get user info
 
-      // Return the messages first
+      // Return the messages to client first.
       if (!options.takeout) {
-        emitter.emit('message:data', { messages: coreMessages })
+        ctx.emitter.emit('message:data', { messages: coreMessages })
       }
 
       // Storage the messages first
-      emitter.emit('storage:record:messages', { messages: coreMessages })
+      ctx.emitter.emit('storage:record:messages', { messages: coreMessages })
 
-      const disabledResolvers = useConfig().resolvers.disabledResolvers || []
+      // Avatar resolver is disabled by default (configured in generateDefaultConfig).
+      // Current strategy: client-driven, on-demand avatar loading via entity:avatar:fetch.
+      const disabledResolvers = (await ctx.getAccountSettings()).resolvers?.disabledResolvers
 
       // Embedding or resolve messages
       const promises = Array.from(resolvers.registry.entries())
@@ -57,21 +59,28 @@ export function createMessageResolverService(ctx: CoreContext) {
         .map(([name, resolver]) => (async () => {
           logger.withFields({ name }).verbose('Process messages with resolver')
 
+          const opts = {
+            messages: coreMessages,
+            rawMessages: messages,
+            syncOptions: options.syncOptions,
+            forceRefetch: options.forceRefetch,
+          }
+
           try {
             if (resolver.run) {
-              const result = (await resolver.run({ messages: coreMessages })).unwrap()
+              const result = (await resolver.run(opts)).unwrap()
 
               if (result.length > 0) {
-                emitter.emit('storage:record:messages', { messages: result })
+                ctx.emitter.emit('storage:record:messages', { messages: result })
               }
             }
             else if (resolver.stream) {
-              for await (const message of resolver.stream({ messages: coreMessages })) {
+              for await (const message of resolver.stream(opts)) {
                 if (!options.takeout) {
-                  emitter.emit('message:data', { messages: [message] })
+                  ctx.emitter.emit('message:data', { messages: [message] })
                 }
 
-                emitter.emit('storage:record:messages', { messages: [message] })
+                ctx.emitter.emit('storage:record:messages', { messages: [message] })
               }
             }
           }
@@ -81,6 +90,14 @@ export function createMessageResolverService(ctx: CoreContext) {
         })())
 
       await Promise.allSettled(promises)
+
+      // Record batch duration if metrics sink is available (Node/server runtime only).
+      if (ctx.metrics) {
+        const durationMs = performance.now() - start
+        const source = options.takeout ? 'takeout' : 'realtime'
+        ctx.metrics.messageBatchDuration.observe({ source }, durationMs)
+        ctx.metrics.messagesProcessed.inc({ source }, coreMessages.length)
+      }
     }
 
     return {

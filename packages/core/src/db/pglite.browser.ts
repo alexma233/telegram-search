@@ -4,14 +4,14 @@ import type { drizzle as drizzlePglite } from 'drizzle-orm/pglite'
 
 import { IdbFs, PGlite } from '@electric-sql/pglite'
 import { vector } from '@electric-sql/pglite/vector'
+import { defineInvokeEventa, defineInvokeHandler } from '@moeru/eventa'
+import { createContext } from '@moeru/eventa/adapters/websocket/native'
 import { migrate } from '@proj-airi/drizzle-orm-browser-migrator/pglite'
-import { defineInvokeEventa, defineInvokeHandler } from '@unbird/eventa'
-import { createContext } from '@unbird/eventa/adapters/websocket/native'
+import { migrations } from '@tg-search/schema'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/pglite'
-import migrations from 'virtual:drizzle-migrations.sql'
 
-import { Conn } from '../ws'
+import { Conn } from '../libs/ws'
 
 type PgliteDB = ReturnType<typeof drizzlePglite>
 
@@ -30,6 +30,7 @@ export async function initPgliteDrizzleInBrowser(
   options: {
     debuggerWebSocketUrl?: string
     isDatabaseDebugMode?: boolean
+    disableMigrations?: boolean
   } = {},
 ) {
   logger.log('Initializing pglite drizzle in browser...')
@@ -72,14 +73,16 @@ export async function initPgliteDrizzleInBrowser(
       logger.log('Vector extension enabled successfully')
 
       // Migrate database
-      await applyMigrations(logger, db)
+      if (!options.disableMigrations) {
+        await applyMigrations(logger, db)
+      }
     }
     catch (error) {
       logger.withError(error).error('Failed to connect to database')
       throw error
     }
 
-    return db
+    return { db, pglite }
   }
   catch (error) {
     logger.withError(error).error('Failed to initialize PGlite database')

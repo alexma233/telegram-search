@@ -1,37 +1,9 @@
+import type { Logger } from '@guiiai/logg'
+
 import type { CoreEmitter } from '../context'
-import type { TakeoutTaskMetadata } from '../services/takeout'
+import type { CoreTask, CoreTaskData, CoreTasks, CoreTaskType } from '../types/task'
 
-import { useLogger } from '@guiiai/logg'
-
-type CoreTaskType = 'takeout' | 'getMessage' | 'embed'
-
-interface CoreTasks {
-  takeout: TakeoutTaskMetadata
-  getMessage: undefined
-  embed: undefined
-}
-
-export interface CoreTaskData<T extends CoreTaskType> {
-  taskId: string
-  type: T
-  progress: number
-  lastMessage?: string
-  lastError?: string
-  rawError?: unknown
-  metadata: CoreTasks[T]
-  createdAt: Date
-  updatedAt: Date
-  abortController: AbortController
-}
-
-export interface CoreTask<T extends CoreTaskType> extends CoreTaskData<T> {
-  updateProgress: (progress: number, message?: string) => CoreTask<T>
-  updateError: (error: Error | unknown) => CoreTask<T>
-  markStarted: () => CoreTask<T>
-  markCompleted: () => CoreTask<T>
-  abort: () => CoreTask<T>
-  toJSON: () => Omit<CoreTaskData<T>, 'abortController'>
-}
+import { v4 as uuidv4 } from 'uuid'
 
 /**
  * Create a task that manages its own state
@@ -40,9 +12,12 @@ export function createTask<T extends CoreTaskType>(
   type: T,
   metadata: CoreTasks[T],
   emitter: CoreEmitter,
+  logger: Logger,
 ): CoreTask<T> {
+  logger = logger.withContext('core:task')
+
   const state: CoreTaskData<T> = {
-    taskId: crypto.randomUUID(),
+    taskId: uuidv4(),
     type,
     progress: 0,
     metadata,
@@ -60,7 +35,9 @@ export function createTask<T extends CoreTaskType>(
   }
 
   task = {
-    ...state,
+    get state() {
+      return state
+    },
 
     updateProgress(progress: number, message?: string) {
       state.progress = progress
@@ -96,7 +73,7 @@ export function createTask<T extends CoreTaskType>(
     abort() {
       state.abortController.abort()
       task.updateError(new Error('Task aborted'))
-      useLogger().withFields({ taskId: state.taskId }).verbose('Task aborted')
+      logger.withFields({ taskId: state.taskId }).verbose('Task aborted')
       return task
     },
 

@@ -4,14 +4,15 @@ import type { drizzle as drizzlePglite } from 'drizzle-orm/pglite'
 
 import fs from 'node:fs'
 
+import path from 'pathe'
+
 import { PGlite } from '@electric-sql/pglite'
 import { vector } from '@electric-sql/pglite/vector'
 import { migrate } from '@proj-airi/drizzle-orm-browser-migrator/pglite'
-import { getDatabaseFilePath } from '@tg-search/common/node/path'
+import { getDatabaseFilePath } from '@tg-search/common/node'
+import { migrations } from '@tg-search/schema'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/pglite'
-import path from 'pathe'
-import migrations from 'virtual:drizzle-migrations.sql'
 
 export type PgliteDB = ReturnType<typeof drizzlePglite>
 
@@ -31,6 +32,7 @@ export async function initPgliteDrizzleInNode(
   dbPath?: string,
   options: {
     isDatabaseDebugMode?: boolean
+    disableMigrations?: boolean
   } = {},
 ) {
   logger.log('Initializing pglite drizzle...')
@@ -57,14 +59,16 @@ export async function initPgliteDrizzleInNode(
       logger.log('Vector extension enabled successfully')
 
       // Migrate database
-      await applyMigrations(logger, db)
+      if (!options.disableMigrations) {
+        await applyMigrations(logger, db)
+      }
     }
     catch (error) {
       logger.withError(error).error('Failed to connect to database')
       throw error
     }
 
-    return db
+    return { db, pglite }
   }
   catch (error) {
     logger.withError(error).error('Failed to initialize PGlite database')

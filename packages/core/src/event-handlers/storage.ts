@@ -1,11 +1,12 @@
+import type { Logger } from '@guiiai/logg'
+
 import type { CoreContext } from '../context'
-import type { DBRetrievalMessages } from '../models'
-import type { CoreDialog } from '../services'
-import type { CoreMessage } from '../utils/message'
+import type { Models } from '../models'
+import type { DBRetrievalMessages } from '../models/utils/message'
+import type { CoreDialog } from '../types/dialog'
+import type { CoreMessage } from '../types/message'
 
-import { useLogger } from '@guiiai/logg'
-
-import { convertToCoreRetrievalMessages, fetchChats, fetchMessageContextWithPhotos, fetchMessagesWithPhotos, getChatMessagesStats, recordChats, recordMessagesWithMedia, retrieveMessages } from '../models'
+import { convertToCoreRetrievalMessages } from '../models/utils/message'
 import { embedContents } from '../utils/embed'
 
 /**
@@ -15,25 +16,46 @@ function hasNoMedia(message: CoreMessage): boolean {
   return !message.media || message.media.length === 0
 }
 
-export function registerStorageEventHandlers(ctx: CoreContext) {
-  const { emitter } = ctx
-  const logger = useLogger('core:storage:event')
+export function registerStorageEventHandlers(ctx: CoreContext, logger: Logger, dbModels: Models) {
+  logger = logger.withContext('core:storage:event')
 
-  emitter.on('storage:fetch:messages', async ({ chatId, pagination }) => {
+  ctx.emitter.on('storage:fetch:messages', async ({ chatId, pagination }) => {
     logger.withFields({ chatId, pagination }).verbose('Fetching messages')
-    const messages = (await fetchMessagesWithPhotos(chatId, pagination)).unwrap()
-    emitter.emit('storage:messages', { messages })
+
+    const accountId = ctx.getCurrentAccountId()
+    const hasAccess = (await dbModels.chatModels.isChatAccessibleByAccount(ctx.getDB(), accountId, chatId)).expect('Failed to check chat access')
+
+    if (!hasAccess) {
+      ctx.withError('Unauthorized chat access', 'Account does not have access to requested chat messages')
+      return
+    }
+
+    const messages = (await dbModels.chatMessageModels.fetchMessagesWithPhotos(ctx.getDB(), dbModels.photoModels, accountId, chatId, pagination)).unwrap()
+    ctx.emitter.emit('storage:messages', { messages })
   })
 
-  emitter.on('storage:fetch:message-context', async ({ chatId, messageId, before = 20, after = 20 }) => {
+  ctx.emitter.on('storage:fetch:message-context', async ({ chatId, messageId, before = 20, after = 20 }) => {
     const safeBefore = Math.max(0, before)
     const safeAfter = Math.max(0, after)
 
     logger.withFields({ chatId, messageId, before: safeBefore, after: safeAfter }).verbose('Fetching message context')
 
-    const messages = (await fetchMessageContextWithPhotos({ chatId, messageId, before: safeBefore, after: safeAfter })).unwrap()
+    const accountId = ctx.getCurrentAccountId()
+    const hasAccess = (await dbModels.chatModels.isChatAccessibleByAccount(ctx.getDB(), accountId, chatId)).expect('Failed to check chat access')
 
-    emitter.emit('storage:messages:context', { chatId, messageId, messages })
+    if (!hasAccess) {
+      ctx.withError('Unauthorized chat access', 'Account does not have access to requested message context')
+      return
+    }
+
+    const messages = (await dbModels.chatMessageModels.fetchMessageContextWithPhotos(
+      ctx.getDB(),
+      dbModels.photoModels,
+      accountId,
+      { chatId, messageId, before: safeBefore, after: safeAfter },
+    )).unwrap()
+
+    ctx.emitter.emit('storage:messages:context', { chatId, messageId, messages })
 
     // After emitting the initial messages, identify messages that might be missing media
     // and trigger a fetch from Telegram to download them
@@ -45,40 +67,34 @@ export function registerStorageEventHandlers(ctx: CoreContext) {
       .filter(id => !Number.isNaN(id))
 
     if (messageIdsToFetch.length > 0) {
-      logger.withFields({ messageIds: messageIdsToFetch.length }).verbose('Fetching messages from Telegram to check for missing media')
+      logger.withFields({ chatId, count: messageIdsToFetch.length }).verbose('Fetching messages from Telegram to check for missing media')
 
       // Fetch these specific messages from Telegram which will download any missing media
       // This is done asynchronously and will update the messages once media is downloaded
-      emitter.emit('message:fetch:specific', {
+      ctx.emitter.emit('message:fetch:specific', {
         chatId,
         messageIds: messageIdsToFetch,
       })
     }
   })
 
-  emitter.on('storage:record:messages', async ({ messages }) => {
-    logger.withFields({ messages: messages.length }).verbose('Recording messages')
-    logger.withFields(
-      messages
-        .map(m => ({
-          ...m,
-          vectors: {
-            vector1536: m.vectors.vector1536?.length,
-            vector1024: m.vectors.vector1024?.length,
-            vector768: m.vectors.vector768?.length,
-          },
-        })),
-    ).debug('Recording messages')
-    await recordMessagesWithMedia(messages)
+  ctx.emitter.on('storage:record:messages', async ({ messages }) => {
+    const accountId = ctx.getCurrentAccountId()
+
+    await dbModels.chatMessageModels.recordMessages(ctx.getDB(), accountId, messages)
+
+    logger.withFields({ count: messages.length }).verbose('Messages recorded')
   })
 
-  emitter.on('storage:fetch:dialogs', async () => {
+  ctx.emitter.on('storage:fetch:dialogs', async (data) => {
     logger.verbose('Fetching dialogs')
 
-    const dbChats = (await fetchChats())?.unwrap()
-    const chatsMessageStats = (await getChatMessagesStats())?.unwrap()
+    const accountId = data?.accountId || ctx.getCurrentAccountId()
 
-    logger.withFields({ dbChatsSize: dbChats.length, chatsMessageStatsSize: chatsMessageStats.length }).verbose('Chat message stats')
+    const dbChats = (await dbModels.chatModels.fetchChatsByAccountId(ctx.getDB(), accountId))?.unwrap()
+    const chatsMessageStats = (await dbModels.chatMessageStatsModels.getChatMessagesStats(ctx.getDB(), accountId))?.unwrap()
+
+    logger.withFields({ count: dbChats.length, chatsMessageStatsCount: chatsMessageStats.length }).verbose('Fetched dialogs for account')
 
     const dialogs = dbChats.map((chat) => {
       const chatMessageStats = chatsMessageStats.find(stats => stats.chat_id === chat.chat_id)
@@ -90,10 +106,10 @@ export function registerStorageEventHandlers(ctx: CoreContext) {
       } satisfies CoreDialog
     })
 
-    emitter.emit('storage:dialogs', { dialogs })
+    ctx.emitter.emit('storage:dialogs', { dialogs })
   })
 
-  emitter.on('storage:record:dialogs', async ({ dialogs }) => {
+  ctx.emitter.on('storage:record:dialogs', async ({ dialogs, accountId }) => {
     logger.withFields({
       size: dialogs.length,
       users: dialogs.filter(d => d.type === 'user').length,
@@ -101,34 +117,59 @@ export function registerStorageEventHandlers(ctx: CoreContext) {
       channels: dialogs.filter(d => d.type === 'channel').length,
     }).verbose('Recording dialogs')
 
-    await recordChats(dialogs)
+    if (dialogs.length === 0) {
+      logger.warn('No dialogs to record, skipping database write')
+      return
+    }
+
+    const result = await dbModels.chatModels.recordChats(ctx.getDB(), dialogs, accountId)
+    logger.withFields({ count: result.length }).verbose('Successfully recorded dialogs')
   })
 
-  emitter.on('storage:search:messages', async (params) => {
+  ctx.emitter.on('storage:search:messages', async (params) => {
     logger.withFields({ params }).verbose('Searching messages')
+
+    const accountId = ctx.getCurrentAccountId()
 
     if (params.content.length === 0) {
       return
     }
 
+    if (params.chatId) {
+      const hasAccess = (await dbModels.chatModels.isChatAccessibleByAccount(ctx.getDB(), accountId, params.chatId)).expect('Failed to check chat access')
+
+      if (!hasAccess) {
+        ctx.withError('Unauthorized chat access', 'Account does not have access to requested chat messages')
+        return
+      }
+    }
+
+    // Prepare filters from params
+    const filters = {
+      fromUserId: params.fromUserId,
+      timeRange: params.timeRange,
+    }
+
+    const embeddingSettings = (await ctx.getAccountSettings()).embedding
+    const embeddingDimension = embeddingSettings.dimension
     let dbMessages: DBRetrievalMessages[] = []
     if (params.useVector) {
       let embedding: number[] = []
-      const embeddingResult = (await embedContents([params.content])).orUndefined()
+      const embeddingResult = (await embedContents([params.content], embeddingSettings)).orUndefined()
       if (embeddingResult)
         embedding = embeddingResult.embeddings[0]
 
-      dbMessages = (await retrieveMessages(params.chatId, { embedding, text: params.content }, params.pagination)).expect('Failed to retrieve messages')
+      dbMessages = (await dbModels.chatMessageModels.retrieveMessages(ctx.getDB(), logger, accountId, params.chatId, embeddingDimension, { embedding, text: params.content }, params.pagination, filters)).expect('Failed to retrieve messages')
     }
     else {
-      dbMessages = (await retrieveMessages(params.chatId, { text: params.content }, params.pagination)).expect('Failed to retrieve messages')
+      dbMessages = (await dbModels.chatMessageModels.retrieveMessages(ctx.getDB(), logger, accountId, params.chatId, embeddingDimension, { text: params.content }, params.pagination, filters)).expect('Failed to retrieve messages')
     }
 
-    logger.withFields({ messages: dbMessages.length }).verbose('Retrieved messages')
+    logger.withFields({ count: dbMessages.length }).verbose('Retrieved messages')
     logger.withFields(dbMessages).debug('Retrieved messages')
 
     const coreMessages = convertToCoreRetrievalMessages(dbMessages)
 
-    emitter.emit('storage:search:messages:data', { messages: coreMessages })
+    ctx.emitter.emit('storage:search:messages:data', { messages: coreMessages })
   })
 }

@@ -1,23 +1,24 @@
+import type { Logger } from '@guiiai/logg'
 import type { Entity } from 'telegram/define'
 
 import type { MessageResolver, MessageResolverOpts } from '.'
 import type { CoreContext } from '../context'
-import type { DBSelectUser } from '../models/users'
+import type { UserModels } from '../models/users'
+import type { DBSelectUser } from '../models/utils/types'
 
-import { useLogger } from '@guiiai/logg'
 import { Ok } from '@unbird/result'
 
-import { findUserByPlatformId, recordUser } from '../models/users'
 import { resolveEntity } from '../utils/entity'
 
-export function createUserResolver(ctx: CoreContext): MessageResolver {
-  const logger = useLogger('core:resolver:user')
+export function createUserResolver(ctx: CoreContext, logger: Logger, userModels: UserModels): MessageResolver {
+  logger = logger.withContext('core:resolver:user')
 
   // In-memory cache for entities fetched from Telegram API during this session
   const entities = new Map<string, Entity>()
 
   // In-memory cache for user database records to avoid repeated DB queries
   const userCache = new Map<string, DBSelectUser>()
+  const userBlockedList = new Set<string>()
 
   return {
     run: async (opts: MessageResolverOpts) => {
@@ -33,7 +34,7 @@ export function createUserResolver(ctx: CoreContext): MessageResolver {
 
         if (!dbUser) {
           // Check database
-          const dbUserOrNull = (await findUserByPlatformId('telegram', message.fromId)).orUndefined()
+          const dbUserOrNull = (await userModels.findUserByPlatformId(ctx.getDB(), 'telegram', message.fromId)).orUndefined()
 
           if (dbUserOrNull) {
             dbUser = dbUserOrNull
@@ -44,10 +45,21 @@ export function createUserResolver(ctx: CoreContext): MessageResolver {
 
         // If user not found in cache or database, fetch from Telegram API
         if (!dbUser) {
+          if (userBlockedList.has(message.fromId)) {
+            continue
+          }
+
           if (!entities.has(message.fromId)) {
-            const entity = await ctx.getClient().getEntity(message.fromId)
-            entities.set(message.fromId, entity)
-            logger.withFields(entity).debug('Resolved entity from Telegram API')
+            try {
+              const entity = await ctx.getClient().getEntity(message.fromId)
+              entities.set(message.fromId, entity)
+              logger.withFields(entity).debug('Resolved entity from Telegram API')
+            }
+            catch {
+              // TODO: is there needs access_hash?
+              userBlockedList.add(message.fromId)
+              logger.withFields({ fromId: message.fromId }).warn('Failed to get entity from Telegram API')
+            }
           }
 
           const entity = entities.get(message.fromId)!
@@ -58,12 +70,10 @@ export function createUserResolver(ctx: CoreContext): MessageResolver {
           }
 
           // Save to database
-          const recordedUsers = (await recordUser(coreEntity)).orUndefined()
-          if (recordedUsers && recordedUsers.length > 0) {
-            dbUser = recordedUsers[0]
-            userCache.set(cacheKey, dbUser)
-            logger.withFields({ userId: dbUser.id, fromId: message.fromId }).debug('User saved to database')
-          }
+          const recordedUser = await userModels.recordUser(ctx.getDB(), coreEntity)
+          dbUser = recordedUser
+          userCache.set(cacheKey, dbUser)
+          logger.withFields({ userId: dbUser.id, fromId: message.fromId }).debug('User saved to database')
         }
 
         // Update message with user information

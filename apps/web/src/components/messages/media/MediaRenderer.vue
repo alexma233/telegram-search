@@ -4,7 +4,12 @@ import type { CoreMessage } from '@tg-search/core/types'
 import type { AnimationItem } from 'lottie-web'
 
 import lottie from 'lottie-web'
-import { computed, onUnmounted, ref, watch } from 'vue'
+import pako from 'pako'
+
+import { getMediaBinaryProvider, hydrateMediaBlobWithCore, useBridgeStore, useSettingsStore } from '@tg-search/client'
+import { models } from '@tg-search/core'
+import { storeToRefs } from 'pinia'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import MediaWebpage from './MediaWebpage.vue'
 
@@ -15,10 +20,12 @@ const props = defineProps<{
 }>()
 
 const runtimeError = ref<string>()
-
-const isMedia = computed(() => {
-  return props.message.media?.length
-})
+const { debugMode } = storeToRefs(useSettingsStore())
+const bridgeStore = useBridgeStore()
+const isReprocessing = ref(false)
+const hasPermanentError = ref(false)
+const currentSrc = ref<string | undefined>(undefined)
+const hasReprocessedCurrentSrc = ref(false)
 
 export interface WebpageData {
   title: string
@@ -35,127 +42,208 @@ export interface ProcessedMedia {
   error?: string
   webpageData?: WebpageData
   mimeType?: string
-  tgsAnimationData?: string
   width?: number
   height?: number
 }
 
 const processedMedia = computed<ProcessedMedia>(() => {
-  if (isMedia.value) {
-    for (const mediaItem of props.message.media!) {
-      switch (mediaItem.type) {
-        case 'webpage': {
-          // TODO: add webpage to core media
-          const webpage = (mediaItem.apiMedia as any)?.webpage
-          if (!webpage)
-            continue
-
-          return {
-            src: webpage.url,
-            type: mediaItem.type,
-            webpageData: {
-              title: webpage.title,
-              description: webpage.description,
-              siteName: webpage.siteName,
-              url: webpage.url,
-              displayUrl: webpage.displayUrl,
-              previewImage: mediaItem.blobUrl,
-            },
-          } satisfies ProcessedMedia
-        }
-        case 'photo': {
-          // Extract dimensions from Telegram API PhotoSize
-          let width: number | undefined
-          let height: number | undefined
-
-          const apiMedia = mediaItem.apiMedia as any
-          if (apiMedia?.photo?.sizes) {
-            // Get the largest photo size for dimensions
-            const sizes = apiMedia.photo.sizes
-            const largestSize = sizes[sizes.length - 1]
-            if (largestSize?.w && largestSize?.h) {
-              width = largestSize.w
-              height = largestSize.h
-            }
-          }
-
-          return {
-            src: mediaItem.blobUrl,
-            type: mediaItem.type,
-            mimeType: mediaItem.mimeType,
-            width,
-            height,
-          } satisfies ProcessedMedia
-        }
-        default:
-          return {
-            src: mediaItem.blobUrl,
-            type: mediaItem.type,
-            mimeType: mediaItem.mimeType,
-            tgsAnimationData: mediaItem.type === 'sticker' ? mediaItem.tgsAnimationData : undefined,
-          } satisfies ProcessedMedia
-      }
-    }
+  const mediaItem = props.message.media?.[0]
+  if (!mediaItem) {
+    return {
+      src: undefined,
+      type: 'unknown',
+    } satisfies ProcessedMedia
   }
 
-  return {
-    src: undefined,
-    type: 'unknown',
-  } satisfies ProcessedMedia
+  switch (mediaItem.type) {
+    case 'webpage':
+      return {
+        // TODO: fix the preview image
+        src: mediaItem.displayUrl,
+        type: mediaItem.type,
+        webpageData: {
+          title: mediaItem.title,
+          description: mediaItem.description,
+          siteName: mediaItem.siteName,
+          url: mediaItem.url,
+          displayUrl: mediaItem.displayUrl,
+        },
+      } satisfies ProcessedMedia
+
+    case 'photo':
+    case 'sticker':
+      return {
+        src: mediaItem.blobUrl,
+        type: mediaItem.type,
+        mimeType: mediaItem.mimeType,
+      } satisfies ProcessedMedia
+
+    default:
+      return {
+        src: undefined,
+        type: 'unknown',
+      } satisfies ProcessedMedia
+  }
 })
 
+// In With Core mode, lazily hydrate media blobs from the embedded database
+// only when this component is mounted and has a media item to render.
+if (import.meta.env.VITE_WITH_CORE) {
+  watch(
+    () => props.message.media?.[0],
+    (mediaItem) => {
+      if (!mediaItem || !mediaItem.queryId || mediaItem.blobUrl)
+        return
+
+      void hydrateMediaBlobWithCore(mediaItem, models.photoModels, models.stickerModels, getMediaBinaryProvider())
+    },
+    { immediate: true },
+  )
+}
+
 const isLoading = computed(() => {
-  return !processedMedia.value.src && !processedMedia.value.tgsAnimationData && isMedia.value
+  return !processedMedia.value.src && processedMedia.value.type !== 'unknown' && (!!props.message.media && props.message.media.length > 0)
 })
 
 const finalError = computed(() => {
   return processedMedia.value.error || runtimeError.value
 })
 
+watch(
+  () => processedMedia.value.src,
+  (newSrc) => {
+    // When media source changes (e.g. after successful re-process),
+    // reset error and reprocess state so the new URL can be loaded normally.
+    if (newSrc !== currentSrc.value) {
+      currentSrc.value = newSrc
+      hasReprocessedCurrentSrc.value = false
+      hasPermanentError.value = false
+      runtimeError.value = undefined
+      isReprocessing.value = false
+    }
+  },
+  { immediate: true },
+)
+
 let animation: AnimationItem | null = null
 const tgsContainer = ref<HTMLElement | null>(null)
 
-watch(processedMedia, (newMedia) => {
+onMounted(() => {
   if (animation) {
     animation.destroy()
     animation = null
   }
 
-  if (
-    newMedia.type === 'sticker'
-    && newMedia.mimeType === 'application/gzip'
-    && newMedia.tgsAnimationData
-    && tgsContainer.value
-  ) {
-    try {
-      animation = lottie.loadAnimation({
-        container: tgsContainer.value,
-        renderer: 'svg',
-        loop: true,
-        autoplay: true,
-        animationData: JSON.parse(newMedia.tgsAnimationData),
-      })
+  nextTick(() => {
+    if (
+      processedMedia.value.type === 'sticker'
+      && processedMedia.value.mimeType === 'application/gzip'
+      && processedMedia.value.src
+      && tgsContainer.value
+    ) {
+      if (!processedMedia.value.src)
+        return
+
+      fetch(processedMedia.value.src)
+        .then(response => response.arrayBuffer())
+        .then(arrayBuffer => pako.inflate(arrayBuffer, { to: 'string' }))
+        .then((data) => {
+          animation = lottie.loadAnimation({
+            container: tgsContainer.value!,
+            renderer: 'svg',
+            loop: true,
+            autoplay: true,
+            animationData: JSON.parse(data),
+          })
+        })
+        .catch((error) => {
+          console.error('Failed to fetch Lottie animation data', error)
+          runtimeError.value = 'Sticker failed to load'
+        })
     }
-    catch (e) {
-      console.error('Failed to parse Lottie animation data', e)
-      runtimeError.value = 'Sticker failed to load'
-    }
-  }
-}, { flush: 'post' })
+  })
+})
 
 onUnmounted(() => {
   if (animation)
     animation.destroy()
 })
+
+function sendReprocessForCurrentMessage(mediaType: 'Image' | 'Sticker') {
+  if (!props.message.chatId || !props.message.platformMessageId) {
+    console.error('Missing chatId or platformMessageId for reprocessing')
+    runtimeError.value = `${mediaType} failed to load`
+    return
+  }
+
+  const messageId = Number.parseInt(props.message.platformMessageId, 10)
+  if (Number.isNaN(messageId)) {
+    console.error(`Invalid message ID: ${props.message.platformMessageId}`)
+    runtimeError.value = `${mediaType} failed to load`
+    return
+  }
+
+  bridgeStore.sendEvent('message:reprocess', {
+    chatId: props.message.chatId,
+    messageIds: [messageId],
+    resolvers: ['media'],
+  })
+}
+
+async function handleMediaError(event: Event, mediaType: 'Image' | 'Sticker') {
+  console.error(`${mediaType} failed to load`, processedMedia.value, event)
+
+  const src = processedMedia.value.src
+
+  if (!src) {
+    hasPermanentError.value = true
+    runtimeError.value = `${mediaType} failed to load`
+    return
+  }
+
+  // If we've already permanently failed for this src, do nothing.
+  if (hasPermanentError.value) {
+    return
+  }
+
+  // Trigger a one-time re-process to re-download missing media.
+  isReprocessing.value = true
+  hasReprocessedCurrentSrc.value = true
+  hasPermanentError.value = true
+  runtimeError.value = `${mediaType} not found, re-downloading...`
+
+  sendReprocessForCurrentMessage(mediaType)
+}
+
+function handleImageError(event: Event) {
+  void handleMediaError(event, 'Image')
+}
+
+function handleStickerError(event: Event) {
+  void handleMediaError(event, 'Sticker')
+}
+
+function handlePlaceholderClick() {
+  // Determine a reasonable media type label for retry messaging
+  const mediaType: 'Image' | 'Sticker'
+    = processedMedia.value.type === 'photo' ? 'Image' : 'Sticker'
+
+  runtimeError.value = `Retrying ${mediaType.toLowerCase()} download...`
+  sendReprocessForCurrentMessage(mediaType)
+}
 </script>
 
 <template>
+  <code v-if="debugMode && processedMedia.type !== 'unknown'" class="whitespace-pre-wrap text-xs">
+    {{ JSON.stringify(processedMedia, null, 2) }}
+  </code>
+
   <div v-if="message.content" class="mb-2 whitespace-pre-wrap text-gray-900 dark:text-gray-100">
     {{ message.content }}
   </div>
 
   <!-- Loading state with dynamic placeholder sizing based on actual image dimensions -->
-  <div v-if="isLoading" class="flex items-center justify-center">
+  <div v-if="isLoading" class="flex items-center">
     <div
       class="max-w-xs w-full animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"
       :style="processedMedia.width && processedMedia.height
@@ -164,39 +252,59 @@ onUnmounted(() => {
     />
   </div>
 
-  <!-- Error state -->
-  <div v-if="finalError" class="flex items-center gap-2 rounded bg-red-100 p-2 dark:bg-red-900">
+  <!-- Error info (debug only) -->
+  <div v-if="finalError && debugMode" class="mt-1 flex items-center gap-2 rounded bg-red-100 p-2 dark:bg-red-900">
     <div class="i-lucide-alert-circle h-4 w-4 text-red-500" />
     <span class="text-sm text-red-700 dark:text-red-300">{{ finalError }}</span>
   </div>
 
-  <!-- Media content -->
-  <div v-if="processedMedia.src || processedMedia.tgsAnimationData">
-    <MediaWebpage
-      v-if="processedMedia.type === 'webpage'" v-model:runtime-error="runtimeError"
-      :processed-media="processedMedia"
-    />
+  <!-- Media content / placeholder -->
+  <template v-if="processedMedia.type !== 'unknown'">
+    <!-- Normal media rendering when no permanent error -->
+    <div v-if="processedMedia.src && !hasPermanentError">
+      <MediaWebpage
+        v-if="processedMedia.type === 'webpage'"
+        :processed-media="processedMedia"
+        @error="runtimeError = 'Webpage failed to load'"
+      />
 
-    <img
-      v-else-if="processedMedia.mimeType?.startsWith('image/')"
-      :src="processedMedia.src"
-      class="h-auto max-w-xs rounded-lg"
-      :style="processedMedia.width && processedMedia.height
-        ? { aspectRatio: `${processedMedia.width} / ${processedMedia.height}` }
-        : {}"
-      alt="Image"
-      @error="runtimeError = 'Image failed to load'"
-    >
+      <img
+        v-else-if="processedMedia.type === 'photo'"
+        :src="processedMedia.src"
+        class="h-auto max-w-xs rounded-lg"
+        :style="processedMedia.width && processedMedia.height
+          ? { aspectRatio: `${processedMedia.width} / ${processedMedia.height}` }
+          : {}"
+        alt="Image"
+        @error="handleImageError"
+      >
 
+      <video
+        v-else-if="processedMedia.mimeType?.startsWith('video/')"
+        :src="processedMedia.src"
+        class="h-auto max-w-[12rem] rounded-lg"
+        alt="Video"
+        autoplay loop muted playsinline
+        @error="handleStickerError"
+      />
+
+      <div
+        v-else-if="processedMedia.type === 'sticker'"
+        ref="tgsContainer"
+        class="h-auto max-w-[12rem] rounded-lg"
+      />
+    </div>
+
+    <!-- Fallback placeholder when media has permanently failed -->
     <div
-      v-else-if="processedMedia.mimeType === 'application/gzip'" ref="tgsContainer"
-      class="h-auto max-w-[12rem] rounded-lg"
-    />
-
-    <video
-      v-else-if="processedMedia.mimeType?.startsWith('video/')" :src="processedMedia.src"
-      class="h-auto max-w-[12rem] rounded-lg" alt="Video" autoplay loop muted playsinline
-      @error="runtimeError = 'Sticker failed to load'"
-    />
-  </div>
+      v-else-if="hasPermanentError"
+      class="h-48 max-w-xs flex cursor-pointer items-center justify-center border border-gray-300 rounded-lg border-dashed bg-gray-50 text-gray-400 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-500"
+      @click="handlePlaceholderClick"
+    >
+      <div class="flex flex-col items-center gap-1">
+        <div class="i-lucide-image-off h-6 w-6" />
+        <span class="text-xs">Media unavailable. Click to retry.</span>
+      </div>
+    </div>
+  </template>
 </template>

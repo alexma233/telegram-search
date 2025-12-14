@@ -1,41 +1,48 @@
-import type { RuntimeFlags } from '@tg-search/common'
-import type { CrossWSOptions } from 'listhen'
+import type { Config, RuntimeFlags } from '@tg-search/common'
 
 import process from 'node:process'
 
-import { initLogger, useLogger } from '@guiiai/logg'
-import { initConfig, parseEnvFlags } from '@tg-search/common'
-import { initDrizzle } from '@tg-search/core'
-import { createApp, createRouter, defineEventHandler, toNodeListener } from 'h3'
-import { listen } from 'listhen'
+import figlet from 'figlet'
 
-import { setupWsRoutes } from './ws/routes'
+import { initLogger, useLogger } from '@guiiai/logg'
+import { parseEnvFlags, parseEnvToConfig } from '@tg-search/common'
+import { models } from '@tg-search/core'
+import { plugin as wsPlugin } from 'crossws/server'
+import { defineEventHandler, H3, serve } from 'h3'
+import { collectDefaultMetrics, register } from 'prom-client'
+
+import pkg from '../package.json' with { type: 'json' }
+
+import { v1api } from './apis/v1'
+import { initOtel, shutdownOtelLogger } from './libs/otel-logger'
+import { getDB, initDrizzle } from './storage/drizzle'
+import { getMinioMediaStorage, initMinioMediaStorage } from './storage/minio'
+import { setupWsRoutes } from './ws-routes'
 
 function setupErrorHandlers(logger: ReturnType<typeof useLogger>): void {
-  // TODO: fix type
-  const handleError = (error: any, type: string) => {
-    logger.withFields({ cause: String(error?.cause), cause_json: JSON.stringify(error?.cause) }).withError(error).error(type)
+  const handleError = (error: unknown, type: string) => {
+    logger.withError(error).error(type)
   }
 
   process.on('uncaughtException', error => handleError(error, 'Uncaught exception'))
   process.on('unhandledRejection', error => handleError(error, 'Unhandled rejection'))
 }
 
-function configureServer(logger: ReturnType<typeof useLogger>, flags: RuntimeFlags) {
-  const app = createApp({
+function configureServer(logger: ReturnType<typeof useLogger>, flags: RuntimeFlags, config: Config) {
+  const app = new H3({
     debug: flags.isDebugMode,
     onRequest(event) {
-      const path = event.path
-      const method = event.method
+      const path = event.url.pathname
+      const method = event.req.method
 
       logger.withFields({
         method,
         path,
-      }).log('Request started')
+      }).debug('Request started')
     },
     onError(error, event) {
-      const path = event.path
-      const method = event.method
+      const path = event.url.pathname
+      const method = event.req.method
 
       const status = error instanceof Error && 'statusCode' in error
         ? (error as { statusCode: number }).statusCode
@@ -47,71 +54,74 @@ function configureServer(logger: ReturnType<typeof useLogger>, flags: RuntimeFla
         status,
         error: error instanceof Error ? error.message : 'Unknown error',
       }).error('Request failed')
-
-      return Response.json({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      })
     },
   })
 
-  // app.use(eventHandler((event) => {
-  //   setResponseHeaders(event, {
-  //     'Access-Control-Allow-Origin': 'http://localhost:3333',
-  //     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  //     'Access-Control-Allow-Credentials': 'true',
-  //     'Access-Control-Allow-Headers': 'Content-Type, Authorization, Cache-Control, X-Requested-With',
-  //   })
-
-  //   if (event.method === 'OPTIONS') {
-  //     setResponseHeaders(event, {
-  //       'Access-Control-Max-Age': '86400',
-  //     })
-  //     return null
-  //   }
-  // }))
-
-  const router = createRouter()
-  router.get('/health', defineEventHandler(() => {
+  app.get('/health', defineEventHandler(() => {
     return Response.json({ success: true })
   }))
 
-  app.use(router)
-  setupWsRoutes(app)
+  collectDefaultMetrics({ prefix: 'telegram_search_' })
+  app.get('/metrics', defineEventHandler(async () => {
+    const metrics = await register.metrics()
+    return new Response(metrics, {
+      status: 200,
+      headers: { 'Content-Type': register.contentType },
+    })
+  }))
+  logger.withFields({ endpoint: '/metrics' }).log('Metrics endpoint mounted')
+
+  app.mount('/v1', v1api(getDB(), models, getMinioMediaStorage()))
+
+  setupWsRoutes(app, config)
 
   return app
 }
 
 async function bootstrap() {
-  const flags = parseEnvFlags(process.env as Record<string, string>)
+  figlet.text('Telegram Search', (_, result) => {
+    // eslint-disable-next-line no-console
+    console.log(`\n${result}\nv${pkg.version}\n`)
+  })
+
+  const flags = parseEnvFlags(process.env)
   initLogger(flags.logLevel, flags.logFormat)
   const logger = useLogger().useGlobalConfig()
-  const config = await initConfig(flags)
 
-  try {
-    await initDrizzle(logger, config, { isDatabaseDebugMode: flags.isDatabaseDebugMode })
-    logger.log('Database initialized successfully')
-  }
-  catch (error) {
-    logger.withError(error).error('Failed to initialize services')
-    process.exit(1)
-  }
+  const config = parseEnvToConfig(process.env, logger)
+
+  initOtel(config)
+
+  await initDrizzle(logger, config, flags)
+
+  await initMinioMediaStorage(logger, config.minio)
 
   setupErrorHandlers(logger)
 
-  const app = configureServer(logger, flags)
-  const listener = toNodeListener(app)
+  const app = configureServer(logger, flags, config)
 
   const port = process.env.PORT ? Number(process.env.PORT) : 3000
-  // const { handleUpgrade } = wsAdapter(app.websocket as NodeOptions)
-  const server = await listen(listener, { port, ws: app.websocket as CrossWSOptions })
-  // const server = createServer(listener).listen(port)
-  // server.on('upgrade', handleUpgrade)
+  const hostname = process.env.HOST || '0.0.0.0'
 
-  logger.log('Server started')
+  const server = serve(app, {
+    port,
+    hostname,
+    plugins: [
+      // @ts-expect-error - the .crossws property wasn't extended in types
+      wsPlugin({ resolve: async req => (await app.fetch(req)).crossws }),
+    ],
+    reusePort: true,
+    gracefulShutdown: {
+      forceTimeout: 500,
+      gracefulTimeout: 500,
+    },
+  })
 
-  const shutdown = () => {
+  logger.withFields({ port, hostname }).log('Server started')
+
+  const shutdown = async () => {
     logger.log('Shutting down server gracefully...')
+    await shutdownOtelLogger()
     server.close()
     process.exit(0)
   }

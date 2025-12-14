@@ -1,31 +1,30 @@
+import type { Logger } from '@guiiai/logg'
 import type { Api } from 'telegram'
 
 import type { CoreContext } from '../context'
+import type { ChatMessageStatsModels } from '../models/chat-message-stats'
 import type { TakeoutService } from '../services'
 
-import { useLogger } from '@guiiai/logg'
 import { usePagination } from '@tg-search/common'
 
 import { MESSAGE_PROCESS_BATCH_SIZE } from '../constants'
-import { getChatMessageStatsByChatId } from '../models'
 import { createTask } from '../utils/task'
 
-export function registerTakeoutEventHandlers(ctx: CoreContext) {
-  const { emitter } = ctx
-  const logger = useLogger('core:takeout:event')
+export function registerTakeoutEventHandlers(ctx: CoreContext, logger: Logger, chatMessageStatsModels: ChatMessageStatsModels) {
+  logger = logger.withContext('core:takeout:event')
 
   // Store active tasks by taskId for abort handling
   const activeTasks = new Map<string, ReturnType<typeof createTask>>()
 
   return (takeoutService: TakeoutService) => {
-    emitter.on('takeout:run', async ({ chatIds, increase }) => {
-      logger.withFields({ chatIds, increase }).verbose('Running takeout')
+    ctx.emitter.on('takeout:run', async ({ chatIds, increase, syncOptions }) => {
+      logger.withFields({ chatIds, increase, syncOptions }).verbose('Running takeout')
       const pagination = usePagination()
 
       // Get chat message stats for incremental sync
       const increaseOptions: { chatId: string, firstMessageId: number, latestMessageId: number, messageCount: number }[] = await Promise.all(
         chatIds.map(async (chatId) => {
-          const stats = (await getChatMessageStatsByChatId(chatId))?.unwrap()
+          const stats = (await chatMessageStatsModels.getChatMessageStatsByChatId(ctx.getDB(), ctx.getCurrentAccountId(), chatId))?.unwrap()
           return {
             chatId,
             firstMessageId: stats?.first_message_id ?? 0, // First synced message ID
@@ -47,48 +46,58 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
           logger.withFields({ chatId, mode: 'full' }).verbose('Starting full sync')
 
           // Create task for full sync
-          const task = createTask('takeout', { chatIds: [chatId] }, emitter)
-          activeTasks.set(task.taskId, task)
+          const task = createTask('takeout', { chatIds: [chatId] }, ctx.emitter, logger)
+          activeTasks.set(task.state.taskId, task)
 
           const opts = {
             pagination: {
               ...pagination,
               offset: 0,
             },
-            minId: 0,
-            maxId: 0,
+            minId: syncOptions?.minMessageId ?? 0,
+            maxId: syncOptions?.maxMessageId ?? 0,
+            startTime: syncOptions?.startTime,
+            endTime: syncOptions?.endTime,
+            skipMedia: !syncOptions?.syncMedia,
             task,
+            syncOptions,
           }
 
           for await (const message of takeoutService.takeoutMessages(chatId, opts)) {
             // Check abort signal before processing
-            if (task.abortController.signal.aborted) {
+            if (task.state.abortController.signal.aborted) {
               logger.verbose('Full sync aborted')
               break
             }
 
             messages.push(message)
 
-            if (messages.length >= MESSAGE_PROCESS_BATCH_SIZE) {
+            const batchSize = MESSAGE_PROCESS_BATCH_SIZE
+            if (messages.length >= batchSize) {
               // Check abort signal before emitting
-              if (task.abortController.signal.aborted) {
+              if (task.state.abortController.signal.aborted) {
                 logger.verbose('Full sync aborted during batch processing')
                 break
               }
 
-              emitter.emit('message:process', { messages, isTakeout: true })
+              logger.withFields({
+                total: messages.length,
+                batchSize,
+              }).debug('Processing takeout batch')
+
+              ctx.emitter.emit('message:process', { messages, isTakeout: true, syncOptions })
               messages = []
             }
           }
 
           // Exit early if aborted
-          if (task.abortController.signal.aborted) {
+          if (task.state.abortController.signal.aborted) {
             logger.withFields({ chatId }).verbose('Full sync aborted')
-            activeTasks.delete(task.taskId)
+            activeTasks.delete(task.state.taskId)
             continue
           }
 
-          activeTasks.delete(task.taskId)
+          activeTasks.delete(task.state.taskId)
         }
         else {
           // Incremental sync mode: bidirectional fill (forward + backward)
@@ -97,48 +106,58 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
             logger.withFields({ chatId }).warn('No existing messages found, switching to full sync')
 
             // Create task for fallback full sync
-            const task = createTask('takeout', { chatIds: [chatId] }, emitter)
-            activeTasks.set(task.taskId, task)
+            const task = createTask('takeout', { chatIds: [chatId] }, ctx.emitter, logger)
+            activeTasks.set(task.state.taskId, task)
 
             const opts = {
               pagination: {
                 ...pagination,
                 offset: 0,
               },
-              minId: 0,
-              maxId: 0,
+              minId: syncOptions?.minMessageId ?? 0,
+              maxId: syncOptions?.maxMessageId ?? 0,
+              startTime: syncOptions?.startTime,
+              endTime: syncOptions?.endTime,
+              skipMedia: !syncOptions?.syncMedia,
               task,
+              syncOptions,
             }
 
             for await (const message of takeoutService.takeoutMessages(chatId, opts)) {
               // Check abort signal before processing
-              if (task.abortController.signal.aborted) {
+              if (task.state.abortController.signal.aborted) {
                 logger.verbose('Fallback full sync aborted')
                 break
               }
 
               messages.push(message)
 
-              if (messages.length >= MESSAGE_PROCESS_BATCH_SIZE) {
+              const batchSize = MESSAGE_PROCESS_BATCH_SIZE
+              if (messages.length >= batchSize) {
                 // Check abort signal before emitting
-                if (task.abortController.signal.aborted) {
+                if (task.state.abortController.signal.aborted) {
                   logger.verbose('Fallback full sync aborted during batch processing')
                   break
                 }
 
-                emitter.emit('message:process', { messages, isTakeout: true })
+                logger.withFields({
+                  total: messages.length,
+                  batchSize,
+                }).debug('Processing fallback sync batch')
+
+                ctx.emitter.emit('message:process', { messages, isTakeout: true, syncOptions })
                 messages = []
               }
             }
 
             // Exit early if aborted
-            if (task.abortController.signal.aborted) {
+            if (task.state.abortController.signal.aborted) {
               logger.withFields({ chatId }).verbose('Fallback full sync aborted')
-              activeTasks.delete(task.taskId)
+              activeTasks.delete(task.state.taskId)
               continue
             }
 
-            activeTasks.delete(task.taskId)
+            activeTasks.delete(task.state.taskId)
           }
           else {
             // Incremental sync mode: bidirectional fill (backward + forward)
@@ -157,8 +176,8 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
             }).verbose('Incremental sync calculation')
 
             // Create task for manual progress management
-            const task = createTask('takeout', { chatIds: [chatId] }, emitter)
-            activeTasks.set(task.taskId, task)
+            const task = createTask('takeout', { chatIds: [chatId] }, ctx.emitter, logger)
+            activeTasks.set(task.state.taskId, task)
             task.updateProgress(0, 'Starting incremental sync')
 
             let totalProcessed = 0
@@ -171,17 +190,21 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
                 ...pagination,
                 offset: 0, // Start from the newest message
               },
-              minId: stats.latestMessageId, // Filter: only get messages > latestMessageId
-              maxId: 0,
+              minId: syncOptions?.minMessageId ?? stats.latestMessageId, // Filter: only get messages > latestMessageId
+              maxId: syncOptions?.maxMessageId ?? 0,
+              startTime: syncOptions?.startTime,
+              endTime: syncOptions?.endTime,
+              skipMedia: !syncOptions?.syncMedia,
               expectedCount: needToSyncCount, // This is the calculated number of messages that need to be synced for accurate progress tracking
               disableAutoProgress: true, // Disable auto progress to prevent reset between phases
               task, // Share task
+              syncOptions,
             }
 
             let backwardMessageCount = 0
             for await (const message of takeoutService.takeoutMessages(chatId, backwardOpts)) {
               // Check abort signal before processing
-              if (task.abortController.signal.aborted) {
+              if (task.state.abortController.signal.aborted) {
                 logger.verbose('Backward fill aborted')
                 break
               }
@@ -195,14 +218,20 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
               backwardMessageCount++
               totalProcessed++
 
-              if (messages.length >= MESSAGE_PROCESS_BATCH_SIZE) {
+              const batchSize = MESSAGE_PROCESS_BATCH_SIZE
+              if (messages.length >= batchSize) {
                 // Check abort signal before emitting
-                if (task.abortController.signal.aborted) {
+                if (task.state.abortController.signal.aborted) {
                   logger.verbose('Backward fill aborted during batch processing')
                   break
                 }
 
-                emitter.emit('message:process', { messages, isTakeout: true })
+                logger.withFields({
+                  total: messages.length,
+                  batchSize,
+                }).debug('Processing backward fill batch')
+
+                ctx.emitter.emit('message:process', { messages, isTakeout: true, syncOptions })
                 messages = []
 
                 // Emit progress update after batch processing
@@ -212,9 +241,9 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
             }
 
             // Exit early if aborted
-            if (task.abortController.signal.aborted) {
+            if (task.state.abortController.signal.aborted) {
               logger.withFields({ chatId }).verbose('Incremental sync aborted')
-              activeTasks.delete(task.taskId)
+              activeTasks.delete(task.state.taskId)
               return
             }
 
@@ -228,17 +257,21 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
                 ...pagination,
                 offset: stats.firstMessageId, // Start from first synced message
               },
-              minId: 0, // No lower limit
-              maxId: 0, // Will fetch older messages from offsetId
+              minId: syncOptions?.minMessageId ?? 0, // No lower limit
+              maxId: syncOptions?.maxMessageId ?? 0, // Will fetch older messages from offsetId
+              startTime: syncOptions?.startTime,
+              endTime: syncOptions?.endTime,
+              skipMedia: !syncOptions?.syncMedia,
               expectedCount: needToSyncCount, // Use calculated count for accurate progress
               disableAutoProgress: true, // Disable auto progress to prevent reset between phases
               task, // Share task
+              syncOptions,
             }
 
             let forwardMessageCount = 0
             for await (const message of takeoutService.takeoutMessages(chatId, forwardOpts)) {
               // Check abort signal before processing
-              if (task.abortController.signal.aborted) {
+              if (task.state.abortController.signal.aborted) {
                 logger.verbose('Forward fill aborted')
                 break
               }
@@ -247,14 +280,20 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
               forwardMessageCount++
               totalProcessed++
 
-              if (messages.length >= MESSAGE_PROCESS_BATCH_SIZE) {
+              const batchSize = MESSAGE_PROCESS_BATCH_SIZE
+              if (messages.length >= batchSize) {
                 // Check abort signal before emitting
-                if (task.abortController.signal.aborted) {
+                if (task.state.abortController.signal.aborted) {
                   logger.verbose('Forward fill aborted during batch processing')
                   break
                 }
 
-                emitter.emit('message:process', { messages, isTakeout: true })
+                logger.withFields({
+                  total: messages.length,
+                  batchSize,
+                }).debug('Processing forward fill batch')
+
+                ctx.emitter.emit('message:process', { messages, isTakeout: true, syncOptions })
                 messages = []
 
                 // Emit progress update after batch processing
@@ -264,9 +303,9 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
             }
 
             // Exit early if aborted
-            if (task.abortController.signal.aborted) {
+            if (task.state.abortController.signal.aborted) {
               logger.withFields({ chatId }).verbose('Incremental sync aborted')
-              activeTasks.delete(task.taskId)
+              activeTasks.delete(task.state.taskId)
               return
             }
 
@@ -274,17 +313,17 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
 
             // Mark as complete
             task.updateProgress(100, 'Incremental sync completed')
-            activeTasks.delete(task.taskId)
+            activeTasks.delete(task.state.taskId)
           }
         }
       }
 
       if (messages.length > 0) {
-        emitter.emit('message:process', { messages, isTakeout: true })
+        ctx.emitter.emit('message:process', { messages, isTakeout: true, syncOptions })
       }
     })
 
-    emitter.on('takeout:task:abort', ({ taskId }) => {
+    ctx.emitter.on('takeout:task:abort', ({ taskId }) => {
       logger.withFields({ taskId }).verbose('Aborting takeout task')
       const task = activeTasks.get(taskId)
       if (task) {
@@ -293,6 +332,47 @@ export function registerTakeoutEventHandlers(ctx: CoreContext) {
       }
       else {
         logger.withFields({ taskId }).warn('Task not found for abort')
+      }
+    })
+
+    ctx.emitter.on('takeout:stats:fetch', async ({ chatId }) => {
+      logger.withFields({ chatId }).verbose('Fetching chat sync stats')
+
+      try {
+        // Get chat message stats from DB
+        const stats = (await chatMessageStatsModels.getChatMessageStatsByChatId(ctx.getDB(), ctx.getCurrentAccountId(), chatId))?.unwrap()
+
+        // Get total message count from Telegram
+        const totalMessageCount = (await takeoutService.getTotalMessageCount(chatId)) ?? 0
+
+        const syncedMessages = stats?.message_count ?? 0
+        const firstMessageId = stats?.first_message_id ?? 0
+        const latestMessageId = stats?.latest_message_id ?? 0
+
+        // Calculate synced ranges
+        const syncedRanges: Array<{ start: number, end: number }> = []
+        if (firstMessageId > 0 && latestMessageId > 0) {
+          // For now, we assume a continuous range from first to latest
+          // In the future, we could query the DB for gaps
+          syncedRanges.push({ start: firstMessageId, end: latestMessageId })
+        }
+
+        const chatSyncStats = {
+          chatId,
+          totalMessages: totalMessageCount,
+          syncedMessages,
+          firstMessageId,
+          latestMessageId,
+          oldestMessageDate: stats?.first_message_at ? new Date(stats.first_message_at * 1000) : undefined,
+          newestMessageDate: stats?.latest_message_at ? new Date(stats.latest_message_at * 1000) : undefined,
+          syncedRanges,
+        }
+
+        ctx.emitter.emit('takeout:stats:data', chatSyncStats)
+      }
+      catch (error) {
+        logger.withError(error).error('Failed to fetch chat sync stats')
+        ctx.withError(error, 'Failed to fetch chat sync stats')
       }
     })
   }

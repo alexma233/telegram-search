@@ -1,11 +1,26 @@
+import type { Logger } from '@guiiai/logg'
 import type { Result } from '@unbird/result'
+import type { Api } from 'telegram'
 
-import type { CoreMessage } from '../utils/message'
-
-import { useLogger } from '@guiiai/logg'
+import type { SyncOptions } from '../types/events'
+import type { CoreMessage } from '../types/message'
 
 export interface MessageResolverOpts {
+  /**
+   * Core message projection, UI/DB friendly.
+   */
   messages: CoreMessage[]
+  /**
+   * Raw Telegram messages, kept only for resolvers that need access
+   * to original Api.Message structures (e.g. media download).
+   */
+  rawMessages: Api.Message[]
+  syncOptions?: SyncOptions
+  /**
+   * If true, forces resolvers to skip database cache and re-fetch from source.
+   * Used when media files are missing from storage (404) to force re-download from Telegram.
+   */
+  forceRefetch?: boolean
 }
 
 export interface MessageResolver {
@@ -15,8 +30,8 @@ export interface MessageResolver {
 
 export type MessageResolverRegistryFn = ReturnType<typeof useMessageResolverRegistry>
 
-export function useMessageResolverRegistry() {
-  const logger = useLogger('core:resolver:registry')
+export function useMessageResolverRegistry(logger: Logger) {
+  logger = logger.withContext('core:resolver:registry')
 
   const registry = new Map<string, MessageResolver>()
 

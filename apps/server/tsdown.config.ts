@@ -1,4 +1,3 @@
-import DrizzleORMMigrations from '@proj-airi/unplugin-drizzle-orm-migrations/rolldown'
 import { defineConfig } from 'tsdown'
 
 export default defineConfig({
@@ -10,15 +9,8 @@ export default defineConfig({
   shims: true,
   fixedExtension: true,
   sourcemap: true,
-  // unbundle: true,
-  plugins: [
-    DrizzleORMMigrations({
-      root: '../..',
-    }),
-  ],
   external: [
     'vue',
-    '@vueuse/core',
     '@node-rs/jieba',
     '@node-rs/jieba-darwin-arm64',
     '@electric-sql/pglite',
@@ -26,7 +18,7 @@ export default defineConfig({
   noExternal: [
     '@tg-search/core',
     '@tg-search/common',
-    '@tg-search/common/node/path',
+    '@tg-search/common/node',
     /^telegram\//,
   ],
 })

@@ -1,21 +1,10 @@
 import type { InferOutput } from 'valibot'
 
-import { array, boolean, enum as enumType, number, object, optional, safeParse, string } from 'valibot'
+import { boolean, enum as enumType, number, object, optional, safeParse, string } from 'valibot'
 
 export enum SocksType {
   SOCKS4 = 4,
   SOCKS5 = 5,
-}
-
-export enum EmbeddingProvider {
-  OPENAI = 'openai',
-  OLLAMA = 'ollama',
-}
-
-export enum EmbeddingDimension {
-  DIMENSION_1536 = 1536,
-  DIMENSION_1024 = 1024,
-  DIMENSION_768 = 768,
 }
 
 export enum DatabaseType {
@@ -24,16 +13,43 @@ export enum DatabaseType {
 }
 
 export const proxyConfigSchema = object({
-  ip: optional(string(), ''),
-  port: optional(number(), 0),
-  MTProxy: optional(boolean()),
-  secret: optional(string()),
-  socksType: optional(enumType(SocksType)),
-  timeout: optional(number()),
-  username: optional(string()),
-  password: optional(string()),
-  // ProxyUrl for convenient configuration, takes precedence over individual fields
+  /**
+   * Proxy URL for convenient configuration, takes precedence over individual fields
+   */
   proxyUrl: optional(string()),
+
+  /**
+   * @deprecated Use proxyUrl instead
+   */
+  MTProxy: optional(boolean()),
+  /**
+   * @deprecated Use proxyUrl instead
+   */
+  ip: optional(string(), ''),
+  /**
+   * @deprecated Use proxyUrl instead
+   */
+  port: optional(number(), 0),
+  /**
+   * @deprecated Use proxyUrl instead
+   */
+  secret: optional(string()),
+  /**
+   * @deprecated Use proxyUrl instead
+   */
+  socksType: optional(enumType(SocksType)),
+  /**
+   * @deprecated Use proxyUrl instead
+   */
+  timeout: optional(number()),
+  /**
+   * @deprecated Use proxyUrl instead
+   */
+  username: optional(string()),
+  /**
+   * @deprecated Use proxyUrl instead
+   */
+  password: optional(string()),
 })
 
 export const databaseConfigSchema = object({
@@ -50,35 +66,40 @@ export const telegramConfigSchema = object({
   apiId: optional(string()),
   apiHash: optional(string()),
   proxy: optional(proxyConfigSchema),
-  receiveMessage: optional(boolean(), false),
-  autoReconnect: optional(boolean(), true),
 })
 
-export const embeddingConfigSchema = object({
-  provider: optional(enumType(EmbeddingProvider), EmbeddingProvider.OPENAI),
-  model: optional(string(), 'text-embedding-3-small'),
-  dimension: optional(enumType(EmbeddingDimension), EmbeddingDimension.DIMENSION_1536),
-  apiKey: optional(string(), ''),
-  apiBase: optional(string(), ''),
+export const minioConfigSchema = object({
+  bucket: optional(string(), 'telegram-media'),
+  endpoint: optional(string()),
+  port: optional(number()),
+  accessKey: optional(string()),
+  secretKey: optional(string()),
+  useSSL: optional(boolean()),
+})
+
+export const otelConfigSchema = object({
+  endpoint: optional(string()),
+  serviceName: optional(string()),
+  serviceVersion: optional(string()),
+  headers: optional(object({})),
 })
 
 export const apiConfigSchema = object({
   telegram: optional(telegramConfigSchema, {}),
-  embedding: optional(embeddingConfigSchema, {}),
-})
-
-export const resolversConfigSchema = object({
-  disabledResolvers: optional(array(string()), []),
 })
 
 export const configSchema = object({
   database: optional(databaseConfigSchema, {}),
   api: optional(apiConfigSchema, {}),
-  resolvers: optional(resolversConfigSchema, {}),
+  minio: optional(minioConfigSchema, {}),
+  otel: optional(otelConfigSchema, {}),
 })
 
 export type Config = InferOutput<typeof configSchema>
 export type ProxyConfig = InferOutput<typeof proxyConfigSchema>
+export type DatabaseConfig = InferOutput<typeof databaseConfigSchema>
+export type MinioConfig = InferOutput<typeof minioConfigSchema>
+export type OtelConfig = InferOutput<typeof otelConfigSchema>
 
 export function generateDefaultConfig(): Config {
   const defaultConfig = safeParse(configSchema, {})

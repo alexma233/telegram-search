@@ -1,28 +1,22 @@
-import type { CoreEntity } from '../services/entity'
+import type { CoreDB } from '../db'
+import type { CoreEntity } from '../types/events'
+import type { PromiseResult } from '../utils/result'
+import type { DBSelectUser } from './utils/types'
 
 import { and, eq, sql } from 'drizzle-orm'
 
-import { withDb } from '../db'
 import { usersTable } from '../schemas/users'
-
-export type DBInsertUser = typeof usersTable.$inferInsert
-export type DBSelectUser = typeof usersTable.$inferSelect
+import { withResult } from '../utils/result'
+import { must0 } from './utils/must'
+import { convertCoreEntityToDBUser } from './utils/users'
 
 /**
  * Record or update a user in the database
  */
-export async function recordUser(user: CoreEntity) {
-  const dbUser: DBInsertUser = {
-    platform: 'telegram',
-    platform_user_id: user.id,
-    name: user.name,
-    username: 'username' in user ? user.username : user.id,
-    type: user.type,
-  }
-
-  return withDb(async db => db
+async function recordUser(db: CoreDB, user: CoreEntity): Promise<DBSelectUser> {
+  const rows = await db
     .insert(usersTable)
-    .values(dbUser)
+    .values(convertCoreEntityToDBUser(user))
     .onConflictDoUpdate({
       target: [usersTable.platform, usersTable.platform_user_id],
       set: {
@@ -32,16 +26,17 @@ export async function recordUser(user: CoreEntity) {
         updated_at: Date.now(),
       },
     })
-    .returning(),
-  )
+    .returning()
+
+  return must0(rows)
 }
 
 /**
  * Find a user by platform and platform_user_id
  */
-export async function findUserByPlatformId(platform: string, platformUserId: string) {
-  return withDb(async (db) => {
-    const results = await db
+async function findUserByPlatformId(db: CoreDB, platform: string, platformUserId: string): PromiseResult<DBSelectUser> {
+  return withResult(async () => {
+    const rows = await db
       .select()
       .from(usersTable)
       .where(and(
@@ -49,63 +44,28 @@ export async function findUserByPlatformId(platform: string, platformUserId: str
         eq(usersTable.platform_user_id, platformUserId),
       ))
       .limit(1)
-
-    return results.length > 0 ? results[0] : null
+    return must0(rows)
   })
 }
 
 /**
  * Find a user by UUID
  */
-export async function findUserByUUID(uuid: string) {
-  return withDb(async (db) => {
-    const results = await db
+async function findUserByUUID(db: CoreDB, uuid: string): PromiseResult<DBSelectUser> {
+  return withResult(async () => {
+    const rows = await db
       .select()
       .from(usersTable)
       .where(eq(usersTable.id, uuid))
       .limit(1)
-
-    return results[0] || null
+    return must0(rows)
   })
 }
 
-/**
- * Convert CoreEntity to a format suitable for database insertion
- */
-export function convertCoreEntityToDBUser(entity: CoreEntity): DBInsertUser {
-  return {
-    platform: 'telegram',
-    platform_user_id: entity.id,
-    name: entity.name,
-    username: 'username' in entity ? entity.username : entity.id,
-    type: entity.type,
-  }
+export const userModels = {
+  recordUser,
+  findUserByPlatformId,
+  findUserByUUID,
 }
 
-/**
- * Convert DBSelectUser back to CoreEntity
- */
-export function convertDBUserToCoreEntity(dbUser: DBSelectUser): CoreEntity {
-  if (dbUser.type === 'user') {
-    return {
-      type: 'user',
-      id: dbUser.platform_user_id,
-      name: dbUser.name,
-      username: dbUser.username,
-    }
-  }
-  else if (dbUser.type === 'chat') {
-    return {
-      type: 'chat',
-      id: dbUser.platform_user_id,
-      name: dbUser.name,
-    }
-  }
-  else {
-    return {
-      type: 'channel',
-      id: dbUser.platform_user_id,
-      name: dbUser.name,
-    }
-  }
-}
+export type UserModels = typeof userModels

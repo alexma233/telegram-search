@@ -1,53 +1,8 @@
-// eslint-disable-next-line unicorn/prefer-node-protocol
-import type { Buffer } from 'buffer'
+import type { CoreMessageMediaType } from '../types/media'
 
 import { Api } from 'telegram'
 
-export interface CoreMessageMediaBase {
-  platformId: string
-  messageUUID?: string
-  byte: Buffer | undefined
-}
-
-export type CoreMessageMediaPhoto = CoreMessageMediaBase & {
-  type: 'photo'
-}
-
-export type CoreMessageMediaSticker = CoreMessageMediaBase & {
-  type: 'sticker'
-  emoji?: string
-  tgsAnimationData?: string
-}
-
-export type CoreMessageMediaDocument = CoreMessageMediaBase & {
-  type: 'document'
-}
-
-export type CoreMessageMediaWebPage = CoreMessageMediaBase & {
-  type: 'webpage'
-}
-
-export type CoreMessageMediaUnknown = CoreMessageMediaBase & {
-  type: 'unknown'
-}
-
-type CoreMessageMedia = CoreMessageMediaPhoto | CoreMessageMediaSticker | CoreMessageMediaDocument | CoreMessageMediaWebPage | CoreMessageMediaUnknown
-
-export type CoreMessageMediaFromServer = CoreMessageMedia & {
-  apiMedia?: unknown // Api.TypeMessageMedia
-  mimeType?: string
-}
-
-export type CoreMessageMediaFromCache = CoreMessageMedia & {
-  mimeType?: string
-}
-
-export type CoreMessageMediaFromBlob = CoreMessageMedia & {
-  blobUrl?: string
-  mimeType?: string
-}
-
-export function parseMediaType(apiMedia: Api.TypeMessageMedia): CoreMessageMedia['type'] {
+export function parseMediaType(apiMedia: Api.TypeMessageMedia): CoreMessageMediaType {
   switch (true) {
     case apiMedia instanceof Api.MessageMediaPhoto:
       return 'photo'

@@ -11,13 +11,25 @@
 </p>
 
 <p align="center">
-  <a href="https://discord.gg/NzYsmJSgCT"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2FNzYsmJSgCT%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&suffix=%20members&logo=discord&logoColor=white&label=%20&color=7389D8&labelColor=6A7EC2"></a>
-  <a href="https://t.me/+Gs3SH2qAPeFhYmU9"><img src="https://img.shields.io/badge/Telegram-%235AA9E6?logo=telegram&labelColor=FFFFFF"></a>
+  <a href="https://discord.gg/NzYsmJSgCT">
+    <img alt="Discord" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2FNzYsmJSgCT%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&suffix=%20members&logo=discord&logoColor=white&label=%20&color=7389D8&labelColor=6A7EC2" />
+  </a>
+  <a href="https://t.me/+Gs3SH2qAPeFhYmU9">
+    <img alt="Telegram" src="https://img.shields.io/badge/Telegram-%235AA9E6?logo=telegram&labelColor=FFFFFF" />
+  </a>
+  <a href="https://deepwiki.com/groupultra/telegram-search">
+    <img alt="DeepWiki" src="https://deepwiki.com/badge.svg" />
+  </a>
   <br>
-  <a href="https://github.com/groupultra/telegram-search/releases"><img src="https://img.shields.io/github/package-json/v/groupultra/telegram-search?style=flat&colorA=080f12&colorB=1fa669"></a>
-  <a href="https://github.com/groupultra/telegram-search/actions"><img src="https://img.shields.io/github/actions/workflow/status/groupultra/telegram-search/ci.yaml?style=flat&colorA=080f12&colorB=1fa669"></a>
-  <a href="https://app.netlify.com/projects/tgsearch/deploys"><img src="https://api.netlify.com/api/v1/badges/89bfbfd2-0f73-41b0-8db4-4ab6b6512f6e/deploy-status"></a>
-  <a href="https://deepwiki.com/groupultra/telegram-search"><img src="https://deepwiki.com/badge.svg"></a>
+  <a href="https://github.com/groupultra/telegram-search/releases">
+    <img alt="GitHub Package Version" src="https://img.shields.io/github/package-json/v/groupultra/telegram-search?style=flat&colorA=080f12&colorB=1fa669" />
+  </a>
+  <a href="https://github.com/groupultra/telegram-search/actions/workflows/release-docker.yaml">
+    <img alt="Release Docker / OCI" src="https://github.com/groupultra/telegram-search/actions/workflows/release-docker.yaml/badge.svg" />
+  </a>
+  <a href="https://github.com/groupultra/telegram-search/actions/workflows/ci.yaml">
+    <img alt="CI" src="https://github.com/groupultra/telegram-search/actions/workflows/ci.yaml/badge.svg" />
+  </a>
 </p>
 
 **Easily find and export your Telegram messages with powerful semantic search, supporting all languages and unsegmented sentences.**
@@ -38,18 +50,18 @@ Make message retrieval fast, accurate, and privacy-friendly — self-host or try
 ### 🔍 Search Your Chat History
 - [x] Keyword search: multi-language support (Chinese, English, etc.)
 - [x] Natural language search: find messages like asking a question
-- [ ] Smart filters: by contact/group, time range, with attachments, etc.
+- [x] Smart filters: by contact/group, time range, with attachments, etc.
 
 ### 🔄 Sync & Storage
 - [x] Incremental sync: sync while using
 - [x] Storage options: server (PostgreSQL + pgvector) or browser-only mode (PGlite)
 - [ ] Resume from breakpoint: auto-continue after failure
 
-### 🧠 AI Capabilities (Planned)
-- [ ] Ask AI about your chats: query current chat or selected range
+### 🧠 AI Capabilities
+- [x] Ask AI about your chats: query current chat or selected range
 - [ ] AI message summary: auto-extract key points, todos, conclusions
-- [ ] AI-powered search: natural language queries with pinpointed results
-- [ ] AI chat: converse with AI based on your chat context
+- [x] AI-powered search: natural language queries with pinpointed results
+- [x] AI chat: converse with AI based on your chat context
 - [ ] AI analysis: trends, sentiment, keywords, insights from links & files
 - [ ] Local model support: local Embedding / inference (no cloud required)
 
@@ -69,7 +81,7 @@ We provide an online version where you can experience all features of Telegram S
 
 Visit: https://search.lingogram.app
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Self-Hosted)
 
 ### 1-Minute Start with Docker
 
@@ -85,7 +97,7 @@ docker run -d --name telegram-search \
 
 Then open **http://localhost:3333** 🎉
 
-### Advanced Setup (Optional)
+### Advanced Setup (Optional, Environment Variables)
 
 <details>
 <summary>🔧 Environment Variables</summary>
@@ -99,14 +111,16 @@ Then open **http://localhost:3333** 🎉
 | `TELEGRAM_API_HASH` | Telegram app hash |
 | `DATABASE_TYPE` | `postgres` or `pglite` (default: `pglite`) |
 | `DATABASE_URL` | PostgreSQL connection string (only when `DATABASE_TYPE=postgres`) |
-| `EMBEDDING_API_KEY` | API key for OpenAI/Ollama |
-| `EMBEDDING_BASE_URL` | Custom embedding API base URL |
-| `EMBEDDING_PROVIDER` | `openai` or `ollama` |
-| `EMBEDDING_MODEL` | Model name |
-| `EMBEDDING_DIMENSION` | Embedding dimension (e.g. `1536`, `1024`, `768`) |
 | `PROXY_URL` | Proxy URL (e.g. `socks5://user:pass@host:port`) |
+| `PORT` | Backend HTTP/WebSocket port inside the container (default: `3000`) |
+| `HOST` | Backend listen host inside the container (default: `0.0.0.0`) |
+| `BACKEND_URL` | Nginx upstream URL for `/api` and `/ws` (default: `http://127.0.0.1:3000`) |
 
-**Example with PostgreSQL & embeddings:**
+> [!IMPORTANT]
+> AI Embedding & LLM settings are now configured **per account inside the app** (Settings → API).  
+> Environment variables like `EMBEDDING_API_KEY`, `EMBEDDING_MODEL`, etc. are deprecated and will be removed in a future release.
+
+**Example with PostgreSQL:**
 
 ```bash
 docker run -d --name telegram-search \
@@ -116,8 +130,6 @@ docker run -d --name telegram-search \
   -e TELEGRAM_API_HASH=d524b414d21f4d37f08684c1df41ac9c \
   -e DATABASE_TYPE=postgres \
   -e DATABASE_URL=postgresql://<postgres-host>:5432/postgres \
-  -e EMBEDDING_API_KEY=sk-xxxx \
-  -e EMBEDDING_BASE_URL=https://api.openai.com/v1 \
   ghcr.io/groupultra/telegram-search:latest
 ```
 
@@ -146,7 +158,7 @@ docker compose up -d
 ## 💻 Development Guide
 
 > [!CAUTION]
-> Development requires **Node.js >= 22.18** and **pnpm**. Make sure you have them installed.
+> Development requires **Node.js >= 24.11** and **pnpm**. Make sure you have them installed.
 
 ### Browser-Only Mode
 
@@ -164,14 +176,17 @@ pnpm run dev
 git clone https://github.com/groupultra/telegram-search.git
 cd telegram-search
 pnpm install
-cp config/config.example.yaml config/config.yaml
 
-# Start database (Docker)
+# Copy and adjust environment variables (Telegram keys, DB type/URL, proxy, etc.)
+cp .env.example .env
+# Optionally override in .env.local (ignored by Git)
+
+# Start PostgreSQL with pgvector (or point DATABASE_URL to your own DB)
 docker compose up -d pgvector
 
-# Start backend & frontend
-pnpm run server:dev  # Terminal 1
-pnpm run web:dev     # Terminal 2
+# Start backend & frontend (two terminals)
+pnpm run server:dev  # Terminal 1: WebSocket server (uses .env/.env.local via dotenvx)
+pnpm run web:dev     # Terminal 2: Vue frontend
 ```
 
 📖 **More development details:** [CONTRIBUTING.md](./CONTRIBUTING.md)
@@ -206,3 +221,4 @@ This project is a **monorepo** with event-driven architecture:
 ![Alt](https://repobeats.axiom.co/api/embed/69d5ef9f5e72cd7901b32ff71b5f359bc7ca42ea.svg "Repobeats analytics image")
 
 [![Star History Chart](https://api.star-history.com/svg?repos=groupultra/telegram-search&type=Date)](https://star-history.com/#groupultra/telegram-search&Date)
+

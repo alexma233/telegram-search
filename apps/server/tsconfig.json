@@ -6,7 +6,6 @@
       "@tg-search/common": ["../../packages/common/src"]
     },
     "types": [
-      "@proj-airi/unplugin-drizzle-orm-migrations/types",
       "node",
       "vite/client"
     ]

@@ -14,21 +14,15 @@ These variables can be set when starting the Docker container or during runtime:
 | `TELEGRAM_API_HASH` | `d524b414d21f4d37f08684c1df41ac9c` | Telegram app hash from the same page |
 | `DATABASE_TYPE` | `pglite` | Database type: `postgres` or `pglite` |
 | `DATABASE_URL` | - | PostgreSQL connection string (only when `DATABASE_TYPE=postgres`) |
-| `EMBEDDING_API_KEY` | - | API key for embedding provider (OpenAI/Ollama) |
-| `EMBEDDING_BASE_URL` | - | Custom base URL for self-hosted or compatible embedding providers |
-| `EMBEDDING_PROVIDER` | `openai` | Embedding provider: `openai` or `ollama` |
-| `EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model name |
-| `EMBEDDING_DIMENSION` | `1536` | Embedding dimension (e.g. `1536`, `1024`, `768`) |
 | `PROXY_URL` | - | Proxy configuration URL (see formats below) |
+| `PORT` | `3000` | Backend HTTP/WebSocket port inside the container |
+| `HOST` | `0.0.0.0` | Backend listen host inside the container |
+| `BACKEND_URL` | `http://127.0.0.1:3000` | Nginx upstream URL for `/api` and `/ws` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | - | OpenTelemetry OTLP endpoint for sending logs to Loki (e.g., `http://localhost:3100/otlp/v1/logs`) |
 
-## Compile-Time Environment Variables
-
-These variables must be set **before building** (not at `docker run` time):
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `VITE_PREVIEW_ALLOW_ALL_HOSTS` | `false` | Allow all hosts to access preview page |
-| `VITE_DISABLE_SETTINGS` | `false` | Disable settings page |
+> [!IMPORTANT]
+> AI Embedding & LLM settings are now configured **per account inside the app** (Settings → API).  
+> Environment variables like `EMBEDDING_API_KEY`, `EMBEDDING_MODEL`, etc. are deprecated and will be removed in a future release.
 
 ## Proxy URL Formats
 
@@ -101,36 +95,21 @@ docker run -d --name telegram-search \
   ghcr.io/groupultra/telegram-search:latest
 ```
 
-### With OpenAI Embeddings
-```bash
-docker run -d --name telegram-search \
-  -p 3333:3333 \
-  -v telegram-search-data:/app/data \
-  -e EMBEDDING_API_KEY=sk-xxxx \
-  -e EMBEDDING_BASE_URL=https://api.openai.com/v1 \
-  -e EMBEDDING_MODEL=text-embedding-3-small \
-  -e EMBEDDING_DIMENSION=1536 \
-  ghcr.io/groupultra/telegram-search:latest
-```
-
-### With Ollama (Local)
-```bash
-docker run -d --name telegram-search \
-  -p 3333:3333 \
-  -v telegram-search-data:/app/data \
-  -e EMBEDDING_PROVIDER=ollama \
-  -e EMBEDDING_BASE_URL=http://localhost:11434 \
-  -e EMBEDDING_MODEL=nomic-embed-text \
-  -e EMBEDDING_DIMENSION=768 \
-  ghcr.io/groupultra/telegram-search:latest
-```
-
 ### With Proxy
 ```bash
 docker run -d --name telegram-search \
   -p 3333:3333 \
   -v telegram-search-data:/app/data \
   -e PROXY_URL=socks5://myuser:mypass@proxy.example.com:1080 \
+  ghcr.io/groupultra/telegram-search:latest
+```
+
+### With OpenTelemetry Logging to Loki
+```bash
+docker run -d --name telegram-search \
+  -p 3333:3333 \
+  -v telegram-search-data:/app/data \
+  -e OTEL_EXPORTER_OTLP_ENDPOINT=http://loki-host:3100/otlp/v1/logs \
   ghcr.io/groupultra/telegram-search:latest
 ```
 
@@ -143,11 +122,6 @@ docker run -d --name telegram-search \
   -e TELEGRAM_API_HASH=d524b414d21f4d37f08684c1df41ac9c \
   -e DATABASE_TYPE=postgres \
   -e DATABASE_URL=postgresql://user:pass@postgres-host:5432/telegram \
-  -e EMBEDDING_API_KEY=sk-xxxx \
-  -e EMBEDDING_BASE_URL=https://api.openai.com/v1 \
-  -e EMBEDDING_PROVIDER=openai \
-  -e EMBEDDING_MODEL=text-embedding-3-small \
-  -e EMBEDDING_DIMENSION=1536 \
   -e PROXY_URL=socks5://user:pass@proxy.example.com:1080 \
   ghcr.io/groupultra/telegram-search:latest
 ```
@@ -163,19 +137,14 @@ services:
   telegram-search:
     image: ghcr.io/groupultra/telegram-search:latest
     ports:
-      - "3333:3333"
+      - '3333:3333'
     volumes:
       - telegram-search-data:/app/data
     environment:
-      TELEGRAM_API_ID: "611335"
-      TELEGRAM_API_HASH: "d524b414d21f4d37f08684c1df41ac9c"
-      DATABASE_TYPE: "postgres"
-      DATABASE_URL: "postgresql://postgres:postgres@pgvector:5432/postgres"
-      EMBEDDING_API_KEY: "sk-xxxx"
-      EMBEDDING_BASE_URL: "https://api.openai.com/v1"
-      EMBEDDING_PROVIDER: "openai"
-      EMBEDDING_MODEL: "text-embedding-3-small"
-      EMBEDDING_DIMENSION: "1536"
+      TELEGRAM_API_ID: '611335'
+      TELEGRAM_API_HASH: 'd524b414d21f4d37f08684c1df41ac9c'
+      DATABASE_TYPE: 'postgres'
+      DATABASE_URL: 'postgresql://postgres:postgres@pgvector:5432/postgres'
     depends_on:
       pgvector:
         condition: service_healthy
@@ -189,9 +158,9 @@ services:
     volumes:
       - pgvector-data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - '5432:5432'
     healthcheck:
-      test: ["CMD-SHELL", "psql -U postgres -c 'CREATE EXTENSION IF NOT EXISTS vector; SELECT 1;'"]
+      test: ['CMD-SHELL', "psql -U postgres -c 'CREATE EXTENSION IF NOT EXISTS vector; SELECT 1;'"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -204,7 +173,7 @@ volumes:
 
 ## Development Mode
 
-For development, you can use `.env` file or `config/config.yaml`:
+For development, you can use `.env` (and optionally `.env.local`) for both browser-only and server mode:
 
 ### Browser Mode (.env)
 ```bash
@@ -213,17 +182,64 @@ cp .env.example .env
 pnpm run dev
 ```
 
-### Server Mode (config.yaml)
+### Server Mode (.env + PostgreSQL)
 ```bash
-cp config/config.example.yaml config/config.yaml
-# Edit config/config.yaml with your values
+cp .env.example .env
+# Edit .env with your Telegram keys, DATABASE_TYPE / DATABASE_URL, PROXY_URL, etc.
+
+# Start PostgreSQL + pgvector (or point DATABASE_URL to your own instance)
+docker compose up -d pgvector
+
+# In one terminal: start backend (uses .env / .env.local via dotenvx)
 pnpm run server:dev
+
+# In another terminal: start frontend
+pnpm run web:dev
 ```
+
+## OpenTelemetry Logging with Loki
+
+The application supports sending logs to Loki (or any OTLP-compatible backend) using OpenTelemetry. This is optional and disabled by default.
+
+### Setup
+
+1. **Deploy Loki** with OTLP receiver enabled. Example docker-compose.yml snippet:
+
+```yaml
+version: "3.8"
+services:
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+```
+
+2. **Configure the application** to send logs to Loki:
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:3100/otlp/v1/logs
+```
+
+3. **Restart the server**. Logs will now be exported to Loki via OTLP HTTP protocol.
+
+### Viewing Logs
+
+Use Grafana with Loki as a data source to view and query logs. The logs will include:
+- Service name and version as resource attributes
+- Log level (severity)
+- Log message (body)
+- Additional context fields
+
+### Troubleshooting
+
+- If logs don't appear in Loki, check the server console for initialization messages
+- Ensure the OTLP endpoint URL is correct and accessible from the server
+- Verify that Loki is configured to accept OTLP logs (requires Loki 2.9+)
 
 ## Notes
 
 - **Default Telegram API credentials** are provided for convenience but have rate limits. Get your own from [my.telegram.org](https://my.telegram.org/apps) for better performance.
-- **Embeddings are optional** for basic search but recommended for semantic/natural language search.
 - **PGlite mode** runs entirely in the browser with no server needed.
 - **PostgreSQL mode** requires a PostgreSQL instance with pgvector extension.
-
+- **OpenTelemetry logging** is optional and only available in server mode.

@@ -1,68 +1,32 @@
-import type { CorePagination } from '@tg-search/common'
+import type { Logger } from '@guiiai/logg'
 import type { Result } from '@unbird/result'
 import type { EntityLike } from 'telegram/define'
 
 import type { CoreContext } from '../context'
-import type { CoreTask } from '../utils/task'
+import type { TakeoutOpts } from '../types/events'
 
-import { useLogger } from '@guiiai/logg'
-import { Err, Ok } from '@unbird/result'
 import bigInt from 'big-integer'
+
+import { Err, Ok } from '@unbird/result'
 import { Api } from 'telegram'
 
-export interface TakeoutTaskMetadata {
-  chatIds: string[]
-}
-
-export interface TakeoutEventToCore {
-  'takeout:run': (data: { chatIds: string[], increase?: boolean }) => void
-  'takeout:task:abort': (data: { taskId: string }) => void
-}
-
-export interface TakeoutEventFromCore {
-  'takeout:task:progress': (data: CoreTask<'takeout'>) => void
-}
-
-export type TakeoutEvent = TakeoutEventFromCore & TakeoutEventToCore
-
-export interface TakeoutOpts {
-  chatId: string
-  pagination: CorePagination
-
-  startTime?: Date
-  endTime?: Date
-
-  // Filter
-  skipMedia?: boolean
-  messageTypes?: string[]
-
-  // Incremental export
-  minId?: number
-  maxId?: number
-
-  // Expected total count for progress calculation (optional, will fetch from Telegram if not provided)
-  expectedCount?: number
-
-  // Disable auto progress emission (for manual progress management in handler)
-  disableAutoProgress?: boolean
-
-  // Task object (required, should be created by handler and passed in)
-  task: CoreTask<'takeout'>
-}
+import { TELEGRAM_HISTORY_INTERVAL_MS } from '../constants'
+import { createMinIntervalWaiter } from '../utils/min-interval'
 
 export type TakeoutService = ReturnType<typeof createTakeoutService>
 
 // https://core.telegram.org/api/takeout
-export function createTakeoutService(ctx: CoreContext) {
-  const { withError, getClient } = ctx
+export function createTakeoutService(ctx: CoreContext, logger: Logger) {
+  logger = logger.withContext('core:takeout:service')
 
-  const logger = useLogger()
+  // Abortable min-interval waiter shared within this service
+  const waitHistoryInterval = createMinIntervalWaiter(TELEGRAM_HISTORY_INTERVAL_MS)
 
   async function initTakeout() {
     const fileMaxSize = bigInt(1024 * 1024 * 1024) // 1GB
 
     // TODO: options
-    return await getClient().invoke(new Api.account.InitTakeoutSession({
+    return await ctx.getClient().invoke(new Api.account.InitTakeoutSession({
       contacts: true,
       messageUsers: true,
       messageChats: true,
@@ -74,7 +38,7 @@ export function createTakeoutService(ctx: CoreContext) {
   }
 
   async function finishTakeout(takeout: Api.account.Takeout, success: boolean) {
-    await getClient().invoke(new Api.InvokeWithTakeout({
+    await ctx.getClient().invoke(new Api.InvokeWithTakeout({
       takeoutId: takeout.id,
       query: new Api.account.FinishTakeoutSession({
         success,
@@ -84,7 +48,7 @@ export function createTakeoutService(ctx: CoreContext) {
 
   async function getHistoryWithMessagesCount(chatId: EntityLike): Promise<Result<Api.messages.TypeMessages & { count: number }>> {
     try {
-      const history = await getClient()
+      const history = await ctx.getClient()
         .invoke(new Api.messages.GetHistory({
           peer: chatId,
           limit: 1,
@@ -99,7 +63,7 @@ export function createTakeoutService(ctx: CoreContext) {
       return Ok(history)
     }
     catch (error) {
-      return Err(withError(error, 'Failed to get history'))
+      return Err(ctx.withError(error, 'Failed to get history'))
     }
   }
 
@@ -136,7 +100,7 @@ export function createTakeoutService(ctx: CoreContext) {
       takeoutSession = await initTakeout()
     }
     catch (error) {
-      task.updateError(withError(error, 'Init takeout session failed'))
+      task.updateError(ctx.withError(error, 'Init takeout session failed'))
       return
     }
 
@@ -151,13 +115,13 @@ export function createTakeoutService(ctx: CoreContext) {
 
       logger.withFields({ expectedCount: count, providedCount: options.expectedCount }).verbose('Message count for progress')
 
-      while (hasMore && !task.abortController.signal.aborted) {
+      while (hasMore && !task.state.abortController.signal.aborted) {
         // https://core.telegram.org/api/offsets#hash-generation
         const id = BigInt(chatId)
         const hashBigInt = id ^ (id >> 21n) ^ (id << 35n) ^ (id >> 4n) + id
         const hash = bigInt(hashBigInt.toString())
 
-        const peer = await getClient().getInputEntity(chatId)
+        const peer = await ctx.getClient().getInputEntity(chatId)
         const historyQuery = new Api.messages.GetHistory({
           peer,
           offsetId,
@@ -171,7 +135,15 @@ export function createTakeoutService(ctx: CoreContext) {
 
         logger.withFields(historyQuery).verbose('Historical messages query')
 
-        const result = await getClient().invoke(
+        // Pace requests before invoking Telegram API; allow abort while waiting
+        try {
+          await waitHistoryInterval(task.state.abortController.signal)
+        }
+        catch {
+          logger.verbose('Aborted during rate-limit wait')
+          break
+        }
+        const result = await ctx.getClient().invoke(
           new Api.InvokeWithTakeout({
             takeoutId: takeoutSession.id,
             query: historyQuery,
@@ -198,7 +170,7 @@ export function createTakeoutService(ctx: CoreContext) {
         logger.withFields({ count: messages.length }).debug('Got messages batch')
 
         for (const message of messages) {
-          if (task.abortController.signal.aborted) {
+          if (task.state.abortController.signal.aborted) {
             break
           }
 
@@ -220,13 +192,15 @@ export function createTakeoutService(ctx: CoreContext) {
             `Processed ${processedCount}/${count} messages`,
           )
         }
+
+        logger.withFields({ processedCount, count }).verbose('Processed messages')
       }
 
       await finishTakeout(takeoutSession, true)
 
-      if (task.abortController.signal.aborted) {
+      if (task.state.abortController.signal.aborted) {
         // Task was aborted, handler layer already updated task status
-        logger.withFields({ taskId: task.taskId }).verbose('Takeout messages aborted')
+        logger.withFields({ taskId: task.state.taskId }).verbose('Takeout messages aborted')
         return
       }
 
@@ -234,7 +208,7 @@ export function createTakeoutService(ctx: CoreContext) {
       if (!options.disableAutoProgress) {
         task.updateProgress(100)
       }
-      logger.withFields({ taskId: task.taskId }).verbose('Takeout messages finished')
+      logger.withFields({ taskId: task.state.taskId }).verbose('Takeout messages finished')
     }
     catch (error) {
       logger.withError(error).error('Takeout messages failed')

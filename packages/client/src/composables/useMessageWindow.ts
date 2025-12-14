@@ -1,5 +1,7 @@
 import type { CoreMessage } from '@tg-search/core'
 
+import { useLogger } from '@guiiai/logg'
+
 import { cleanupMediaBlobs } from '../utils/blob'
 
 export class MessageWindow {
@@ -7,6 +9,7 @@ export class MessageWindow {
   minId: number = Infinity
   maxId: number = -Infinity
   lastAccessTime: number = Date.now()
+  logger = useLogger('MessageWindow')
 
   readonly maxSize: number
 
@@ -30,8 +33,7 @@ export class MessageWindow {
       this.maxId = Math.max(Number(msgId), this.maxId)
     })
 
-    // eslint-disable-next-line no-console
-    console.log('[MessageWindow] Add batch', messages.length, `${sortedNewMessages[0].platformMessageId} - ${sortedNewMessages[sortedNewMessages.length - 1].platformMessageId}`, `direction: ${direction}`)
+    this.logger.debug('Add batch', messages.length, `${sortedNewMessages[0].platformMessageId} - ${sortedNewMessages[sortedNewMessages.length - 1].platformMessageId}`, `direction: ${direction}`)
 
     this.lastAccessTime = Date.now()
 
@@ -88,16 +90,9 @@ export class MessageWindow {
         removedIds.push(id)
       })
     }
-    else if (direction === 'newer') {
-      // When loading newer messages, remove the oldest (lowest ID) messages
-      const idsToRemove = sortedIds.slice(0, excessCount)
-      idsToRemove.forEach((id) => {
-        this.cleanupMessage(id)
-        removedIds.push(id)
-      })
-    }
     else {
-      // For initial load, keep the most recent messages (default behavior)
+      // For initial load and loading newer messages, keep the most recent messages
+      // Remove the oldest (lowest ID) messages
       const idsToRemove = sortedIds.slice(0, excessCount)
       idsToRemove.forEach((id) => {
         this.cleanupMessage(id)
@@ -118,8 +113,7 @@ export class MessageWindow {
     }
 
     if (removedIds.length > 0) {
-      // eslint-disable-next-line no-console
-      console.log(`[MessageWindow] Cleaned up ${removedIds.length} messages (${direction}), removed: ${removedIds[0]} - ${removedIds[removedIds.length - 1]}`)
+      this.logger.debug(`Cleaned up ${removedIds.length} messages (${direction}), removed: ${removedIds[0]} - ${removedIds[removedIds.length - 1]}`)
     }
   }
 
@@ -137,7 +131,6 @@ export class MessageWindow {
     this.maxId = -Infinity
     this.lastAccessTime = Date.now()
 
-    // eslint-disable-next-line no-console
-    console.log('[MessageWindow] All messages and blob URLs cleared')
+    this.logger.debug('All messages and blob URLs cleared')
   }
 }

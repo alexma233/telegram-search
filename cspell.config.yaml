@@ -12,6 +12,7 @@ words:
   - culori
   - deditor
   - defu
+  - dotenvx
   - Elysia
   - elysiajs
   - eslintcache
@@ -37,15 +38,20 @@ words:
   - oklch
   - ollama
   - onnotice
+  - Opfs
   - overscan
+  - pako
   - pathe
   - pglite
   - pgvector
   - pinia
+  - POSTHOG
+  - reconnections
   - reka
   - Retriable
   - rolldown
   - shadcn
+  - sonarjs
   - sonner
   - taze
   - tiktoken
@@ -64,5 +70,6 @@ words:
   - vitest
   - vueuse
   - xsai
+  - xsschema
 ignoreWords: []
 import: []

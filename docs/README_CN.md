@@ -11,18 +11,30 @@
 </p>
 
 <p align="center">
-  <a href="https://discord.gg/NzYsmJSgCT"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2FNzYsmJSgCT%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&suffix=%20members&logo=discord&logoColor=white&label=%20&color=7389D8&labelColor=6A7EC2"></a>
-  <a href="https://t.me/+Gs3SH2qAPeFhYmU9"><img src="https://img.shields.io/badge/Telegram-%235AA9E6?logo=telegram&labelColor=FFFFFF"></a>
+  <a href="https://discord.gg/NzYsmJSgCT">
+    <img alt="Discord" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2FNzYsmJSgCT%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&suffix=%20members&logo=discord&logoColor=white&label=%20&color=7389D8&labelColor=6A7EC2" />
+  </a>
+  <a href="https://t.me/+Gs3SH2qAPeFhYmU9">
+    <img alt="Telegram" src="https://img.shields.io/badge/Telegram-%235AA9E6?logo=telegram&labelColor=FFFFFF" />
+  </a>
+  <a href="https://deepwiki.com/groupultra/telegram-search">
+    <img alt="DeepWiki" src="https://deepwiki.com/badge.svg" />
+  </a>
   <br>
-  <a href="https://github.com/groupultra/telegram-search/releases"><img src="https://img.shields.io/github/package-json/v/groupultra/telegram-search?style=flat&colorA=080f12&colorB=1fa669"></a>
-  <a href="https://github.com/groupultra/telegram-search/actions"><img src="https://img.shields.io/github/actions/workflow/status/groupultra/telegram-search/ci.yaml?style=flat&colorA=080f12&colorB=1fa669"></a>
-  <a href="https://app.netlify.com/projects/tgsearch/deploys"><img src="https://api.netlify.com/api/v1/badges/89bfbfd2-0f73-41b0-8db4-4ab6b6512f6e/deploy-status"></a>
-  <a href="https://deepwiki.com/groupultra/telegram-search"><img src="https://deepwiki.com/badge.svg"></a>
+  <a href="https://github.com/groupultra/telegram-search/releases">
+    <img alt="GitHub Package Version" src="https://img.shields.io/github/package-json/v/groupultra/telegram-search?style=flat&colorA=080f12&colorB=1fa669" />
+  </a>
+  <a href="https://github.com/groupultra/telegram-search/actions/workflows/release-docker.yaml">
+    <img alt="Release Docker / OCI" src="https://github.com/groupultra/telegram-search/actions/workflows/release-docker.yaml/badge.svg" />
+  </a>
+  <a href="https://github.com/groupultra/telegram-search/actions/workflows/ci.yaml">
+    <img alt="CI" src="https://github.com/groupultra/telegram-search/actions/workflows/ci.yaml/badge.svg" />
+  </a>
 </p>
 
 **轻松查找和导出您的 Telegram 消息，强大的语义搜索支持所有语言和无分词句子。**
 
-让消息检索更快速、更准确、更注重隐私 — 自托管或在线试用。
+让消息检索更快速、更准确、更注重隐私 — 使用 Docker 本地运行，或在线试用。
 
 ## 💖 赞助者
 
@@ -38,18 +50,18 @@
 ### 🔍 搜索聊天历史
 - [x] 关键词搜索：多语言支持（中文、英文等）
 - [x] 自然语言搜索：像提问一样查找消息
-- [ ] 智能过滤：按联系人/群组、时间范围、包含附件等
+- [x] 智能过滤：按联系人/群组、时间范围、包含附件等
 
 ### 🔄 同步与存储
 - [x] 增量同步：边使用边同步
 - [x] 存储选项：服务器模式（PostgreSQL + pgvector）或纯浏览器模式（PGlite）
 - [ ] 断点续传：失败后自动继续
 
-### 🧠 AI 能力（规划中）
-- [ ] 向 AI 询问聊天内容：查询当前聊天或选定范围
+### 🧠 AI 能力
+- [x] 向 AI 询问聊天内容：查询当前聊天或选定范围
 - [ ] AI 消息摘要：自动提取关键点、待办事项、结论
-- [ ] AI 驱动搜索：自然语言查询并精确定位结果
-- [ ] AI 聊天：基于聊天上下文与 AI 对话
+- [x] AI 驱动搜索：自然语言查询并精确定位结果
+- [x] AI 聊天：基于聊天上下文与 AI 对话
 - [ ] AI 分析：趋势、情感、关键词、链接和文件洞察
 - [ ] 本地模型支持：本地 Embedding / 推理（无需云服务）
 
@@ -99,14 +111,17 @@ docker run -d --name telegram-search \
 | `TELEGRAM_API_HASH` | Telegram 应用 Hash |
 | `DATABASE_TYPE` | `postgres` 或 `pglite`（默认：`pglite`） |
 | `DATABASE_URL` | PostgreSQL 连接字符串（仅当 `DATABASE_TYPE=postgres` 时） |
-| `EMBEDDING_API_KEY` | OpenAI/Ollama 的 API 密钥 |
-| `EMBEDDING_BASE_URL` | 自定义 Embedding API 基础 URL |
-| `EMBEDDING_PROVIDER` | `openai` 或 `ollama` |
-| `EMBEDDING_MODEL` | 模型名称 |
-| `EMBEDDING_DIMENSION` | Embedding 维度（如 `1536`、`1024`、`768`） |
 | `PROXY_URL` | 代理 URL（如 `socks5://user:pass@host:port`） |
+| `PORT` | 后端 HTTP/WebSocket 端口（默认：`3000`） |
+| `HOST` | 后端监听主机（默认：`0.0.0.0`） |
+| `BACKEND_URL` | Nginx 上游 URL 用于 `/api` 和 `/ws`（默认：`http://127.0.0.1:3000`） |
 
-**使用 PostgreSQL 和 Embeddings 的示例：**
+
+> [!IMPORTANT]
+> AI Embedding & LLM 设置现在在应用内**按账户**配置（设置 → API）。  
+> 环境变量如 `EMBEDDING_API_KEY`, `EMBEDDING_MODEL`, 等已废弃，将在未来版本中移除。
+
+**使用 PostgreSQL 的示例：**
 
 ```bash
 docker run -d --name telegram-search \
@@ -116,8 +131,6 @@ docker run -d --name telegram-search \
   -e TELEGRAM_API_HASH=d524b414d21f4d37f08684c1df41ac9c \
   -e DATABASE_TYPE=postgres \
   -e DATABASE_URL=postgresql://<postgres-host>:5432/postgres \
-  -e EMBEDDING_API_KEY=sk-xxxx \
-  -e EMBEDDING_BASE_URL=https://api.openai.com/v1 \
   ghcr.io/groupultra/telegram-search:latest
 ```
 
@@ -146,7 +159,7 @@ docker compose up -d
 ## 💻 开发指南
 
 > [!CAUTION]
-> 开发需要 **Node.js >= 22.18** 和 **pnpm**。请确保已安装。
+> 开发需要 **Node.js >= 24.11** 和 **pnpm**。请确保已安装。
 
 ### 纯浏览器模式
 
@@ -164,14 +177,17 @@ pnpm run dev
 git clone https://github.com/groupultra/telegram-search.git
 cd telegram-search
 pnpm install
-cp config/config.example.yaml config/config.yaml
 
-# 启动数据库（Docker）
+# 复制并修改环境变量（Telegram 密钥、数据库类型/URL、代理等）
+cp .env.example .env
+# 可选：在 .env.local 中覆盖（不会提交到 Git）
+
+# 启动 PostgreSQL + pgvector（或将 DATABASE_URL 指向你自己的数据库）
 docker compose up -d pgvector
 
-# 启动后端和前端
-pnpm run server:dev  # 终端 1
-pnpm run web:dev     # 终端 2
+# 启动后端与前端（两个终端）
+pnpm run server:dev  # 终端 1：WebSocket 后端（通过 dotenvx 读取 .env/.env.local）
+pnpm run web:dev     # 终端 2：Vue 前端
 ```
 
 📖 **更多开发细节：** [CONTRIBUTING.md](../CONTRIBUTING.md)

@@ -1,0 +1,23 @@
+{
+  "name": "@unbird/pglite-inspector",
+  "type": "module",
+  "version": "1.1.38",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsdown"
+  },
+  "peerDependencies": {
+    "@electric-sql/pglite": "*",
+    "vue": "^3.5.25"
+  },
+  "dependencies": {
+    "@vue/devtools-kit": "^8.0.5"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:"
+  }
+}

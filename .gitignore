@@ -4,7 +4,6 @@ dist
 .env
 .session
 .DS_Store
-config.yaml
 !.gemini/
 .postgres/
 out/
@@ -17,3 +16,4 @@ data/
 dev-dist/
 .netlify
 tsconfig.tsbuildinfo
+coverage/

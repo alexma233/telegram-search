@@ -1,48 +1,52 @@
 import type { CoreMessageMediaFromBlob } from '@tg-search/core'
 
-import pako from 'pako'
+import { useLogger } from '@guiiai/logg'
 
+import { API_BASE } from '../../constants'
+
+/**
+ * Create a browser-friendly media representation.
+ *
+ * Strategy:
+ * - In server (WebSocket) mode, if `queryId` exists, construct an HTTP URL that the server can serve.
+ * - In With Core (browser-only) mode, hydration is handled lazily by the UI layer when media is rendered.
+ */
 export function createMediaBlob(media: CoreMessageMediaFromBlob) {
-  // when media.type is 'webpage'
-  // media.byte (preview image) might be an empty buffer
-  if (media.byte) {
-    let buffer
-    if ((media.byte as any).data?.length) {
-      buffer = new Uint8Array((media.byte as any).data)
-    }
-    else {
-      buffer = media.byte as Uint8Array
-    }
+  const logger = useLogger('Blob')
 
-    if (media.type === 'sticker' && media.mimeType === 'application/gzip') {
-      media.tgsAnimationData = pako.inflate(buffer, { to: 'string' })
-    }
-    else {
-      const blob = new Blob([buffer], { type: media.mimeType })
-      const url = URL.createObjectURL(blob)
-      media.blobUrl = url
+  // In With Core mode (browser-embedded core), there is no HTTP API backend.
+  // The UI is responsible for hydrating media from the embedded database when
+  // it actually needs to render the image/video.
+  if (import.meta.env.VITE_WITH_CORE) {
+    logger.debug('With Core mode detected; skipping HTTP media endpoint in createMediaBlob', {
+      type: media.type,
+      queryId: media.queryId,
+    })
 
-      // eslint-disable-next-line no-console
-      console.log('[Blob] Blob URL created:', {
-        url,
-        blobSize: blob.size,
-      })
-    }
+    return media
   }
 
-  media.byte = undefined
+  if (media.queryId && media.type === 'photo') {
+    media.blobUrl = `${API_BASE}/v1/photos/${media.queryId}`
+    logger.debug('Using HTTP media endpoint for photo', { queryId: media.queryId, url: media.blobUrl })
+  }
+
+  if (media.queryId && media.type === 'sticker') {
+    media.blobUrl = `${API_BASE}/v1/stickers/${media.queryId}`
+    logger.debug('Using HTTP media endpoint for sticker', { queryId: media.queryId, url: media.blobUrl })
+  }
+
   return media
 }
 
 export function cleanupMediaBlob(media: CoreMessageMediaFromBlob): void {
-  if (media.blobUrl) {
+  if (media.blobUrl?.startsWith('blob:')) {
     URL.revokeObjectURL(media.blobUrl)
 
-    // eslint-disable-next-line no-console
-    console.log('[Blob] Blob URL revoked:', { url: media.blobUrl })
-
-    media.blobUrl = undefined
+    useLogger('Blob').log('Blob URL revoked:', { url: media.blobUrl })
   }
+
+  media.blobUrl = undefined
 }
 
 export function cleanupMediaBlobs(mediaArray: CoreMessageMediaFromBlob[]): void {

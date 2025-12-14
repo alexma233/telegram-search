@@ -4,22 +4,26 @@ packages:
   - apps/*
 
 catalog:
-  '@guiiai/logg': ^1.2.5-beta.2
-  '@unbird/eslint-config': ^1.0.2
+  '@guiiai/logg': ^1.2.10
   '@unbird/result': ^1.1.1
-  '@xsai-ext/providers-cloud': ^0.4.0-beta.4
-  '@xsai-ext/providers-local': ^0.4.0-beta.4
-  '@xsai/embed': ^0.4.0-beta.4
+  '@xsai-ext/providers-cloud': ^0.4.0-beta.10
+  '@xsai-ext/providers-local': ^0.4.0-beta.10
+  '@xsai/embed': ^0.4.0-beta.10
+  '@xsai/tool': ^0.4.0-beta.10
+  tsdown: ^0.17.0
   vue-sonner: ^2.0.9
+  xsai: ^0.4.0-beta.10
 
 onlyBuiltDependencies:
   - '@parcel/watcher'
   - better-sqlite3
   - bufferutil
+  - core-js
   - electron
   - electron-winstaller
   - es5-ext
   - esbuild
+  - protobufjs
   - sharp
   - unrs-resolver
   - utf-8-validate

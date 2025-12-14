@@ -1,29 +1,37 @@
+import type { Logger } from '@guiiai/logg'
 import type { Config } from '@tg-search/common'
 
 import type { CoreContext } from './context'
-import type { SessionService } from './services/session'
+import type { MediaBinaryProvider } from './types/storage'
 
 import { useLogger } from '@guiiai/logg'
-import { isBrowser } from '@tg-search/common'
 
 import { useService } from './context'
-import { registerBasicEventHandlers } from './event-handlers/auth'
-import { registerConfigEventHandlers } from './event-handlers/config'
+import { registerAccountEventHandlers } from './event-handlers/account'
+import { registerAccountSettingsEventHandlers } from './event-handlers/account-settings'
+import { registerAuthEventHandlers } from './event-handlers/auth'
 import { registerDialogEventHandlers } from './event-handlers/dialog'
 import { registerEntityEventHandlers } from './event-handlers/entity'
 import { registerGramEventsEventHandlers } from './event-handlers/gram-events'
 import { registerMessageEventHandlers } from './event-handlers/message'
 import { registerMessageResolverEventHandlers } from './event-handlers/message-resolver'
-import { registerSessionEventHandlers } from './event-handlers/session'
 import { registerStorageEventHandlers } from './event-handlers/storage'
 import { registerTakeoutEventHandlers } from './event-handlers/takeout'
 import { useMessageResolverRegistry } from './message-resolvers'
+import { createAvatarResolver } from './message-resolvers/avatar-resolver'
 import { createEmbeddingResolver } from './message-resolvers/embedding-resolver'
 import { createJiebaResolver } from './message-resolvers/jieba-resolver'
 import { createLinkResolver } from './message-resolvers/link-resolver'
 import { createMediaResolver } from './message-resolvers/media-resolver'
 import { createUserResolver } from './message-resolvers/user-resolver'
-import { createConfigService } from './services/config'
+import { models } from './models'
+import { accountModels } from './models/accounts'
+import { chatMessageStatsModels } from './models/chat-message-stats'
+import { photoModels } from './models/photos'
+import { stickerModels } from './models/stickers'
+import { userModels } from './models/users'
+import { createAccountService } from './services/account'
+import { createAccountSettingsService } from './services/account-settings'
 import { createConnectionService } from './services/connection'
 import { createDialogService } from './services/dialog'
 import { createEntityService } from './services/entity'
@@ -32,72 +40,74 @@ import { createMessageService } from './services/message'
 import { createMessageResolverService } from './services/message-resolver'
 import { createTakeoutService } from './services/takeout'
 
-type EventHandler<T = void> = (ctx: CoreContext, config: Config) => T
+type EventHandler<T = void> = (ctx: CoreContext, config: Config, mediaBinaryProvider: MediaBinaryProvider | undefined) => T
 
-export function basicEventHandler(
-  ctx: CoreContext,
-  config: Config,
-): EventHandler {
-  const registry = useMessageResolverRegistry()
+export function basicEventHandler(ctx: CoreContext, config: Config, mediaBinaryProvider: MediaBinaryProvider | undefined): EventHandler {
+  const logger = useLogger()
 
-  const connectionService = useService(ctx, createConnectionService)({
+  const registry = useMessageResolverRegistry(logger)
+
+  const connectionService = useService(ctx, logger, createConnectionService)({
     apiId: Number(config.api.telegram.apiId!),
     apiHash: config.api.telegram.apiHash!,
     proxy: config.api.telegram.proxy,
   })
-  const configService = useService(ctx, createConfigService)
-  const messageResolverService = useService(ctx, createMessageResolverService)(registry)
+  const configService = useService(ctx, logger, createAccountSettingsService)
+  const messageResolverService = useService(ctx, logger, createMessageResolverService)(registry)
 
-  registry.register('media', createMediaResolver(ctx))
-  registry.register('user', createUserResolver(ctx))
-  registry.register('link', createLinkResolver())
-  registry.register('embedding', createEmbeddingResolver())
-  registry.register('jieba', createJiebaResolver())
+  registry.register('media', createMediaResolver(ctx, logger, photoModels, stickerModels, mediaBinaryProvider))
+  registry.register('user', createUserResolver(ctx, logger, userModels))
+  // Centralized avatar fetching for users (via messages)
+  // Note: avatar resolver is registered but filtered by the disabled list
+  // (see message-resolver service). Current strategy is client-driven and
+  // on-demand via frontend events; the resolver remains available to enable
+  // server-side prefetch in the future if desired.
+  registry.register('avatar', createAvatarResolver(ctx, logger))
+  registry.register('link', createLinkResolver(logger))
+  registry.register('embedding', createEmbeddingResolver (ctx, logger))
+  registry.register('jieba', createJiebaResolver(logger))
 
-  registerStorageEventHandlers(ctx)
-  registerConfigEventHandlers(ctx)(configService)
-  registerMessageResolverEventHandlers(ctx)(messageResolverService)
+  registerStorageEventHandlers(ctx, logger, models)
+  registerAccountSettingsEventHandlers(ctx, logger)(configService)
+  registerMessageResolverEventHandlers(ctx, logger)(messageResolverService)
 
   ;(async () => {
-    let sessionService: SessionService
-
-    if (isBrowser()) {
-      const { createSessionService } = await import('./services/session.browser')
-      sessionService = useService(ctx, createSessionService)
-    }
-    else {
-      const { createSessionService } = await import('./services/session')
-      sessionService = useService(ctx, createSessionService)
-    }
-
-    registerBasicEventHandlers(ctx)(connectionService, sessionService)
-    registerSessionEventHandlers(ctx)(sessionService)
+    registerAuthEventHandlers(ctx, logger)(connectionService)
   })()
 
   return () => {}
 }
 
-export function afterConnectedEventHandler(
-  ctx: CoreContext,
-  _config: Config,
-): EventHandler {
-  const { emitter } = ctx
+export function afterConnectedEventHandler(ctx: CoreContext): EventHandler {
+  let logger = useLogger()
 
-  emitter.on('auth:connected', () => {
-    const messageService = useService(ctx, createMessageService)
-    const dialogService = useService(ctx, createDialogService)
-    const takeoutService = useService(ctx, createTakeoutService)
-    const entityService = useService(ctx, createEntityService)
-    const gramEventsService = useService(ctx, createGramEventsService)
+  ctx.emitter.once('auth:connected', () => {
+    // Register entity handlers first so we can establish currentAccountId.
+    const accountService = useService(ctx, logger, createAccountService)
+    registerAccountEventHandlers(ctx, logger, accountModels)(accountService)
 
-    registerMessageEventHandlers(ctx)(messageService)
-    registerDialogEventHandlers(ctx)(dialogService)
-    registerTakeoutEventHandlers(ctx)(takeoutService)
-    registerEntityEventHandlers(ctx)(entityService)
-    registerGramEventsEventHandlers(ctx)(gramEventsService)
+    // Ensure current account ID is established before any dialog/storage access.
+    ctx.emitter.emit('account:me:fetch')
+  })
 
-    // Init all entities
-    emitter.emit('dialog:fetch')
+  ctx.emitter.once('account:ready', ({ accountId }) => {
+    logger = logger.withFields({ accountId })
+
+    const entityService = useService(ctx, logger, createEntityService)
+    const messageService = useService(ctx, logger, createMessageService)
+    const dialogService = useService(ctx, logger, createDialogService)
+    const takeoutService = useService(ctx, logger, createTakeoutService)
+    const gramEventsService = useService(ctx, logger, createGramEventsService)
+
+    registerEntityEventHandlers(ctx, logger)(entityService)
+    registerMessageEventHandlers(ctx, logger)(messageService)
+    registerDialogEventHandlers(ctx, logger)(dialogService)
+    registerTakeoutEventHandlers(ctx, logger, chatMessageStatsModels)(takeoutService)
+    registerGramEventsEventHandlers(ctx, logger)(gramEventsService)
+
+    // Dialog bootstrap is now triggered from account:me:fetch handler once
+    // currentAccountId has been established, to avoid races where dialog or
+    // storage handlers read account context too early.
     gramEventsService.registerGramEvents()
   })
 
@@ -107,12 +117,14 @@ export function afterConnectedEventHandler(
 export function useEventHandler(
   ctx: CoreContext,
   config: Config,
+  mediaBinaryProvider: MediaBinaryProvider | undefined,
+  logger: Logger,
 ) {
-  const logger = useLogger()
+  logger = logger.withContext('core:event-handler')
 
   function register(fn: EventHandler) {
     logger.withFields({ fn: fn.name }).log('Register event handler')
-    fn(ctx, config)
+    fn(ctx, config, mediaBinaryProvider)
   }
 
   return {

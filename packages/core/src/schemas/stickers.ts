@@ -1,8 +1,8 @@
 // https://github.com/moeru-ai/airi/blob/main/services/telegram-bot/src/db/schema.ts
 
-import { bigint, index, pgTable, text, uniqueIndex, uuid, vector } from 'drizzle-orm/pg-core'
+import { bigint, index, integer, pgTable, text, uniqueIndex, uuid, vector } from 'drizzle-orm/pg-core'
 
-import { bytea } from './type'
+import { bytea } from './utils/type'
 
 export const stickersTable = pgTable('stickers', {
   id: uuid().primaryKey().defaultRandom(),
@@ -13,6 +13,9 @@ export const stickersTable = pgTable('stickers', {
   file_id: text().notNull(),
   sticker_bytes: bytea(),
   sticker_path: text().notNull().default(''),
+  sticker_mime_type: text().notNull().default(''),
+  sticker_width: integer().notNull().default(0),
+  sticker_height: integer().notNull().default(0),
   description: text().notNull().default(''),
   created_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),
   updated_at: bigint({ mode: 'number' }).notNull().default(0).$defaultFn(() => Date.now()),

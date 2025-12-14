@@ -1,19 +1,19 @@
 import { resolve } from 'node:path'
 import { env } from 'node:process'
 
-import DrizzleORMMigrations from '@proj-airi/unplugin-drizzle-orm-migrations/vite'
 import Vue from '@vitejs/plugin-vue'
 import UnoCSS from 'unocss/vite'
 import Info from 'unplugin-info/vite'
 import Unused from 'unplugin-unused/vite'
 import VueMacros from 'unplugin-vue-macros/vite'
 import VueRouter from 'unplugin-vue-router/vite'
-import { defineConfig } from 'vite'
 import Inspect from 'vite-plugin-inspect'
-import { VitePWA } from 'vite-plugin-pwa'
-import { splashScreen } from 'vite-plugin-splash-screen'
 import Devtools from 'vite-plugin-vue-devtools'
 import Layouts from 'vite-plugin-vue-layouts'
+
+import { defineConfig } from 'vite'
+import { VitePWA } from 'vite-plugin-pwa'
+import { splashScreen } from 'vite-plugin-splash-screen'
 
 export default defineConfig({
   plugins: [
@@ -27,6 +27,7 @@ export default defineConfig({
       ignore: [
         '@iconify-json/lucide',
         '@node-rs/jieba-wasm32-wasi',
+        '@valibot/to-json-schema',
       ],
     }),
 
@@ -45,6 +46,11 @@ export default defineConfig({
           script: {
             propsDestructure: true,
             defineModel: true,
+          },
+          template: {
+            compilerOptions: {
+              isCustomElement: tag => tag.startsWith('pglite-'),
+            },
           },
         }),
       },
@@ -86,11 +92,12 @@ export default defineConfig({
       },
       workbox: {
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
+        // https://github.com/moeru-ai/airi/blob/main/apps/stage-web/vite.config.ts#L136-L141
+        navigateFallbackDenylist: [
+          /^\/api\//,
+          /^\/ws\//,
+        ],
       },
-    }),
-
-    DrizzleORMMigrations({
-      root: '../..',
     }),
 
     splashScreen({
@@ -110,10 +117,23 @@ export default defineConfig({
   },
 
   optimizeDeps: {
-    exclude: ['@electric-sql/pglite'],
+    exclude: [
+      '@electric-sql/pglite',
+    ],
+    include: [
+      'virtua/vue',
+      'date-fns',
+      'echarts/charts',
+      'echarts/components',
+      'echarts/core',
+      'echarts/renderers',
+      'vue-echarts',
+      'lottie-web',
+    ],
   },
 
   build: {
+    sourcemap: true,
     rollupOptions: {
       // https://github.com/rollup/rollup/issues/6012#issuecomment-3065953828
       external: ['postgres'],
@@ -139,8 +159,7 @@ export default defineConfig({
     },
   },
 
-  // Allow all hosts in preview mode for reverse proxy deployments by setting VITE_PREVIEW_ALLOW_ALL_HOSTS=true
   preview: {
-    allowedHosts: env.VITE_PREVIEW_ALLOW_ALL_HOSTS === 'true' ? true : [],
+    allowedHosts: true,
   },
 })

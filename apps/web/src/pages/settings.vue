@@ -1,35 +1,20 @@
 <script setup lang="ts">
-import { useBridgeStore, useSettingsStore } from '@tg-search/client'
+import { useAccountStore, useAuthStore, useBridgeStore } from '@tg-search/client'
 import { storeToRefs } from 'pinia'
-import { computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 
 import { Button } from '../components/ui/Button'
-import SelectDropdown from '../components/ui/SelectDropdown.vue'
 
 const { t } = useI18n()
+const router = useRouter()
 
-const { config } = storeToRefs(useSettingsStore())
-const websocketStore = useBridgeStore()
+const { accountSettings } = storeToRefs(useAccountStore())
 
-const embeddingProviderOptions = [
-  { label: 'OpenAI', value: 'openai' },
-  { label: 'Ollama', value: 'ollama' },
-]
-
-const databaseProviderOptions = [
-  { label: 'PostgreSQL', value: 'postgres' },
-  { label: 'PGLite', value: 'pglite' },
-]
-
-// Check if VITE_WITH_CORE is enabled
-const isWithCore = import.meta.env.VITE_WITH_CORE === 'true'
-
-// Computed properties for dynamic form behavior
-const isPostgresSelected = computed(() => config.value?.database?.type === 'postgres')
-const hasConnectionUrl = computed(() => !!config.value?.database?.url?.trim())
-const shouldDisableIndividualFields = computed(() => isPostgresSelected.value && hasConnectionUrl.value)
+const sessionStore = useAuthStore()
+const { isLoggedIn } = storeToRefs(sessionStore)
 
 // Message resolvers configuration
 const messageResolvers = [
@@ -39,23 +24,25 @@ const messageResolvers = [
   { key: 'embedding' },
 ]
 
+const embeddingDimensions = Object.values([1536, 1024, 768])
+
 // Computed properties for message resolver switches
 const isResolverEnabled = computed(() => (resolverKey: string) => {
-  if (!config.value?.resolvers?.disabledResolvers)
+  if (!accountSettings.value?.resolvers?.disabledResolvers)
     return true
-  return !config.value.resolvers.disabledResolvers.includes(resolverKey)
+  return !accountSettings.value.resolvers.disabledResolvers.includes(resolverKey)
 })
 
 function toggleMessageResolver(resolverKey: string, enabled: boolean) {
-  if (!config.value) {
+  if (!accountSettings.value) {
     return
   }
 
   // Ensure resolvers and disabledResolvers are initialized.
-  config.value.resolvers ??= { disabledResolvers: [] }
-  config.value.resolvers.disabledResolvers ??= []
+  accountSettings.value.resolvers ??= { disabledResolvers: [] }
+  accountSettings.value.resolvers.disabledResolvers ??= []
 
-  const disabledResolvers = config.value.resolvers.disabledResolvers
+  const disabledResolvers = accountSettings.value.resolvers.disabledResolvers
   const index = disabledResolvers.indexOf(resolverKey)
 
   if (enabled && index !== -1) {
@@ -68,18 +55,22 @@ function toggleMessageResolver(resolverKey: string, enabled: boolean) {
   }
 }
 
-async function updateConfig() {
-  if (!config.value)
+function updateConfig() {
+  if (!accountSettings.value)
     return
 
-  websocketStore.sendEvent('config:update', { config: config.value })
+  useBridgeStore().sendEvent('config:update', { accountSettings: accountSettings.value })
+  const toastId = toast.loading(t('settings.savingSettings'))
 
-  toast.success(t('settings.settingsSavedSuccessfully'))
+  Promise.race([
+    useBridgeStore().waitForEvent('config:data'),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000)),
+  ])
+    .then(() => toast.success(t('settings.settingsSavedSuccessfully'), { id: toastId }))
+    .catch((error) => {
+      toast.error(error.message, { id: toastId })
+    })
 }
-
-onMounted(() => {
-  websocketStore.sendEvent('config:fetch')
-})
 </script>
 
 <template>
@@ -97,135 +88,48 @@ onMounted(() => {
     </div>
   </header>
 
-  <div class="container mx-auto p-6 space-y-6">
-    <!-- Settings form -->
-    <div class="space-y-6">
-      <!-- Database settings (hidden when VITE_WITH_CORE is enabled) -->
-      <div v-if="!isWithCore" class="border rounded-lg bg-card p-6 shadow-sm">
-        <h2 class="mb-4 text-xl font-semibold">
-          {{ t('settings.databaseSettings') }}
-        </h2>
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm text-muted-foreground font-medium">Provider</label>
-            <SelectDropdown
-              v-model="config.database.type"
-              :options="databaseProviderOptions"
-            />
+  <!-- Login prompt banner -->
+  <div
+    v-if="!isLoggedIn"
+    class="flex items-center justify-center px-6 py-8"
+  >
+    <div
+      class="max-w-2xl w-full border border-primary/20 rounded-2xl bg-primary/5 p-6 transition-all"
+    >
+      <div class="flex flex-col items-center justify-center gap-4 md:flex-row md:justify-between">
+        <div class="flex items-center gap-4">
+          <div class="h-12 w-12 flex shrink-0 items-center justify-center rounded-full bg-primary/10">
+            <div class="i-lucide-lock-keyhole h-6 w-6 text-primary" />
           </div>
-          <div v-if="isPostgresSelected">
-            <label class="block text-sm text-muted-foreground font-medium">Connection URL</label>
-            <input
-              v-model="config.database.url"
-              type="text"
-              placeholder="postgresql://user:password@host:port/database"
-              class="mt-1 block w-full border rounded-md bg-background px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-            <p class="mt-1 text-xs text-muted-foreground">
-              Optional: Use connection URL instead of individual fields below
-            </p>
-          </div>
-          <div v-if="isPostgresSelected" class="grid gap-4 md:grid-cols-2">
-            <div>
-              <label class="block text-sm text-muted-foreground font-medium">Host</label>
-              <input
-                v-model="config.database.host"
-                type="text"
-                :disabled="shouldDisableIndividualFields"
-                class="mt-1 block w-full border rounded-md px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                :class="{
-                  'cursor-not-allowed bg-muted opacity-60': shouldDisableIndividualFields,
-                  'bg-background': !shouldDisableIndividualFields,
-                }"
-              >
-            </div>
-            <div>
-              <label class="block text-sm text-muted-foreground font-medium">Port</label>
-              <input
-                v-model.number="config.database.port"
-                type="number"
-                :disabled="shouldDisableIndividualFields"
-                class="mt-1 block w-full border rounded-md px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                :class="{
-                  'cursor-not-allowed bg-muted opacity-60': shouldDisableIndividualFields,
-                  'bg-background': !shouldDisableIndividualFields,
-                }"
-              >
-            </div>
-            <div>
-              <label class="block text-sm text-muted-foreground font-medium">Username</label>
-              <input
-                v-model="config.database.user"
-                type="text"
-                :disabled="shouldDisableIndividualFields"
-                class="mt-1 block w-full border rounded-md px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                :class="{
-                  'cursor-not-allowed bg-muted opacity-60': shouldDisableIndividualFields,
-                  'bg-background': !shouldDisableIndividualFields,
-                }"
-              >
-            </div>
-            <div>
-              <label class="block text-sm text-muted-foreground font-medium">Password</label>
-              <input
-                v-model="config.database.password"
-                type="password"
-                :disabled="shouldDisableIndividualFields"
-                class="mt-1 block w-full border rounded-md px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                :class="{
-                  'cursor-not-allowed bg-muted opacity-60': shouldDisableIndividualFields,
-                  'bg-background': !shouldDisableIndividualFields,
-                }"
-              >
-            </div>
-            <div class="md:col-span-2">
-              <label class="block text-sm text-muted-foreground font-medium">Database Name</label>
-              <input
-                v-model="config.database.database"
-                type="text"
-                :disabled="shouldDisableIndividualFields"
-                class="mt-1 block w-full border rounded-md px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                :class="{
-                  'cursor-not-allowed bg-muted opacity-60': shouldDisableIndividualFields,
-                  'bg-background': !shouldDisableIndividualFields,
-                }"
-              >
-            </div>
+          <div class="flex flex-col gap-1">
+            <span class="text-sm text-foreground font-semibold">{{ t('loginPromptBanner.pleaseLoginToUseFullFeatures') }}</span>
+            <span class="text-xs text-muted-foreground">{{ t('loginPromptBanner.subtitle') }}</span>
           </div>
         </div>
+        <Button
+          size="md"
+          icon="i-lucide-log-in"
+          class="shrink-0"
+          @click="router.push({ path: '/login', query: { redirect: '/settings' } })"
+        >
+          {{ t('loginPromptBanner.login') }}
+        </Button>
       </div>
+    </div>
+  </div>
 
+  <div
+    v-else
+    class="container mx-auto p-6 space-y-6"
+  >
+    <!-- Settings form -->
+    <div class="space-y-6">
       <!-- API settings -->
       <div class="border rounded-lg bg-card p-6 shadow-sm">
         <h2 class="mb-4 text-xl font-semibold">
           {{ t('settings.apiSettings') }}
         </h2>
         <div class="space-y-4">
-          <!-- Telegram API -->
-          <div>
-            <h3 class="mb-2 text-lg font-medium">
-              {{ t('settings.telegramApi') }}
-            </h3>
-            <div class="grid gap-4 md:grid-cols-2">
-              <div>
-                <label class="block text-sm text-muted-foreground font-medium">API ID</label>
-                <input
-                  v-model="config.api.telegram.apiId"
-                  type="text"
-                  class="mt-1 block w-full border rounded-md bg-background px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-              </div>
-              <div>
-                <label class="block text-sm text-muted-foreground font-medium">API Hash</label>
-                <input
-                  v-model="config.api.telegram.apiHash"
-                  type="password"
-                  class="mt-1 block w-full border rounded-md bg-background px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-              </div>
-            </div>
-          </div>
-
           <!-- OpenAI API -->
           <div>
             <h3 class="mb-2 text-lg font-medium">
@@ -233,30 +137,27 @@ onMounted(() => {
             </h3>
             <div class="grid gap-4">
               <div>
-                <label class="block text-sm text-muted-foreground font-medium">Provider</label>
-                <SelectDropdown
-                  v-model="config.api.embedding.provider"
-                  :options="embeddingProviderOptions"
-                />
-              </div>
-              <div>
                 <label class="block text-sm text-muted-foreground font-medium">{{ t('settings.model') }}</label>
                 <input
-                  v-model="config.api.embedding.model"
+                  v-model="accountSettings.embedding.model"
                   class="mt-1 block w-full border rounded-md bg-background px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
               </div>
               <div>
                 <label class="block text-sm text-muted-foreground font-medium">{{ t('settings.dimension') }}</label>
-                <input
-                  v-model="config.api.embedding.dimension"
+                <select
+                  v-model="accountSettings.embedding.dimension"
                   class="mt-1 block w-full border rounded-md bg-background px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
+                  <option v-for="dimension in embeddingDimensions" :key="dimension" :value="dimension">
+                    {{ dimension }}
+                  </option>
+                </select>
               </div>
               <div>
                 <label class="block text-sm text-muted-foreground font-medium">{{ t('settings.apiKey') }}</label>
                 <input
-                  v-model="config.api.embedding.apiKey"
+                  v-model="accountSettings.embedding.apiKey"
                   type="password"
                   class="mt-1 block w-full border rounded-md bg-background px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
@@ -264,11 +165,101 @@ onMounted(() => {
               <div>
                 <label class="block text-sm text-muted-foreground font-medium">{{ t('settings.apiBaseUrl') }}</label>
                 <input
-                  v-model="config.api.embedding.apiBase"
+                  v-model="accountSettings.embedding.apiBase"
                   type="text"
                   class="mt-1 block w-full border rounded-md bg-background px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
               </div>
+            </div>
+          </div>
+
+          <!-- LLM API -->
+          <div>
+            <h3 class="mb-2 text-lg font-medium">
+              {{ t('settings.llm') }}
+            </h3>
+            <div class="grid gap-4">
+              <div>
+                <label class="block text-sm text-muted-foreground font-medium">{{ t('settings.llmModel') }}</label>
+                <input
+                  v-model="accountSettings.llm.model"
+                  type="text"
+                  placeholder="gpt-4o-mini"
+                  class="mt-1 block w-full border rounded-md bg-background px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+              </div>
+              <div>
+                <label class="block text-sm text-muted-foreground font-medium">{{ t('settings.apiKey') }}</label>
+                <input
+                  v-model="accountSettings.llm.apiKey"
+                  type="password"
+                  class="mt-1 block w-full border rounded-md bg-background px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+              </div>
+              <div>
+                <label class="block text-sm text-muted-foreground font-medium">{{ t('settings.apiBaseUrl') }}</label>
+                <input
+                  v-model="accountSettings.llm.apiBase"
+                  type="text"
+                  placeholder="https://api.openai.com/v1"
+                  class="mt-1 block w-full border rounded-md bg-background px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+              </div>
+              <div class="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label class="block text-sm text-muted-foreground font-medium">{{ t('settings.temperature') }}</label>
+                  <input
+                    v-model.number="accountSettings.llm.temperature"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="2"
+                    class="mt-1 block w-full border rounded-md bg-background px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                </div>
+                <div>
+                  <label class="block text-sm text-muted-foreground font-medium">{{ t('settings.maxTokens') }}</label>
+                  <input
+                    v-model.number="accountSettings.llm.maxTokens"
+                    type="number"
+                    step="100"
+                    min="100"
+                    max="32000"
+                    class="mt-1 block w-full border rounded-md bg-background px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Receive messages settings -->
+      <div
+        v-if="accountSettings.receiveMessages"
+        class="border rounded-lg bg-card p-6 shadow-sm"
+      >
+        <h2 class="mb-4 text-xl font-semibold">
+          {{ t('settings.receiveMessagesSettings') }}
+        </h2>
+        <div class="space-y-4">
+          <p class="text-sm text-muted-foreground">
+            {{ t('settings.receiveMessagesDescription') }}
+          </p>
+          <div class="grid gap-4 md:grid-cols-2">
+            <div class="flex items-center justify-between">
+              <label class="text-sm text-muted-foreground font-medium">
+                {{ t('settings.receiveAll') }}
+              </label>
+              <label class="relative inline-flex cursor-pointer items-center">
+                <input
+                  :checked="accountSettings.receiveMessages.receiveAll"
+                  type="checkbox"
+                  class="peer sr-only"
+                  @change="accountSettings.receiveMessages.receiveAll = ($event.target as HTMLInputElement).checked"
+                >
+                <div class="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:border after:rounded-full after:bg-background peer-checked:bg-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
+              </label>
             </div>
           </div>
         </div>

@@ -1,14 +1,12 @@
-import type { CoreMessageMediaPhoto } from '../../index'
-import type { photosTable } from '../../schemas/photos'
-
-export type DBInsertPhoto = typeof photosTable.$inferInsert
-export type DBSelectPhoto = typeof photosTable.$inferSelect
+import type { CoreMessageMediaPhoto } from '../../types/media'
+import type { DBSelectPhoto } from './types'
 
 export function convertDBPhotoToCoreMessageMedia(dbPhoto: DBSelectPhoto): CoreMessageMediaPhoto {
   return {
     type: 'photo',
     messageUUID: dbPhoto.message_id ?? undefined,
-    byte: dbPhoto.image_bytes ?? undefined,
     platformId: dbPhoto.file_id,
+    // Expose queryId so clients can fetch media via HTTP endpoints.
+    queryId: dbPhoto.id,
   } satisfies CoreMessageMediaPhoto
 }

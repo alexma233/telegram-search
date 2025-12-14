@@ -12,8 +12,7 @@ Telegram Search is a monorepo application for exporting, backing up, and searchi
 
 ```bash
 pnpm install                    # Install all dependencies
-cp .env.example .env           # For browser-only mode
-cp config/config.example.yaml config/config.yaml  # For server mode
+cp .env.example .env           # Base env for both browser-only and server mode
 ```
 
 ### Development Modes
@@ -38,7 +37,7 @@ pnpm run web:build            # Build frontend (server mode)
 pnpm run server:build         # Build backend server
 pnpm run packages:build       # Build all packages (required before typecheck)
 pnpm run typecheck            # TypeScript type checking (runs packages:build first)
-pnpm run test                 # Run Vitest tests
+pnpm run test run             # Run Vitest tests
 pnpm run lint                 # ESLint check
 pnpm run lint:fix             # Auto-fix ESLint issues
 ```
@@ -47,7 +46,6 @@ pnpm run lint:fix             # Auto-fix ESLint issues
 
 ```bash
 pnpm run db:generate          # Generate Drizzle migration files
-pnpm run db:kit              # Database utility tool
 ```
 
 ## Architecture
@@ -160,14 +158,13 @@ This automatically:
 ### Configuration
 
 **Browser mode**: `.env` file
-- `VITE_TELEGRAM_APP_ID`
-- `VITE_TELEGRAM_APP_HASH`
+- `VITE_TELEGRAM_API_ID`
+- `VITE_TELEGRAM_API_HASH`
 
-**Server mode**: `config/config.yaml`
-- Database settings (`database.type`, `database.host`, etc.)
-- Telegram API (`api.telegram.apiId`, `api.telegram.apiHash`)
-- Embedding settings (`api.embedding.provider`, `api.embedding.model`, `api.embedding.dimension`)
-- Optional proxy configuration
+**Server mode**: environment variables (loaded via `.env` / `.env.local` and dotenvx)
+- Database settings (`DATABASE_TYPE`, `DATABASE_URL`)
+- Telegram API (`TELEGRAM_API_ID`, `TELEGRAM_API_HASH`)
+- Optional proxy configuration (`PROXY_URL`, `PROXY_MT_PROXY`, etc.)
 
 ### Code Standards
 
@@ -195,7 +192,7 @@ This automatically:
 
 Test framework: Vitest
 - Test files: `*.spec.ts` or `*.test.ts`
-- Run: `pnpm run test`
+- Run: `pnpm run test run`
 
 ## Key Technical Considerations
 

@@ -8,7 +8,8 @@
     },
     "types": [
       "vite/client",
-      "@proj-airi/unplugin-drizzle-orm-migrations/types"
+      // TODO: Remove this once we have a better solution for node types
+      "node"
     ]
   },
   "include": [

@@ -114,7 +114,7 @@ watch(() => arrivedState.bottom, (isAtBottom) => {
       </div>
     </header>
 
-    <!-- 搜索栏直接放在页面顶部 -->
+    <!-- Search bar placed directly at the top of the page -->
     <div class="flex flex-col px-8 pt-8">
       <div class="w-full flex items-center gap-2">
         <input
@@ -130,13 +130,13 @@ watch(() => arrivedState.bottom, (isAtBottom) => {
         </button>
       </div>
 
-      <!-- 设置栏 -->
+      <!-- Settings bar -->
       <div v-if="showSettings" class="py-3">
         <slot name="settings" />
       </div>
     </div>
 
-    <!-- 搜索结果直接展示在下方 -->
+    <!-- Search results displayed directly below -->
     <div
       v-show="keywordDebounced"
       class="flex-1 px-8 pt-4 transition-all duration-300 ease-in-out"

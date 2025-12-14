@@ -1,13 +1,13 @@
-import type { CoreMessage, CoreRetrievalMessages } from '../../index'
-import type { chatMessagesTable } from '../../schemas/chat_messages'
-
-export type DBInsertMessage = typeof chatMessagesTable.$inferInsert
-export type DBSelectMessage = typeof chatMessagesTable.$inferSelect
+import type { JoinedChatType } from '../../schemas/joined-chats'
+import type { CoreRetrievalMessages } from '../../types/events'
+import type { CoreMessage, ProcessedCoreMessage } from '../../types/message'
+import type { DBInsertMessage, DBSelectMessage } from './types'
 
 export interface DBRetrievalMessages extends Omit<DBSelectMessage, 'content_vector_1536' | 'content_vector_1024' | 'content_vector_768'> {
   similarity?: number
   time_relevance?: number
   combined_score?: number
+  chat_name?: string | null
 }
 
 export function convertToCoreMessageFromDB(message: DBSelectMessage): CoreMessage {
@@ -36,28 +36,27 @@ export function convertToCoreMessageFromDB(message: DBSelectMessage): CoreMessag
       // forwardFromMessageId: message.forward_from_message_id,
     },
 
-    vectors: {
-      vector1536: message.content_vector_1536 || [],
-      vector1024: message.content_vector_1024 || [],
-      vector768: message.content_vector_768 || [],
-    },
-
-    jiebaTokens: message.jieba_tokens as unknown as string[],
-
     createdAt: message.created_at,
     updatedAt: message.updated_at,
     platformTimestamp: message.platform_timestamp,
   } satisfies CoreMessage
 }
 
-export function convertToDBInsertMessage(message: CoreMessage): DBInsertMessage {
+export function convertToDBInsertMessage(
+  ownerAccountId: string | null | undefined,
+  type: JoinedChatType,
+  message: ProcessedCoreMessage,
+): DBInsertMessage {
   const msg: DBInsertMessage = {
+    // Let the database generate the ID, we don't need to set it here
+    // id: message.uuid,
     platform: message.platform,
     from_id: message.fromId,
     platform_message_id: message.platformMessageId,
     from_name: message.fromName,
     from_user_uuid: message.fromUserUuid,
     in_chat_id: message.chatId,
+    in_chat_type: type,
     content: message.content,
     is_reply: message.reply.isReply,
     reply_to_name: message.reply.replyToName,
@@ -65,16 +64,22 @@ export function convertToDBInsertMessage(message: CoreMessage): DBInsertMessage 
     platform_timestamp: message.platformTimestamp,
   }
 
-  if (message.vectors.vector1536?.length) {
-    msg.content_vector_1536 = message.vectors.vector1536
+  if (ownerAccountId) {
+    msg.owner_account_id = ownerAccountId
   }
 
-  if (message.vectors.vector1024?.length) {
-    msg.content_vector_1024 = message.vectors.vector1024
-  }
+  if (message.vectors) {
+    if (message.vectors.vector1536?.length) {
+      msg.content_vector_1536 = message.vectors.vector1536
+    }
 
-  if (message.vectors.vector768?.length) {
-    msg.content_vector_768 = message.vectors.vector768
+    if (message.vectors.vector1024?.length) {
+      msg.content_vector_1024 = message.vectors.vector1024
+    }
+
+    if (message.vectors.vector768?.length) {
+      msg.content_vector_768 = message.vectors.vector768
+    }
   }
 
   if (message.jiebaTokens?.length) {
@@ -90,5 +95,6 @@ export function convertToCoreRetrievalMessages(messages: DBRetrievalMessages[]):
     similarity: message?.similarity,
     timeRelevance: message?.time_relevance,
     combinedScore: message?.combined_score,
+    chatName: message?.chat_name ?? undefined,
   })) satisfies CoreRetrievalMessages[]
 }

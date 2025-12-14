@@ -35,45 +35,22 @@ export function getRootPath(): string {
   return ROOT_DIR
 }
 
-export function getDataPath(): string {
-  return resolve(ROOT_DIR, './data')
+export function useDataPath(): string {
+  const path = resolve(ROOT_DIR, './data')
+  if (!fs.existsSync(path)) {
+    fs.mkdirSync(path, { recursive: true })
+  }
+
+  return path
 }
 
 export function getDatabaseFilePath(config: Config): string {
   const { database } = config
 
-  let extension = ''
-  switch (database.type) {
-    case DatabaseType.PGLITE:
-      extension = '.pglite'
-      break
-    default:
-      return ''
+  if (database.type === DatabaseType.PGLITE) {
+    return resolve(useDataPath(), `db.pglite`)
   }
-
-  return resolve(getDataPath(), `db${extension}`)
-}
-
-export async function useConfigPath(): Promise<string> {
-  const configPath = resolve(getRootPath(), './config', 'config.yaml')
-
-  logger.withFields({ configPath }).log('Config path')
-
-  if (!fs.existsSync(configPath)) {
-    fs.mkdirSync(dirname(configPath), { recursive: true })
-    fs.copyFileSync(resolve(dirname(configPath), 'config.example.yaml'), configPath)
+  else {
+    throw new Error(`Unsupported database type: ${database.type}`)
   }
-
-  return configPath
-}
-
-export function getSessionPath(): string {
-  const sessionPath = resolve(getDataPath(), 'sessions')
-  if (!fs.existsSync(sessionPath)) {
-    fs.mkdirSync(sessionPath, { recursive: true })
-  }
-
-  logger.withFields({ sessionPath }).log('Session path')
-
-  return sessionPath
 }

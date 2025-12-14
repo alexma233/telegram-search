@@ -1,10 +1,9 @@
-import process from 'node:process'
-
 export default {
   schema: './packages/core/src/schemas/**/*.ts',
   out: './drizzle',
   dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.DATABASE_DSN,
+    // eslint-disable-next-line node/prefer-global/process
+    url: process.env.DATABASE_URL,
   },
 }
