@@ -3,7 +3,6 @@ import type { ClientRegisterEventHandler } from '.'
 import { useBridgeStore } from '../composables/useBridge'
 import { useAvatarStore } from '../stores/useAvatar'
 import { useBootstrapStore } from '../stores/useBootstrap'
-import { persistUserAvatar } from '../utils/avatar-cache'
 import { bytesToBlob, canDecodeAvatar } from '../utils/image'
 
 /**
@@ -61,15 +60,6 @@ export function registerEntityEventHandlers(
     // Convert bytes to Blob directly (optimization step removed)
     const blob = bytesToBlob(buffer, data.mimeType)
     const url = URL.createObjectURL(blob)
-
-    // Persist optimized blob into IndexedDB for cache-first load next time
-    try {
-      await persistUserAvatar(data.userId, blob, data.mimeType, data.fileId)
-    }
-    catch (error) {
-      // Warn-only logging to comply with lint rules
-      console.warn('[Avatar] persistUserAvatar failed', { userId: data.userId }, error)
-    }
 
     avatarStore.setUserAvatar(data.userId, { blobUrl: url, fileId: data.fileId, mimeType: data.mimeType })
 

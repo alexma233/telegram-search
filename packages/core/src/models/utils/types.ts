@@ -1,5 +1,6 @@
 import type { accountJoinedChatsTable } from '../../schemas/account-joined-chats'
 import type { accountsTable } from '../../schemas/accounts'
+import type { avatarsTable } from '../../schemas/avatars'
 import type { chatMessagesTable } from '../../schemas/chat-messages'
 import type { joinedChatsTable } from '../../schemas/joined-chats'
 import type { photosTable } from '../../schemas/photos'
@@ -34,6 +35,9 @@ export type DBSelectPhoto = typeof photosTable.$inferSelect
 
 export type DBSelectSticker = typeof stickersTable.$inferSelect
 export type DBInsertSticker = typeof stickersTable.$inferInsert
+
+export type DBInsertAvatar = typeof avatarsTable.$inferInsert
+export type DBSelectAvatar = typeof avatarsTable.$inferSelect
 
 export type DBInsertUser = typeof usersTable.$inferInsert
 export type DBSelectUser = typeof usersTable.$inferSelect

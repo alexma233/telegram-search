@@ -2,7 +2,6 @@ import type { ClientRegisterEventHandlerFn } from '.'
 
 import { useAvatarStore } from '../stores/useAvatar'
 import { useChatStore } from '../stores/useChat'
-import { persistChatAvatar } from '../utils/avatar-cache'
 import { bytesToBlob, canDecodeAvatar } from '../utils/image'
 
 /**
@@ -68,15 +67,6 @@ export function registerDialogEventHandlers(
     // Convert bytes to Blob and create blob URL
     const blob = bytesToBlob(buffer, data.mimeType)
     const url = URL.createObjectURL(blob)
-
-    // Persist optimized chat avatar
-    try {
-      await persistChatAvatar(data.chatId, blob, data.mimeType, data.fileId)
-    }
-    catch (error) {
-      // Warn-only logging to comply with lint rules
-      console.warn('[Avatar] persistChatAvatar failed', { chatId: data.chatId }, error)
-    }
 
     // Update chat store fields
     const chat = chatStore.chats.find(c => c.id === data.chatId)

@@ -1,4 +1,4 @@
-export type MediaKind = 'photo' | 'sticker'
+export type MediaKind = 'photo' | 'sticker' | 'avatar'
 
 export interface MediaBinaryDescriptor {
   kind: MediaKind

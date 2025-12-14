@@ -26,6 +26,7 @@ import { createMediaResolver } from './message-resolvers/media-resolver'
 import { createUserResolver } from './message-resolvers/user-resolver'
 import { models } from './models'
 import { accountModels } from './models/accounts'
+import { avatarModels } from './models/avatars'
 import { chatMessageStatsModels } from './models/chat-message-stats'
 import { photoModels } from './models/photos'
 import { stickerModels } from './models/stickers'
@@ -62,7 +63,7 @@ export function basicEventHandler(ctx: CoreContext, config: Config, mediaBinaryP
   // (see message-resolver service). Current strategy is client-driven and
   // on-demand via frontend events; the resolver remains available to enable
   // server-side prefetch in the future if desired.
-  registry.register('avatar', createAvatarResolver(ctx, logger))
+  registry.register('avatar', createAvatarResolver(ctx, logger, avatarModels, mediaBinaryProvider))
   registry.register('link', createLinkResolver(logger))
   registry.register('embedding', createEmbeddingResolver (ctx, logger))
   registry.register('jieba', createJiebaResolver(logger))

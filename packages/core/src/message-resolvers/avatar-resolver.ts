@@ -5,6 +5,8 @@ import type { Dialog } from 'telegram/tl/custom/dialog'
 
 import type { MessageResolver, MessageResolverOpts } from '.'
 import type { CoreContext } from '../context'
+import type { AvatarModels } from '../models/avatars'
+import type { MediaBinaryProvider } from '../types/storage'
 
 import { Buffer } from 'buffer'
 
@@ -12,8 +14,10 @@ import { newQueue } from '@henrygd/queue'
 import { Ok } from '@unbird/result'
 import { Api } from 'telegram'
 import { lru } from 'tiny-lru'
+import { v4 as uuidv4 } from 'uuid'
 
 import { AVATAR_CACHE_TTL, AVATAR_DOWNLOAD_CONCURRENCY, MAX_AVATAR_CACHE_SIZE } from '../constants'
+import { avatarModels as defaultAvatarModels } from '../models/avatars'
 
 /**
  * Shared avatar cache entry.
@@ -35,7 +39,12 @@ type AvatarEntity = Api.User | Api.Chat | Api.Channel
  * Create shared avatar helper bound to a CoreContext.
  * Encapsulates caches and in-flight deduplication for users and dialogs.
  */
-function createAvatarHelper(ctx: CoreContext, logger: Logger) {
+function createAvatarHelper(
+  ctx: CoreContext,
+  logger: Logger,
+  avatarModels: AvatarModels,
+  mediaBinaryProvider: MediaBinaryProvider | undefined,
+) {
   logger = logger.withContext('core:resolver:avatar')
 
   // Use tiny-lru to implement LRU cache with automatic expiration and eviction
@@ -195,6 +204,106 @@ function createAvatarHelper(ctx: CoreContext, logger: Logger) {
     return result
   }
 
+  function applyAvatarResult(
+    kind: 'user' | 'chat',
+    key: string,
+    idRaw: string | number,
+    fileId: string | undefined,
+    cache: ReturnType<typeof lru<AvatarCacheEntry>>,
+    negativeCache: ReturnType<typeof lru<boolean>>,
+    result: { byte: Buffer, mimeType: string },
+  ) {
+    const prev = cache.get(key)
+    if (prev?.byte)
+      byteBudget -= prev.byte.length
+    cache.set(key, { fileId, mimeType: result.mimeType, byte: result.byte })
+    byteBudget += result.byte.length
+    if (fileId)
+      fileIdByteCache.set(fileId, { byte: result.byte, mimeType: result.mimeType })
+    if (negativeCache.get(key))
+      negativeCache.delete(key)
+    if (byteBudget > BYTE_BUDGET_MAX) {
+      logger.warn('Avatar byte budget exceeded; clearing caches')
+      userAvatarCache.clear()
+      chatAvatarCache.clear()
+      dialogEntityCache.clear()
+      noUserAvatarCache.clear()
+      noChatAvatarCache.clear()
+      fileIdByteCache.clear()
+      byteBudget = 0
+    }
+
+    if (kind === 'user') {
+      ctx.emitter.emit('entity:avatar:data', { userId: key, byte: result.byte, mimeType: result.mimeType, fileId })
+    }
+    else {
+      const idNum = typeof idRaw === 'string' ? Number(idRaw) : idRaw
+      ctx.emitter.emit('dialog:avatar:data', { chatId: idNum, byte: result.byte, mimeType: result.mimeType, fileId })
+    }
+  }
+
+  async function loadAvatarFromStorage(
+    kind: 'user' | 'chat',
+    key: string,
+    expectedFileId?: string,
+  ): Promise<{ byte: Buffer, mimeType: string, fileId?: string } | undefined> {
+    try {
+      const record = (await avatarModels.findAvatarByEntity(ctx.getDB(), kind, key)).orUndefined()
+      if (!record)
+        return undefined
+      if (expectedFileId && record.file_id && expectedFileId !== record.file_id)
+        return undefined
+
+      const mimeType = record.mime_type || 'image/jpeg'
+
+      if (record.storage_path && mediaBinaryProvider) {
+        const loaded = await mediaBinaryProvider.load({ kind: 'avatar', path: record.storage_path })
+        if (loaded)
+          return { byte: Buffer.from(loaded), mimeType, fileId: record.file_id || undefined }
+      }
+
+      if (record.avatar_bytes)
+        return { byte: Buffer.from(record.avatar_bytes), mimeType, fileId: record.file_id || undefined }
+    }
+    catch (error) {
+      logger.withError(error as Error).debug('Failed to load avatar from storage')
+    }
+    return undefined
+  }
+
+  async function persistAvatar(
+    kind: 'user' | 'chat',
+    key: string,
+    fileId: string | undefined,
+    result: { byte: Buffer, mimeType: string },
+  ) {
+    try {
+      const db = ctx.getDB()
+      let storagePath: string | undefined
+
+      if (mediaBinaryProvider) {
+        const location = await mediaBinaryProvider.save(
+          { uuid: fileId ?? uuidv4(), kind: 'avatar' },
+          new Uint8Array(result.byte),
+          result.mimeType,
+        )
+        storagePath = location.path
+      }
+
+      await avatarModels.upsertAvatar(db, {
+        entityId: key,
+        entityType: kind,
+        fileId,
+        mimeType: result.mimeType,
+        storagePath,
+        byte: storagePath ? undefined : result.byte,
+      })
+    }
+    catch (error) {
+      logger.withError(error as Error).debug('Failed to persist avatar to storage')
+    }
+  }
+
   /**
    * Generic avatar fetcher for user/chat with caches, in-flight dedup, and emission.
    */
@@ -237,6 +346,12 @@ function createAvatarHelper(ctx: CoreContext, logger: Logger) {
         logger.withFields({ userId: key }).verbose('No expectedFileId provided for early cache validation')
       }
 
+      const stored = await loadAvatarFromStorage(kind, key, opts.expectedFileId)
+      if (stored) {
+        applyAvatarResult(kind, key, idRaw, stored.fileId ?? opts.expectedFileId, cache, negative, stored)
+        return
+      }
+
       let entity: AvatarEntity | undefined
       if (isUser) {
         entity = await ctx.getClient().getEntity(String(idRaw)) as Api.User
@@ -262,13 +377,7 @@ function createAvatarHelper(ctx: CoreContext, logger: Logger) {
 
       const cached = cache.get(key)
       if (cached && cached.byte && cached.mimeType && ((fileId && cached.fileId === fileId) || !fileId)) {
-        if (isUser) {
-          ctx.emitter.emit('entity:avatar:data', { userId: key, byte: cached.byte, mimeType: cached.mimeType, fileId })
-        }
-        else {
-          const idNumCached = typeof idRaw === 'string' ? Number(idRaw) : idRaw
-          ctx.emitter.emit('dialog:avatar:data', { chatId: idNumCached, byte: cached.byte, mimeType: cached.mimeType, fileId })
-        }
+        applyAvatarResult(kind, key, idRaw, fileId, cache, negative, { byte: cached.byte, mimeType: cached.mimeType })
         return
       }
 
@@ -284,31 +393,8 @@ function createAvatarHelper(ctx: CoreContext, logger: Logger) {
         return
       }
 
-      const prev = cache.get(key)
-      if (prev?.byte)
-        byteBudget -= prev.byte.length
-      cache.set(key, { fileId, mimeType: result.mimeType, byte: result.byte })
-      byteBudget += result.byte.length
-      if (negative.get(key))
-        negative.delete(key)
-      if (byteBudget > BYTE_BUDGET_MAX) {
-        logger.warn('Avatar byte budget exceeded; clearing caches')
-        userAvatarCache.clear()
-        chatAvatarCache.clear()
-        dialogEntityCache.clear()
-        noUserAvatarCache.clear()
-        noChatAvatarCache.clear()
-        fileIdByteCache.clear()
-        byteBudget = 0
-      }
-
-      if (isUser) {
-        ctx.emitter.emit('entity:avatar:data', { userId: key, byte: result.byte, mimeType: result.mimeType, fileId })
-      }
-      else {
-        const idNum = typeof idRaw === 'string' ? Number(idRaw) : idRaw
-        ctx.emitter.emit('dialog:avatar:data', { chatId: idNum, byte: result.byte, mimeType: result.mimeType, fileId })
-      }
+      await persistAvatar(kind, key, fileId, result)
+      applyAvatarResult(kind, key, idRaw, fileId, cache, negative, result)
     }
     catch (error) {
       logger.withError(error as Error).warn(isUser ? 'Failed to fetch avatar for user' : 'Failed to fetch single avatar for dialog')
@@ -392,6 +478,12 @@ function createAvatarHelper(ctx: CoreContext, logger: Logger) {
         if (cached && cached.byte && cached.mimeType && ((fileId && cached.fileId === fileId) || !fileId))
           return
 
+        const stored = await loadAvatarFromStorage('chat', key)
+        if (stored) {
+          applyAvatarResult('chat', key, id, stored.fileId, chatAvatarCache, noChatAvatarCache, stored)
+          return
+        }
+
         // Delegates concurrency via global downloadQueue, with fileId-level dedup
         const result = await getAvatarBytes(fileId, () => downloadSmallAvatar(dialog.entity as AvatarEntity))
         if (!result) {
@@ -405,9 +497,8 @@ function createAvatarHelper(ctx: CoreContext, logger: Logger) {
           return
         }
 
-        chatAvatarCache.set(key, { fileId, mimeType: result.mimeType, byte: result.byte })
-
-        ctx.emitter.emit('dialog:avatar:data', { chatId: id, byte: result.byte, mimeType: result.mimeType, fileId })
+        await persistAvatar('chat', key, fileId, result)
+        applyAvatarResult('chat', key, id, fileId, chatAvatarCache, noChatAvatarCache, result)
       }
       catch (error) {
         logger.withError(error as Error).warn('Failed to fetch avatar for dialog')
@@ -460,10 +551,16 @@ function createAvatarHelper(ctx: CoreContext, logger: Logger) {
 /**
  * Get or create a shared avatar helper instance bound to the provided context.
  */
-export function useAvatarHelper(ctx: CoreContext, logger: Logger) {
+export function useAvatarHelper(
+  ctx: CoreContext,
+  logger: Logger,
+  avatarModels?: AvatarModels,
+  mediaBinaryProvider?: MediaBinaryProvider,
+) {
   let helper = __avatarHelperSingleton.get(ctx)
   if (!helper) {
-    helper = createAvatarHelper(ctx, logger)
+    const modelRef = avatarModels ?? defaultAvatarModels
+    helper = createAvatarHelper(ctx, logger, modelRef, mediaBinaryProvider)
     __avatarHelperSingleton.set(ctx, helper)
   }
   return helper
@@ -474,10 +571,15 @@ export function useAvatarHelper(ctx: CoreContext, logger: Logger) {
  * For each message, opportunistically fetch sender's avatar and emit bytes.
  * Returns no message mutations (Ok([])) to avoid duplicate storage writes.
  */
-export function createAvatarResolver(ctx: CoreContext, logger: Logger): MessageResolver {
+export function createAvatarResolver(
+  ctx: CoreContext,
+  logger: Logger,
+  avatarModels: AvatarModels,
+  mediaBinaryProvider: MediaBinaryProvider | undefined,
+): MessageResolver {
   logger = logger.withContext('core:resolver:avatar')
 
-  const helper = useAvatarHelper(ctx, logger)
+  const helper = useAvatarHelper(ctx, logger, avatarModels, mediaBinaryProvider)
 
   return {
     /**
