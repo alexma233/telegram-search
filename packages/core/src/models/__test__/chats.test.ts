@@ -1,7 +1,7 @@
 import type { CoreDialog } from '../../types/dialog'
 
-import { describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
+import { describe, expect, it } from 'vitest'
 
 import { mockDB } from '../../db/mock'
 import { accountJoinedChatsTable } from '../../schemas/account-joined-chats'
