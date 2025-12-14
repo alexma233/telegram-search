@@ -12,7 +12,7 @@ export function buildMessageReprocessBatches(
   batchSize: number,
   maxMessages?: number,
 ): number[][] {
-  if (batchSize <= 0 || !Number.isInteger(batchSize))
+  if (!Array.isArray(ranges) || ranges.length === 0 || batchSize <= 0 || !Number.isInteger(batchSize))
     return []
 
   const batches: number[][] = []

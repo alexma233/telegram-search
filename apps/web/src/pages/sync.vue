@@ -187,6 +187,10 @@ function getEstimatedSyncedCount(stats?: ChatSyncStats) {
   }, 0) ?? 0
 }
 
+function hasSyncedMessages(stats: ChatSyncStats | undefined, targetCount: number) {
+  return !!stats && targetCount > 0 && (stats.syncedRanges?.length ?? 0) > 0
+}
+
 async function fetchChatStatsForReprocess(chatId: number): Promise<ChatSyncStats | undefined> {
   const chatIdStr = chatId.toString()
 
@@ -200,7 +204,7 @@ async function fetchChatStatsForReprocess(chatId: number): Promise<ChatSyncStats
   try {
     const stats = await Promise.race([
       websocketStore.waitForEvent('takeout:stats:data'),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), STATS_FETCH_TIMEOUT_MS)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Chat statistics fetch timed out after ${STATS_FETCH_TIMEOUT_MS}ms`)), STATS_FETCH_TIMEOUT_MS)),
     ])
 
     if (stats.chatId === chatIdStr)
@@ -225,7 +229,7 @@ async function handleReprocess() {
     for (const chatId of selectedChats.value) {
       const stats = await fetchChatStatsForReprocess(chatId)
       const targetCount = getEstimatedSyncedCount(stats)
-      if (!stats || targetCount === 0 || !stats.syncedRanges?.length) {
+      if (!hasSyncedMessages(stats, targetCount)) {
         toast.info(t('sync.reprocessNoMessages', { chat: getChatLabel(chatId) }))
         continue
       }
