@@ -241,15 +241,20 @@ function handleResync() {
 }
 
 function handleAbort() {
-  const taskToAbort = runningTasks.value[0] || currentTask.value
-  if (taskToAbort) {
-    websocketStore.sendEvent('takeout:task:abort', {
-      taskId: taskToAbort.taskId,
-    })
-  }
-  else {
+  const targets = runningTasks.value.length
+    ? runningTasks.value
+    : (currentTask.value ? [currentTask.value] : [])
+
+  if (!targets.length) {
     toast.error(t('sync.noInProgressTask'))
+    return
   }
+
+  targets.forEach((task) => {
+    websocketStore.sendEvent('takeout:task:abort', {
+      taskId: task.taskId,
+    })
+  })
 }
 
 function dismissTask(taskId?: string) {

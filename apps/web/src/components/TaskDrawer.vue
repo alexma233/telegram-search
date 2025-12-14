@@ -26,9 +26,9 @@ const { tasksSorted, batchProgress, totalChats, runningTasks } = storeToRefs(syn
 const { t } = useI18n()
 
 const chatNameMap = computed(() => {
-  const map = new Map<number, string>()
+  const map = new Map<string, string>()
   for (const chat of chatStore.chats) {
-    map.set(chat.id, chat.name || t('chatSelector.chat', { id: chat.id }))
+    map.set(chat.id.toString(), chat.name || t('chatSelector.chat', { id: chat.id }))
   }
   return map
 })
@@ -40,8 +40,7 @@ function taskChatLabel(task: (typeof tasksSorted.value)[number]) {
   if (!chatId)
     return t('sync.currentChatPlaceholder')
 
-  const idNumber = Number(chatId)
-  return chatNameMap.value.get(idNumber) || t('chatSelector.chat', { id: chatId })
+  return chatNameMap.value.get(chatId) || t('chatSelector.chat', { id: chatId })
 }
 
 function clearTask(taskId: string) {

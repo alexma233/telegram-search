@@ -52,6 +52,10 @@ export const useSyncTaskStore = defineStore('sync-task', () => {
 
   const tasks = computed(() => sessionState.value.tasks)
 
+  const normalizeProgress = (task: TakeoutTaskView) => {
+    return task.progress < 0 ? 0 : Math.min(100, Math.max(0, task.progress))
+  }
+
   function setSessionState(patch: Partial<SessionTaskState>) {
     const key = activeSessionId.value || 'default'
     const current = sessionState.value
@@ -90,7 +94,7 @@ export const useSyncTaskStore = defineStore('sync-task', () => {
   }
 
   function clearFinishedTasks() {
-    const list = tasks.value.filter(task => task.progress >= 0 && task.progress < 100 && !task.lastError)
+    const list = tasks.value.filter(task => task.progress < 100 || task.lastError)
     const nextBatch = list.length > 0 ? sessionState.value.activeBatchChatIds : []
     setSessionState({
       tasks: list,
@@ -130,7 +134,8 @@ export const useSyncTaskStore = defineStore('sync-task', () => {
       const chatId = task.chatId
       if (!chatId)
         continue
-      const progress = task.progress < 0 ? 100 : Math.min(100, Math.max(0, task.progress))
+      // Treat error/aborted tasks as 0% to avoid marking totals as complete
+      const progress = normalizeProgress(task)
       const lastTimestamp = latestTimestamps.get(chatId) ?? 0
       if (task.updatedAt >= lastTimestamp) {
         latestTimestamps.set(chatId, task.updatedAt)
