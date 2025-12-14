@@ -18,7 +18,7 @@ import SelectDropdown from '../components/ui/SelectDropdown.vue'
 
 import { Button } from '../components/ui/Button'
 import { Progress } from '../components/ui/Progress'
-import { buildMessageReprocessBatches } from '../utils/reprocess'
+import { buildMessageReprocessBatches, getSyncedRangeSize } from '../utils/reprocess'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -183,7 +183,7 @@ function getEstimatedSyncedCount(stats?: ChatSyncStats) {
     return stats.syncedMessages
 
   return stats.syncedRanges?.reduce((sum, range) => {
-    return sum + Math.abs(range.end - range.start) + 1
+    return sum + getSyncedRangeSize(range)
   }, 0) ?? 0
 }
 

@@ -3,6 +3,10 @@ export interface SyncedRange {
   end: number
 }
 
+export function getSyncedRangeSize(range: SyncedRange) {
+  return Math.abs(range.end - range.start) + 1
+}
+
 /**
  * Build message ID batches for reprocessing based on synced ranges.
  * Uses a simple ascending iteration and stops after `maxMessages` IDs are collected.
@@ -19,7 +23,8 @@ export function buildMessageReprocessBatches(
     return []
 
   const batches: number[][] = []
-  let remaining = maxMessages ?? Number.POSITIVE_INFINITY
+  const remainingLimit = maxMessages && maxMessages > 0 ? maxMessages : Number.POSITIVE_INFINITY
+  let remaining = remainingLimit
 
   for (const range of ranges) {
     const start = Math.min(range.start, range.end)
