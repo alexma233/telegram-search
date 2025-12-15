@@ -36,6 +36,7 @@
     }
   },
   "chat": {
+    "chats": "聊天",
     "forceLoadNewer": "强制加载更新的消息",
     "forceLoadOlder": "强制加载更早的消息",
     "messageSent": "消息已发送",

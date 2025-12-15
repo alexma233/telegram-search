@@ -7,6 +7,12 @@ import { useI18n } from 'vue-i18n'
 
 import { Button } from '../ui/Button'
 
+const props = withDefaults(defineProps<{
+  align?: 'left' | 'right'
+}>(), {
+  align: 'right'
+})
+
 const { t, locale } = useI18n()
 
 const settingsStore = useSettingsStore()
@@ -55,7 +61,10 @@ onClickOutside(dropdownRef, () => {
     >
       <div
         v-if="isOpen"
-        class="absolute bottom-full right-0 z-50 mb-2 min-w-[120px] overflow-hidden border rounded-md bg-popover shadow-md"
+        :class="[
+          'absolute bottom-full z-50 mb-2 min-w-[120px] overflow-hidden border rounded-md bg-popover shadow-md',
+          align === 'left' ? 'left-0' : 'right-0'
+        ]"
       >
         <button
           v-for="option in languageOptions"

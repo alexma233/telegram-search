@@ -16,6 +16,7 @@ import { RouterView, useRoute, useRouter } from 'vue-router'
 
 import EntityAvatar from '../components/avatar/EntityAvatar.vue'
 import LanguageSelector from '../components/layout/LanguageSelector.vue'
+import NavigationRail from '../components/layout/NavigationRail.vue'
 import SidebarSelector from '../components/layout/SidebarSelector.vue'
 import UserDropdown from '../components/layout/UserDropdown.vue'
 
@@ -96,10 +97,18 @@ const sidebarClasses = computed(() => {
   }
   else {
     return {
-      container: 'w-80',
+      container: 'w-80 border-r flex-shrink-0',
       backdrop: false,
     }
   }
+})
+
+// Show Chat Sidebar logic
+const showChatSidebar = computed(() => {
+  // Always show on mobile (controlled by drawer state)
+  if (isMobile.value) return true
+  // On desktop, show only for root or chat routes
+  return route.path === '/' || route.path.startsWith('/chat')
 })
 
 watch(theme, (newTheme) => {
@@ -157,7 +166,7 @@ async function prioritizeVisibleAvatars(list: CoreDialog[], count = 50) {
 // Prioritize visible avatars on group change and initial render
 watch(activeGroupChats, (list) => {
   if (!list?.length)
-    return
+  return
   void prioritizeVisibleAvatars(list)
 }, { immediate: true })
 </script>
@@ -187,16 +196,21 @@ watch(activeGroupChats, (list) => {
       />
     </div>
 
-    <!-- Sidebar -->
+    <!-- Desktop Navigation Rail -->
+    <NavigationRail class="hidden md:flex flex-shrink-0" />
+
+    <!-- Sidebar (Chat List & Mobile Nav) -->
     <div
+      v-show="isMobile || showChatSidebar"
       :class="sidebarClasses.container"
-      class="flex flex-col border-r bg-card h-dvh"
+      class="flex flex-col bg-card h-dvh"
     >
       <!-- Search section -->
       <div
-        v-if="!isMobile || mobileDrawerOpen"
-        class="border-b p-3"
+        class="border-b p-3 flex-shrink-0"
+        :class="{ 'pt-16': isMobile }" 
       >
+        <!-- Added pt-16 for mobile to clear the menu button -->
         <div class="relative">
           <div
             class="i-lucide-search absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2"
@@ -210,8 +224,8 @@ watch(activeGroupChats, (list) => {
         </div>
       </div>
 
-      <!-- Navigation -->
-      <div class="py-2">
+      <!-- Mobile ONLY Navigation -->
+      <div v-if="isMobile" class="py-2 border-b flex-shrink-0">
         <SidebarSelector
           path="/sync"
           icon="i-lucide-refresh-cw"
@@ -239,18 +253,17 @@ watch(activeGroupChats, (list) => {
 
       <!-- Chat groups -->
       <div
-        v-if="!isMobile || mobileDrawerOpen"
-        class="min-h-0 flex flex-1 flex-col border-t"
+        class="min-h-0 flex flex-1 flex-col"
       >
         <!-- Tab selector -->
-        <div class="flex items-center gap-1 border-b p-2">
+        <div class="flex items-center gap-1 border-b p-2 flex-shrink-0">
           <button
             :class="{ 'bg-accent text-accent-foreground': activeChatGroup === 'user' }"
             class="flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
             @click="toggleActiveChatGroup('user')"
           >
             <span class="i-lucide-user h-4 w-4" />
-            <span>{{ t('chatGroups.user') }}</span>
+            <span class="sr-only md:not-sr-only">{{ t('chatGroups.user') }}</span>
           </button>
 
           <button
@@ -259,7 +272,7 @@ watch(activeGroupChats, (list) => {
             @click="toggleActiveChatGroup('group')"
           >
             <span class="i-lucide-users h-4 w-4" />
-            <span>{{ t('chatGroups.group') }}</span>
+            <span class="sr-only md:not-sr-only">{{ t('chatGroups.group') }}</span>
           </button>
 
           <button
@@ -268,7 +281,7 @@ watch(activeGroupChats, (list) => {
             @click="toggleActiveChatGroup('channel')"
           >
             <span class="i-lucide-message-circle h-4 w-4" />
-            <span>{{ t('chatGroups.channel') }}</span>
+            <span class="sr-only md:not-sr-only">{{ t('chatGroups.channel') }}</span>
           </button>
         </div>
 
@@ -307,8 +320,8 @@ watch(activeGroupChats, (list) => {
         </div>
       </div>
 
-      <!-- User profile section -->
-      <div class="relative border-t p-3">
+      <!-- Mobile ONLY User profile section -->
+      <div v-if="isMobile" class="relative border-t p-3 flex-shrink-0">
         <div class="flex items-center justify-between gap-2">
           <div
             class="min-w-0 flex flex-1 cursor-pointer items-center gap-2.5 rounded-md p-1 transition-colors hover:bg-accent"
