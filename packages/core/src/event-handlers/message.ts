@@ -4,6 +4,7 @@ import type { CoreContext } from '../context'
 import type { MessageService } from '../services'
 
 import { Api } from 'telegram/tl'
+import { v4 as uuidv4 } from 'uuid'
 
 import { MESSAGE_PROCESS_BATCH_SIZE } from '../constants'
 
@@ -54,17 +55,40 @@ export function registerMessageEventHandlers(ctx: CoreContext, logger: Logger) {
 
     ctx.emitter.on('message:send', async ({ chatId, content }) => {
       logger.withFields({ chatId, content }).verbose('Sending message')
-      const updatedMessage = (await messageService.sendMessage(chatId, content)).unwrap() as Api.Updates
+      const updatedMessage = (await messageService.sendMessage(chatId, content)).unwrap()
 
-      logger.withFields({ message: updatedMessage }).verbose('Message sent')
-
-      updatedMessage.updates.forEach((update) => {
-        if (update instanceof Api.UpdateNewMessage) {
-          if (update.message instanceof Api.Message) {
-            ctx.emitter.emit('message:process', { messages: [update.message] })
-          }
+      switch (updatedMessage.className) {
+        case 'Updates':
+          updatedMessage.updates.forEach((update) => {
+            if ('message' in update && update.message instanceof Api.Message) {
+              ctx.emitter.emit('message:process', { messages: [update.message] })
+            }
+          })
+          break
+        case 'UpdateShortSentMessage': {
+          const sender = ctx.getMyUser()
+          ctx.emitter.emit('message:data', {
+            messages: [{
+              uuid: uuidv4(),
+              platform: 'telegram',
+              platformMessageId: updatedMessage.id.toString(),
+              chatId,
+              fromId: sender.id,
+              fromName: sender.name,
+              content,
+              reply: { isReply: false, replyToId: undefined, replyToName: undefined },
+              forward: { isForward: false, forwardFromChatId: undefined, forwardFromChatName: undefined, forwardFromMessageId: undefined },
+              platformTimestamp: updatedMessage.date,
+            }],
+          })
+          break
         }
-      })
+        default:
+          logger.withFields({ message: updatedMessage }).warn('Unknown message type')
+          break
+      }
+
+      logger.withFields({ content }).verbose('Message sent')
     })
 
     ctx.emitter.on('message:reprocess', async ({ chatId, messageIds, resolvers }) => {

@@ -5,7 +5,7 @@ import type { TelegramClient } from 'telegram'
 import type { CoreDB } from './db'
 import type { Models } from './models'
 import type { AccountSettings } from './types/account-settings'
-import type { CoreEmitter, CoreEvent, FromCoreEvent, ToCoreEvent } from './types/events'
+import type { CoreEmitter, CoreEvent, CoreUserEntity, FromCoreEvent, ToCoreEvent } from './types/events'
 
 import { useLogger } from '@guiiai/logg'
 import { EventEmitter } from 'eventemitter3'
@@ -24,6 +24,8 @@ export interface CoreContext {
   getClient: () => TelegramClient
   setCurrentAccountId: (accountId: string) => void
   getCurrentAccountId: () => string
+  setMyUser: (newMyUser: CoreUserEntity) => void
+  getMyUser: () => CoreUserEntity
   getDB: () => CoreDB
   withError: (error: unknown, description?: string) => Error
   cleanup: () => void
@@ -68,6 +70,7 @@ export function createCoreContext(db: () => CoreDB, models: Models, logger: Logg
   const withError = createErrorHandler(emitter, logger)
   let telegramClient: TelegramClient
   let currentAccountId: string | undefined
+  let myUser: CoreUserEntity | undefined
 
   const toCoreEvents = new Set<keyof ToCoreEvent>()
   const fromCoreEvents = new Set<keyof FromCoreEvent>()
@@ -141,6 +144,18 @@ export function createCoreContext(db: () => CoreDB, models: Models, logger: Logg
     return currentAccountId
   }
 
+  function setMyUser(newMyUser: CoreUserEntity) {
+    logger.withFields({ userId: newMyUser.id }).debug('Set my user')
+    myUser = newMyUser
+  }
+
+  function getMyUser(): CoreUserEntity {
+    if (!myUser) {
+      throw withError('My user not set')
+    }
+    return myUser
+  }
+
   async function getAccountSettings(): Promise<AccountSettings> {
     if (!models) {
       throw withError('Models not initialized')
@@ -207,6 +222,8 @@ export function createCoreContext(db: () => CoreDB, models: Models, logger: Logg
     getClient: ensureClient,
     setCurrentAccountId,
     getCurrentAccountId,
+    setMyUser,
+    getMyUser,
     getDB,
     withError,
     cleanup,

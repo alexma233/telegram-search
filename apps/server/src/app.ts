@@ -1,3 +1,4 @@
+import type { Logger } from '@guiiai/logg'
 import type { Config, RuntimeFlags } from '@tg-search/common'
 
 import process from 'node:process'
@@ -19,7 +20,7 @@ import { getDB, initDrizzle } from './storage/drizzle'
 import { getMinioMediaStorage, initMinioMediaStorage } from './storage/minio'
 import { setupWsRoutes } from './ws-routes'
 
-function setupErrorHandlers(logger: ReturnType<typeof useLogger>): void {
+function setupErrorHandlers(logger: Logger): void {
   const handleError = (error: unknown, type: string) => {
     logger.withError(error).error(type)
   }
@@ -28,7 +29,7 @@ function setupErrorHandlers(logger: ReturnType<typeof useLogger>): void {
   process.on('unhandledRejection', error => handleError(error, 'Unhandled rejection'))
 }
 
-function configureServer(logger: ReturnType<typeof useLogger>, flags: RuntimeFlags, config: Config) {
+function configureServer(logger: Logger, flags: RuntimeFlags, config: Config) {
   const app = new H3({
     debug: flags.isDebugMode,
     onRequest(event) {

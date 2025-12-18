@@ -7,6 +7,7 @@ import type { ClientOptions } from 'minio'
 // eslint-disable-next-line unicorn/prefer-node-protocol
 import { Buffer } from 'buffer'
 
+import { parseMinioDSN } from '@tg-search/common'
 import { Err, Ok } from '@unbird/result'
 import { Client as MinioClient } from 'minio'
 
@@ -47,8 +48,9 @@ function buildObjectKey(descriptor: MediaBinaryDescriptor): string {
     .join('/')
 }
 
-export async function registerMinioMediaStorage(logger: Logger, options: ClientOptions, bucket: string) {
-  const client = getMinioClient(options).expect('Failed to get MinIO client')
+export async function registerMinioMediaStorage(logger: Logger, dsn: string, accessKey: string, secretKey: string, bucket: string) {
+  const options = parseMinioDSN(dsn)
+  const client = getMinioClient({ ...options, accessKey, secretKey }).expect('Failed to get MinIO client')
 
   try {
     const exists = await client.bucketExists(bucket)
@@ -112,19 +114,11 @@ export async function registerMinioMediaStorage(logger: Logger, options: ClientO
  */
 export async function initMinioMediaStorage(logger: Logger, config: MinioConfig): Promise<MediaBinaryProvider | undefined> {
   try {
-    if (!config.endpoint || !config.accessKey || !config.secretKey) {
+    if (!config.url || !config.accessKey || !config.secretKey) {
       return undefined
     }
 
-    const options: ClientOptions = {
-      endPoint: config.endpoint,
-      port: config.port,
-      accessKey: config.accessKey,
-      secretKey: config.secretKey,
-      useSSL: config.useSSL,
-    }
-
-    minioMediaStorage = await registerMinioMediaStorage(logger, options, config.bucket)
+    minioMediaStorage = await registerMinioMediaStorage(logger, config.url, config.accessKey, config.secretKey, config.bucket)
     return minioMediaStorage
   }
   catch (error) {

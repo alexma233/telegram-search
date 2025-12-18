@@ -70,11 +70,22 @@ export const telegramConfigSchema = object({
 
 export const minioConfigSchema = object({
   bucket: optional(string(), 'telegram-media'),
-  endpoint: optional(string()),
-  port: optional(number()),
+  url: optional(string()),
   accessKey: optional(string()),
   secretKey: optional(string()),
-  useSSL: optional(boolean()),
+
+  /**
+   * @deprecated Use url instead
+   */
+  endPoint: optional(string()),
+  /**
+   * @deprecated Use url instead
+   */
+  port: optional(number(), 9000),
+  /**
+   * @deprecated Use url instead
+   */
+  useSSL: optional(boolean(), false),
 })
 
 export const otelConfigSchema = object({

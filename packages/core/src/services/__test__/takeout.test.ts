@@ -1,6 +1,7 @@
 import type { CoreContext, CoreEmitter } from '../../context'
 import type { CoreDB } from '../../db'
 import type { AccountSettings } from '../../types/account-settings'
+import type { CoreUserEntity } from '../../types/events'
 
 import bigInt from 'big-integer'
 
@@ -36,6 +37,8 @@ function createMockCtx(client: any) {
     getDB: () => ({} as unknown as CoreDB),
     withError,
     cleanup: () => {},
+    setMyUser: () => {},
+    getMyUser: () => ({}) as unknown as CoreUserEntity,
     getAccountSettings: async () => ({}) as unknown as AccountSettings,
     setAccountSettings: async () => {},
     metrics: undefined,
