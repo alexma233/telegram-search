@@ -16,4 +16,3 @@ export function registerAvatarEventHandlers(ctx: CoreContext, logger: Logger) {
     await helper.fetchAvatars(items)
   })
 }
-

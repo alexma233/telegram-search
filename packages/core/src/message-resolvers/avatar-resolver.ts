@@ -3,10 +3,10 @@ import type { Logger } from '@guiiai/logg'
 import type { Result } from '@unbird/result'
 import type { Dialog } from 'telegram/tl/custom/dialog'
 
-import type { AvatarData, AvatarRequest } from '../types/events'
 import type { MessageResolver, MessageResolverOpts } from '.'
 import type { CoreContext } from '../context'
 import type { AvatarModels } from '../models/avatars'
+import type { AvatarData, AvatarRequest } from '../types/events'
 import type { MediaBinaryProvider } from '../types/storage'
 
 import { Buffer } from 'buffer'
