@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CoreDialog, CoreMessage } from '@tg-search/core/types'
 
+import { useLogger } from '@guiiai/logg'
 import { useBridgeStore, useChatStore, useMessageStore, useSettingsStore } from '@tg-search/client'
 import { useWindowSize } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
@@ -14,7 +15,6 @@ import SearchDialog from '../../components/SearchDialog.vue'
 import VirtualMessageList from '../../components/VirtualMessageList.vue'
 
 import { Button } from '../../components/ui/Button'
-import { useLogger } from '@guiiai/logg'
 
 const { t } = useI18n()
 
