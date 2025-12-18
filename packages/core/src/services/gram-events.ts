@@ -1,8 +1,9 @@
 import type { Logger } from '@guiiai/logg'
+import type { EventBuilder } from 'telegram/events/common'
 
 import type { CoreContext } from '../context'
 
-import { NewMessage } from 'telegram/events'
+import { NewMessage, NewMessageEvent } from 'telegram/events'
 
 export type GramEventsService = ReturnType<typeof createGramEventsService>
 
@@ -20,12 +21,12 @@ export function createGramEventsService(ctx: CoreContext, logger: Logger) {
       return
     }
 
-    eventHandler = async (event) => {
+    eventHandler = async (event: EventBuilder) => {
       // TODO: should we store the account settings into ctx, to avoid fetching it from db every time?
       // Is there a way to notify the service when the account settings change?
       const shouldReceive = (await ctx.getAccountSettings()).receiveMessages?.receiveAll
 
-      if (event.message && shouldReceive) {
+      if (shouldReceive && event instanceof NewMessageEvent && event.message) {
         ctx.emitter.emit('gram:message:received', { message: event.message })
       }
     }

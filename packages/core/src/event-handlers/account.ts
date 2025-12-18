@@ -19,6 +19,7 @@ export function registerAccountEventHandlers(ctx: CoreContext, logger: Logger, a
 
       const dbAccount = await accountModels.recordAccount(ctx.getDB(), 'telegram', account.id)
       ctx.setCurrentAccountId(dbAccount.id)
+      ctx.setMyUser(account)
 
       logger.withFields({ accountId: dbAccount.id }).verbose('Set current account ID')
 

@@ -1,4 +1,4 @@
-![preview](./assets/preview.png)
+![プレビュー](./assets/preview.png)
 
 ---
 
@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  [<a href="https://search.lingogram.app">すぐに使用</a>] [<a href="../README.md">English</a>] [<a href="./README_CN.md">简体中文</a>]
+  [<a href="https://search.lingogram.app">デモを体験</a>] [<a href="../README.md">简体中文</a>] [<a href="./README_EN.md">English</a>]
 </p>
 
 <p align="center">
@@ -32,61 +32,62 @@
   </a>
 </p>
 
-**強力なセマンティック検索で Telegram メッセージを簡単に検索・エクスポート。すべての言語と分かち書きなしの文に対応。**
-
-メッセージ検索を高速・正確かつプライバシー重視に — Docker でローカル実行するか、オンラインで試せます。
+> [!TIP]
+> Telegram で日本語のチャット履歴を検索できずに困ったことはありませんか？
+> 
+> 重要なメッセージを探しているのに大量の履歴の中から見つけ出せず、悩んだ経験はありませんか？
+>
+> Telegram Search なら、日本語メッセージも含めて簡単に検索・エクスポートできます。高度なセマンティック検索で言語を問わず、単語の区切りがなくてもスムーズに検索可能です。
+> 
+> また、ベクトル検索による文レベルのあいまい検索で、必要な情報をより素早く・正確に見つけ出せます。
 
 ## 💖 スポンサー
 
 ![Sponsors](https://github.com/luoling8192/luoling8192/raw/master/sponsorkit/sponsors.svg)
 
-## ✅ できること
+## ✅ 主な特徴
 
-### 📦 エクスポートとバックアップ
-- [x] PostgreSQL またはブラウザ内データベース（PGlite）にエクスポート
-- [x] あらゆるデータベースへの簡単なインポート用の汎用エクスポート形式
-- [ ] CSV / JSON への1クリックエクスポート
+### 📦 エクスポート & バックアップ
+- [x] 複数のデータベース形式（PGlite、PostgreSQL）へのチャット履歴エクスポート対応
+- [x] メディアファイルの MinIO オブジェクトストレージ自動エクスポート
+- [x] メッセージのエクスポート時にベクトル埋め込み・分かち書き処理を自動実行
+- [x] リアルタイム同期で常に最新のチャット内容を取得
 
-### 🔍 チャット履歴の検索
-- [x] キーワード検索：多言語対応（中国語、英語など）
-- [x] 自然言語検索：質問するようにメッセージを検索
-- [x] スマートフィルター：連絡先/グループ、時間範囲、添付ファイル付きなど
+### 🔍 チャット履歴検索
+- [x] インテリジェントな分かち書きと精度の高い検索、多言語対応
+- [x] あいまい検索とベクトルセマンティック検索でより高速に検索
+- [x] RAG による AI 質問応答：AI と直接会話し、チャット履歴の文脈を活用して即座に回答
 
-### 🔄 同期とストレージ
-- [x] 増分同期：使用中に同期
-- [x] ストレージオプション：サーバー（PostgreSQL + pgvector）またはブラウザのみモード（PGlite）
-- [ ] 中断からの再開：失敗後に自動的に続行
+## 🛣️ 今後のロードマップ
 
-### 🧠 AI 機能
-- [x] チャットについて AI に質問：現在のチャットまたは選択範囲を照会
-- [ ] AI メッセージ要約：キーポイント、ToDo、結論を自動抽出
-- [x] AI 駆動検索：自然言語クエリで正確な結果を取得
-- [x] AI チャット：チャットコンテキストに基づいて AI と会話
-- [ ] AI 分析：トレンド、感情、キーワード、リンクとファイルからの洞察
-- [ ] ローカルモデルサポート：ローカル Embedding / 推論（クラウド不要）
+### 🧠 AI 機能強化
+- [ ] 会話サマリーの自動生成
+- [ ] スーパー・ブレイン：履歴メッセージから人物やイベントの知識グラフを自動抽出
 
-### 🔗 メディアとリンク（予定）
-- [ ] リンクと画像の深いインデックス：Web 要約、画像 OCR/説明
-- [ ] 添付ファイルコンテンツ抽出：PDF、画像、音声/ビデオのキーフレームとテキスト
+### 🔗 メディア & リンク機能
+- [ ] 「保存済みメッセージ」フォルダを賢く整理し、重要な内容をより効率的に管理
+- [ ] リンクや画像の高度なインデックス作成：ウェブ要約、画像 OCR/キャプション解析などで検索力・整理力を強化
 
-### 🌐 その他のプラットフォーム（予定）
-- [ ] マルチクライアントサポート：Discord など
+### 🌐 マルチプラットフォーム対応
+- [ ] Telegram Bot 対応でさらに多様なメッセージ管理需要に対応
+- [ ] Discord 等他のソーシャル／チャットサービス対応で、クロスプラットフォームな統合検索＆バックアップを実現
 
-## 🌐 すぐに使用
+## 🎉 今すぐお試し
 
-我々はオンラインバージョンを提供しており、Telegram Search のすべての機能を体験できます。
+オンラインデモを用意しています。デプロイ不要で Telegram Search の全機能をすぐ体験できます。
 
-> [!NOTE]
-> 我々はあなたのプライバシーを尊重します。
+アクセス：https://search.lingogram.app
 
-以下の URL から開始してください：https://search.lingogram.app
+> [!WARNING]
+> 暗号通貨等の発行はしていません。詐欺にご注意ください。
+>
+> このツールはご自身のチャット履歴を検索・エクスポートする用途限定です。違法目的での利用は禁止します。
 
 ## 🚀 クイックスタート
 
-### 1分で起動（Docker）
+デフォルトで PGlite がメッセージデータベースとして使用されます。より高性能な PostgreSQL データベースや、メディアストレージとして MinIO を利用したい場合は、下記の環境変数をカスタマイズするか、`docker compose up -d` で全サービスを起動してください。
 
-> [!IMPORTANT]
-> 最も簡単な始め方 — 設定不要。すべての機能が合理的なデフォルト設定で動作します。
+イメージには latest と nightly のバージョンが提供されています。ご自身の用途に合わせて選択してください。
 
 ```bash
 docker run -d --name telegram-search \
@@ -95,32 +96,30 @@ docker run -d --name telegram-search \
   ghcr.io/groupultra/telegram-search:latest
 ```
 
-**http://localhost:3333** を開いてください 🎉
+ブラウザで **http://localhost:3333** にアクセスし、そのままご利用いただけます 🎉
 
-### 高度な設定（オプション）
-
-<details>
-<summary>🔧 環境変数</summary>
-
-> [!TIP]
-> すべての環境変数は任意です。必要な場合のみカスタマイズしてください。
-
-| 変数 | 説明 |
-| --- | --- |
-| `TELEGRAM_API_ID` | [my.telegram.org](https://my.telegram.org/apps) の Telegram アプリ ID |
-| `TELEGRAM_API_HASH` | Telegram アプリ Hash |
-| `DATABASE_TYPE` | `postgres` または `pglite`（デフォルト：`pglite`） |
-| `DATABASE_URL` | PostgreSQL 接続文字列（`DATABASE_TYPE=postgres` の場合のみ） |
-| `PROXY_URL` | プロキシ URL（例：`socks5://user:pass@host:port`） |
-| `PORT` | コンテナ内のバックエンド HTTP/WebSocket ポート（デフォルト：`3000`） |
-| `HOST` | コンテナ内のバックエンド監視ホスト（デフォルト：`0.0.0.0`） |
-| `BACKEND_URL` | Nginx 上流 URL 用 `/api` と `/ws`（デフォルト：`http://127.0.0.1:3000`） |
+### 環境変数のカスタマイズ
 
 > [!IMPORTANT]
-> AI Embedding & LLM 設定は現在アプリ内で**アカウントごとに設定**されています（設定 → API）。  
-> 環境変数 like `EMBEDDING_API_KEY`, `EMBEDDING_MODEL`, etc. は廃止され、将来のリリースで削除されます。
+> AI 埋め込み & LLM の設定は現在「アカウントごとに」アプリ内で設定します（設定 → API）。
 
-**PostgreSQL を使用する例：**
+| 環境変数                      | 説明                                                                            | サンプル値                                            |
+| ----------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `TELEGRAM_API_ID`             | [my.telegram.org](https://my.telegram.org/apps) で取得した Telegram アプリ ID   |                                                       |
+| `TELEGRAM_API_HASH`           | [my.telegram.org](https://my.telegram.org/apps) で取得した Telegram アプリ Hash |                                                       |
+| `DATABASE_TYPE`               | データベース種別。`postgres` または `pglite` を指定                             | `pglite`                                              |
+| `DATABASE_URL`                | PostgreSQL 用接続文字列（`DATABASE_TYPE=postgres`の場合のみ記入）               | `postgresql://postgres:123456@pgvector:5432/postgres` |
+| `PROXY_URL`                   | 利用可能なプロキシ URL（例：`socks5://user:pass@host:port` など）               | `socks5://user:pass@host:port`                        |
+| `PORT`                        | サーバー HTTP/WebSocket のリッスンポート                                        | `3333`                                                |
+| `HOST`                        | サーバーのバインドアドレス                                                      | `0.0.0.0`                                             |
+| `BACKEND_URL`                 | Nginx 等でリバースプロキシを使う場合の上流サーバー URL                          | `http://127.0.0.1:3333`                               |
+| `MINIO_URL`                   | MinIO サービスホスト名または IP                                                 | `minio`                                               |
+| `MINIO_ACCESS_KEY`            | MinIO アクセスキー                                                              | `minioadmin`                                          |
+| `MINIO_SECRET_KEY`            | MinIO シークレットキー                                                          | `minioadmin`                                          |
+| `MINIO_BUCKET`                | MinIO のバケット名                                                              | `telegram-media`                                      |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry OTLP ログ送信エンドポイント                                       | `http://loki:3100/otlp/v1/logs`                       |
+
+**PostgreSQL 利用例：**
 
 ```bash
 docker run -d --name telegram-search \
@@ -133,34 +132,27 @@ docker run -d --name telegram-search \
   ghcr.io/groupultra/telegram-search:latest
 ```
 
-**プロキシ形式：**
+**プロキシ形式サンプル：**
 - SOCKS5: `socks5://user:pass@host:port`
 - SOCKS4: `socks4://user:pass@host:port`
 - HTTP: `http://user:pass@host:port`
 - MTProxy: `mtproxy://secret@host:port`
 
-📖 **完全な環境変数リファレンス：** [docs/ENVIRONMENT.md](./ENVIRONMENT.md)
-
-</details>
-
-### Docker Compose で起動
+### Docker Compose での起動
 
 1. リポジトリをクローンします。
 
-2. docker compose を実行してデータベースを含むすべてのサービスを起動します。
+2. docker compose でデータベースや MinIO 等すべてのサービス起動：
 
 ```bash
 docker compose up -d
 ```
 
-3. `http://localhost:3333` にアクセスして検索インターフェースを開きます。
+3. `http://localhost:3333` へアクセスし、検索画面を開きます。
 
 ## 💻 開発ガイド
 
-> [!CAUTION]
-> 開発には **Node.js >= 24.11** と **pnpm** が必要です。インストールされていることを確認してください。
-
-### ブラウザのみモード
+### ブラウザ専用モード
 
 ```bash
 git clone https://github.com/groupultra/telegram-search.git
@@ -170,53 +162,24 @@ cp .env.example .env
 pnpm run dev
 ```
 
-### サーバーモード（バックエンド付き）
+### サーバーモード
 
 ```bash
 git clone https://github.com/groupultra/telegram-search.git
 cd telegram-search
 pnpm install
 
-# 環境変数をコピーして編集（Telegram キー、DB タイプ/URL、プロキシなど）
 cp .env.example .env
-# 任意: .env.local で上書き（Git には含めない）
 
-# PostgreSQL + pgvector を起動（または DATABASE_URL を自前の DB に向ける）
-docker compose up -d pgvector
+docker compose up -d pgvector minio
 
-# バックエンドとフロントエンドを起動（2つのターミナル）
-pnpm run server:dev  # ターミナル 1: WebSocket バックエンド（dotenvx 経由で .env/.env.local を読み込み）
-pnpm run web:dev     # ターミナル 2: Vue フロントエンド
+pnpm run server:dev
+pnpm run web:dev
 ```
 
-📖 **開発の詳細：** [CONTRIBUTING.md](../CONTRIBUTING.md)
+📖 **さらに詳しい開発やアーキテクチャ情報：** [CONTRIBUTING.md](../CONTRIBUTING.md)
 
-## 🏗️ アーキテクチャ
-
-このプロジェクトは**イベント駆動アーキテクチャ**の **monorepo** です：
-
-- **`apps/web`**: Vue 3 フロントエンド
-- **`apps/server`**: WebSocket サーバー
-- **`packages/client`**: クライアントアダプターと stores（Pinia）
-- **`packages/core`**: イベントバス（EventEmitter3）、サービス、データベースモデル（Drizzle ORM）
-- **`packages/common`**: ロガーとユーティリティ
-
-**主要技術：**
-- イベント駆動：`CoreContext`（EventEmitter3）
-- リアルタイム通信：WebSocket
-- データベース：PostgreSQL + pgvector または PGlite（ブラウザ内）
-- メッセージ処理パイプライン：Embedding、Jieba、Link、Media、User resolvers
-
-📖 **完全なアーキテクチャの詳細、イベントフロー、図：** [CONTRIBUTING.md](../CONTRIBUTING.md)
-
-## 🚨 警告
-> [!WARNING]
-> 仮想通貨は一切発行していません。詐欺にご注意ください。
-
-> [!CAUTION]
-> このソフトウェアは自分のチャット履歴をエクスポートして検索するためのものです。違法な目的で使用しないでください。
-
-## 🚀 アクティビティ
+## 🚀 活動状況
 
 ![Alt](https://repobeats.axiom.co/api/embed/69d5ef9f5e72cd7901b32ff71b5f359bc7ca42ea.svg "Repobeats analytics image")
 
