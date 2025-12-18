@@ -137,14 +137,6 @@ export interface EntityEventToCore {
    * Optional fileId allows core to check cache before fetching.
    */
   'entity:avatar:fetch': (data: { userId: string, fileId?: string }) => void
-  /**
-   * Deprecated: previously used to prime avatar cache from frontend storage.
-   */
-  'entity:avatar:prime-cache': (data: { userId: string, fileId: string }) => void
-  /**
-   * Deprecated: previously used to prime chat avatar cache from frontend storage.
-   */
-  'entity:chat-avatar:prime-cache': (data: { chatId: string, fileId: string }) => void
 }
 
 export interface EntityEventFromCore {

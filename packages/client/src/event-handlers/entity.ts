@@ -1,3 +1,4 @@
+import { useLogger } from '@guiiai/logg'
 import type { ClientRegisterEventHandler } from '.'
 
 import { useBridgeStore } from '../composables/useBridge'
@@ -39,7 +40,7 @@ export function registerEntityEventHandlers(
     }
     catch (error) {
       // Warn-only logging to comply with lint rules
-      console.warn('[Avatar] Failed to reconstruct user avatar byte', { userId: data.userId }, error)
+      useLogger('avatar').withError(error).warn('Failed to reconstruct user avatar byte', { userId: data.userId })
     }
 
     if (!buffer) {
@@ -69,6 +70,6 @@ export function registerEntityEventHandlers(
     // Clean up ArrayBuffer references to help the GC reclaim memory
     buffer = undefined
 
-    // console.warn('[Avatar] Updated user avatar', { userId: data.userId, fileId: data.fileId })
+    useLogger('avatar').withFields({ userId: data.userId, fileId: data.fileId }).debug('Updated user avatar')
   })
 }

@@ -11,15 +11,5 @@ export function registerEntityEventHandlers(ctx: CoreContext, logger: Logger) {
       logger.withFields({ userId, fileId }).debug('Fetching user avatar')
       await entityService.fetchUserAvatar(userId, fileId)
     })
-
-    ctx.emitter.on('entity:avatar:prime-cache', async ({ userId, fileId }) => {
-      logger.withFields({ userId, fileId }).debug('Priming avatar cache')
-      await entityService.primeUserAvatarCache(userId, fileId)
-    })
-
-    ctx.emitter.on('entity:chat-avatar:prime-cache', async ({ chatId, fileId }) => {
-      logger.withFields({ chatId, fileId }).debug('Priming chat avatar cache')
-      await entityService.primeChatAvatarCache(chatId, fileId)
-    })
   }
 }

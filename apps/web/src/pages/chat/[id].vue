@@ -14,6 +14,7 @@ import SearchDialog from '../../components/SearchDialog.vue'
 import VirtualMessageList from '../../components/VirtualMessageList.vue'
 
 import { Button } from '../../components/ui/Button'
+import { useLogger } from '@guiiai/logg'
 
 const { t } = useI18n()
 
@@ -124,7 +125,7 @@ async function loadNewerMessages() {
   // Get the current max message ID to fetch messages after it
   const currentMaxId = messageWindow.value?.maxId
   if (!currentMaxId || currentMaxId === -Infinity) {
-    console.warn('No messages loaded yet, cannot fetch newer messages')
+    useLogger('chat').warn('No messages loaded yet, cannot fetch newer messages')
     return
   }
 

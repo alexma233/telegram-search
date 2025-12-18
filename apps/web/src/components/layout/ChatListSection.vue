@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import type { ChatGroup } from '@tg-search/client'
-import type { CoreDialog } from '@tg-search/core/types'
 
-import { prefillChatAvatarIntoStore, useChatStore, useSettingsStore } from '@tg-search/client'
+import { useChatStore, useSettingsStore } from '@tg-search/client'
 import { storeToRefs } from 'pinia'
 import { VList } from 'virtua/vue'
-import { computed, watch } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -50,38 +49,6 @@ const activeGroupChats = computed(() => {
 function toggleActiveChatGroup(group: ChatGroup) {
   selectedGroup.value = group
 }
-
-/**
- * Prefill chat avatars from persistent cache in parallel.
- * - Avoids sequential IndexedDB waits when chat list is large.
- * - Only warms cache; network fetch continues to be driven by server events.
- */
-async function prefillChatAvatarsParallel(list: CoreDialog[]) {
-  const tasks = list.map(chat => prefillChatAvatarIntoStore(chat.id))
-  try {
-    await Promise.all(tasks)
-  }
-  catch (error) {
-    console.warn('Failed to prefill chat avatars', error)
-  }
-}
-
-/**
- * Prefill avatars for currently visible chats only.
- * - Warms disk -> memory cache for first `count` items
- * - Does NOT trigger network; visible elements use composable ensure
- */
-async function prioritizeVisibleAvatars(list: CoreDialog[], count = 50) {
-  const top = list.slice(0, count)
-  await prefillChatAvatarsParallel(top)
-}
-
-// Prioritize visible avatars on group change and initial render
-watch(activeGroupChats, (list) => {
-  if (!list?.length)
-    return
-  void prioritizeVisibleAvatars(list)
-}, { immediate: true })
 </script>
 
 <template>

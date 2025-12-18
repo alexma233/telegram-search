@@ -2,6 +2,7 @@ import { acceptHMRUpdate, defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import { useBridgeStore } from '../composables/useBridge'
+import { useLogger } from '@guiiai/logg'
 
 export interface AvatarEntry {
   id: string
@@ -181,7 +182,7 @@ export const useAvatarStore = defineStore('avatar', () => {
       websocketStore.sendEvent('entity:avatar:fetch', { userId: key, fileId })
     }
     catch (error) {
-      console.warn('[Avatar] ensureUserAvatar sendEvent failed:', error)
+      useLogger('avatar').withError(error).warn('ensureUserAvatar sendEvent failed')
     }
   }
 
@@ -224,7 +225,7 @@ export const useAvatarStore = defineStore('avatar', () => {
       websocketStore.sendEvent('dialog:avatar:fetch', { chatId: key })
     }
     catch (error) {
-      console.warn('[Avatar] ensureChatAvatar sendEvent failed:', error)
+      useLogger('avatar').withError(error).warn('ensureChatAvatar sendEvent failed')
     }
   }
 

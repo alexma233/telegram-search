@@ -6,6 +6,7 @@ import type { AnimationItem } from 'lottie-web'
 import lottie from 'lottie-web'
 import pako from 'pako'
 
+import { useLogger } from '@guiiai/logg'
 import { getMediaBinaryProvider, hydrateMediaBlobWithCore, useBridgeStore, useSettingsStore } from '@tg-search/client'
 import { models } from '@tg-search/core'
 import { storeToRefs } from 'pinia'
@@ -157,7 +158,7 @@ onMounted(() => {
           })
         })
         .catch((error) => {
-          console.error('Failed to fetch Lottie animation data', error)
+          useLogger('media').withError(error).warn('Failed to fetch Lottie animation data')
           runtimeError.value = 'Sticker failed to load'
         })
     }
@@ -171,14 +172,14 @@ onUnmounted(() => {
 
 function sendReprocessForCurrentMessage(mediaType: 'Image' | 'Sticker') {
   if (!props.message.chatId || !props.message.platformMessageId) {
-    console.error('Missing chatId or platformMessageId for reprocessing')
+    useLogger('media').warn('Missing chatId or platformMessageId for reprocessing')
     runtimeError.value = `${mediaType} failed to load`
     return
   }
 
   const messageId = Number.parseInt(props.message.platformMessageId, 10)
   if (Number.isNaN(messageId)) {
-    console.error(`Invalid message ID: ${props.message.platformMessageId}`)
+    useLogger('media').warn(`Invalid message ID: ${props.message.platformMessageId}`)
     runtimeError.value = `${mediaType} failed to load`
     return
   }
@@ -191,7 +192,7 @@ function sendReprocessForCurrentMessage(mediaType: 'Image' | 'Sticker') {
 }
 
 async function handleMediaError(event: Event, mediaType: 'Image' | 'Sticker') {
-  console.error(`${mediaType} failed to load`, processedMedia.value, event)
+  useLogger('media').withFields({ mediaType, processedMedia: processedMedia.value, event }).warn(`${mediaType} failed to load`)
 
   const src = processedMedia.value.src
 

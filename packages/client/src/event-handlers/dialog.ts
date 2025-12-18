@@ -1,5 +1,7 @@
 import type { ClientRegisterEventHandlerFn } from '.'
 
+import { useLogger } from '@guiiai/logg'
+
 import { useAvatarStore } from '../stores/useAvatar'
 import { useChatStore } from '../stores/useChat'
 import { bytesToBlob, canDecodeAvatar } from '../utils/image'
@@ -26,13 +28,14 @@ export function registerDialogEventHandlers(
   registerEventHandler('dialog:avatar:data', async (data) => {
     const chatStore = useChatStore()
     const avatarStore = useAvatarStore()
+    const logger = useLogger('avatar')
 
     // Early guard: use cached avatar if it's still valid and matches fileId
     if (avatarStore.hasValidChatAvatar(data.chatId, data.fileId)) {
       const chat = chatStore.chats.find(c => c.id === data.chatId)
       if (chat && data.fileId && chat.avatarFileId !== data.fileId)
         chat.avatarFileId = data.fileId
-      console.warn('[Avatar] Skip update; cache valid', { chatId: data.chatId, fileId: data.fileId })
+      logger.withFields({ chatId: data.chatId, fileId: data.fileId }).warn('Skip update; cache valid')
       return
     }
 
@@ -46,12 +49,12 @@ export function registerDialogEventHandlers(
     }
     catch (error) {
       // Warn-only logging to comply with lint rules
-      console.warn('[Avatar] Failed to reconstruct chat avatar byte', { chatId: data.chatId }, error)
+      logger.withError(error).warn('Failed to reconstruct chat avatar byte', { chatId: data.chatId })
     }
 
     if (!buffer) {
       // Use warn to comply with lint rule: allow only warn/error
-      console.warn('[Avatar] Missing byte for chat avatar')
+      logger.warn('Missing byte for chat avatar', { chatId: data.chatId })
       return
     }
 
@@ -86,6 +89,6 @@ export function registerDialogEventHandlers(
     // Clean up ArrayBuffer references to help the GC reclaim memory
     buffer = undefined
 
-    console.warn('[Avatar] Updated chat avatar', { chatId: data.chatId, fileId: data.fileId })
+    logger.withFields({ chatId: data.chatId, fileId: data.fileId }).debug('Updated chat avatar')
   })
 }
