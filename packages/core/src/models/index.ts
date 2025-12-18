@@ -20,6 +20,19 @@ import { photoModels } from './photos'
 import { stickerModels } from './stickers'
 import { userModels } from './users'
 
+export {
+  accountJoinedChatModels,
+  accountModels,
+  accountSettingsModels,
+  avatarModels,
+  chatMessageModels,
+  chatMessageStatsModels,
+  chatModels,
+  photoModels,
+  stickerModels,
+  userModels,
+}
+
 export const models = {
   chatMessageModels,
   chatMessageStatsModels,

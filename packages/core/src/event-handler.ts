@@ -10,8 +10,8 @@ import { useService } from './context'
 import { registerAccountEventHandlers } from './event-handlers/account'
 import { registerAccountSettingsEventHandlers } from './event-handlers/account-settings'
 import { registerAuthEventHandlers } from './event-handlers/auth'
+import { registerAvatarEventHandlers } from './event-handlers/avatar'
 import { registerDialogEventHandlers } from './event-handlers/dialog'
-import { registerEntityEventHandlers } from './event-handlers/entity'
 import { registerGramEventsEventHandlers } from './event-handlers/gram-events'
 import { registerMessageEventHandlers } from './event-handlers/message'
 import { registerMessageResolverEventHandlers } from './event-handlers/message-resolver'
@@ -65,7 +65,7 @@ export function basicEventHandler(ctx: CoreContext, config: Config, mediaBinaryP
   // server-side prefetch in the future if desired.
   registry.register('avatar', createAvatarResolver(ctx, logger, avatarModels, mediaBinaryProvider))
   registry.register('link', createLinkResolver(logger))
-  registry.register('embedding', createEmbeddingResolver (ctx, logger))
+  registry.register('embedding', createEmbeddingResolver(ctx, logger))
   registry.register('jieba', createJiebaResolver(logger))
 
   registerStorageEventHandlers(ctx, logger, models)
@@ -94,17 +94,17 @@ export function afterConnectedEventHandler(ctx: CoreContext): EventHandler {
   ctx.emitter.once('account:ready', ({ accountId }) => {
     logger = logger.withFields({ accountId })
 
-    const entityService = useService(ctx, logger, createEntityService)
+    useService(ctx, logger, createEntityService)
     const messageService = useService(ctx, logger, createMessageService)
     const dialogService = useService(ctx, logger, createDialogService)
     const takeoutService = useService(ctx, logger, createTakeoutService)
     const gramEventsService = useService(ctx, logger, createGramEventsService)
 
-    registerEntityEventHandlers(ctx, logger)(entityService)
     registerMessageEventHandlers(ctx, logger)(messageService)
     registerDialogEventHandlers(ctx, logger)(dialogService)
     registerTakeoutEventHandlers(ctx, logger, chatMessageStatsModels)(takeoutService)
     registerGramEventsEventHandlers(ctx, logger)(gramEventsService)
+    registerAvatarEventHandlers(ctx, logger)
 
     // Dialog bootstrap is now triggered from account:me:fetch handler once
     // currentAccountId has been established, to avoid races where dialog or

@@ -111,40 +111,20 @@ export interface FetchMessageOpts {
 
 export interface DialogEventToCore {
   'dialog:fetch': () => void
-  /**
-   * Request fetching a single dialog's avatar immediately.
-   * Used by frontend to prioritize avatars within viewport.
-   */
-  'dialog:avatar:fetch': (data: { chatId: number | string }) => void
 }
 
 export interface DialogEventFromCore {
   'dialog:data': (data: { dialogs: CoreDialog[] }) => void
-  /**
-   * Emit avatar bytes for a single dialog. Frontend should convert bytes to blobUrl
-   * and attach it to the corresponding chat. This event is incremental and small-sized.
-   */
-  'dialog:avatar:data': (data: { chatId: number, byte: Uint8Array | { data: number[] }, mimeType: string, fileId?: string }) => void
 }
 
 // ============================================================================
 // Entity Events
 // ============================================================================
 
-export interface EntityEventToCore {
-  /**
-   * Lazy fetch of a user's avatar by userId. Core should respond with 'entity:avatar:data'.
-   * Optional fileId allows core to check cache before fetching.
-   */
-  'entity:avatar:fetch': (data: { userId: string, fileId?: string }) => void
-}
+export interface EntityEventToCore {}
 
 export interface EntityEventFromCore {
   'entity:me:data': (data: CoreUserEntity) => void
-  /**
-   * Emit avatar bytes for a single user. Frontend converts to blobUrl and caches.
-   */
-  'entity:avatar:data': (data: { userId: string, byte: Uint8Array | { data: number[] }, mimeType: string, fileId?: string }) => void
 }
 
 export interface CoreBaseEntity {
@@ -166,6 +146,39 @@ export interface CoreChannelEntity extends CoreBaseEntity {
 }
 
 export type CoreEntity = CoreUserEntity | CoreChatEntity | CoreChannelEntity
+
+// ============================================================================
+// Avatar Events (Consolidated)
+// ============================================================================
+
+export interface AvatarRequest {
+  kind: 'user' | 'chat'
+  id: string
+  fileId?: string
+}
+
+export interface AvatarData {
+  kind: 'user' | 'chat'
+  id: string
+  mimeType: string
+  fileId?: string
+}
+
+export interface AvatarEventToCore {
+  /**
+   * Request fetching avatars for users or chats in batch.
+   * Optional fileId allows core to check cache before fetching.
+   */
+  'avatar:fetch': (data: { items: AvatarRequest[] }) => void
+}
+
+export interface AvatarEventFromCore {
+  /**
+   * Notify that avatars have been updated/resolved in batch.
+   * Frontend should use the fileId to construct the blob/URL.
+   */
+  'avatar:data': (data: { items: AvatarData[] }) => void
+}
 
 // ============================================================================
 // Storage Events
@@ -344,6 +357,7 @@ export type FromCoreEvent = ClientInstanceEventFromCore
   & AccountSettingsEventFromCore
   & GramEventsEventFromCore
   & MessageResolverEventFromCore
+  & AvatarEventFromCore
 
 export type ToCoreEvent = ClientInstanceEventToCore
   & MessageEventToCore
@@ -356,6 +370,7 @@ export type ToCoreEvent = ClientInstanceEventToCore
   & AccountSettingsEventToCore
   & GramEventsEventToCore
   & MessageResolverEventToCore
+  & AvatarEventToCore
 
 export type CoreEvent = FromCoreEvent & ToCoreEvent
 

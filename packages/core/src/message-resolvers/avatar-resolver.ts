@@ -3,6 +3,7 @@ import type { Logger } from '@guiiai/logg'
 import type { Result } from '@unbird/result'
 import type { Dialog } from 'telegram/tl/custom/dialog'
 
+import type { AvatarData, AvatarRequest } from '../types/events'
 import type { MessageResolver, MessageResolverOpts } from '.'
 import type { CoreContext } from '../context'
 import type { AvatarModels } from '../models/avatars'
@@ -21,13 +22,14 @@ import { avatarModels as defaultAvatarModels } from '../models/avatars'
 
 /**
  * Shared avatar cache entry.
- * Stores last `fileId`, `mimeType`, and raw `byte` for reuse.
+ * Stores last `fileId` and `mimeType` for reuse.
+ * We no longer store raw bytes in memory to reduce footprint.
  */
 interface AvatarCacheEntry {
   fileId?: string
   mimeType?: string
-  byte?: Buffer
 }
+
 /**
  * Per-context singleton store for avatar helper to avoid duplicated instances.
  */
@@ -54,12 +56,32 @@ function createAvatarHelper(
   // Negative caches (sentinels): record entities known to have no avatar
   const noUserAvatarCache = lru<boolean>(MAX_AVATAR_CACHE_SIZE, AVATAR_CACHE_TTL)
   const noChatAvatarCache = lru<boolean>(MAX_AVATAR_CACHE_SIZE, AVATAR_CACHE_TTL)
-  // Global per-context fileId -> bytes cache to dedupe downloads across users/chats
-  const fileIdByteCache = lru<{ byte: Buffer, mimeType: string }>(MAX_AVATAR_CACHE_SIZE, AVATAR_CACHE_TTL)
 
   // In-flight dedup sets
   const inflightUsers = new Set<string>()
   const inflightChats = new Set<string>()
+
+  // Outbox for batching avatar:data events
+  let outbox: AvatarData[] = []
+  let outboxTimeout: ReturnType<typeof setTimeout> | undefined
+
+  function flushOutbox() {
+    if (outbox.length === 0)
+      return
+    const items = [...outbox]
+    outbox = []
+    ctx.emitter.emit('avatar:data', { items })
+  }
+
+  function queueOutbox(data: AvatarData) {
+    outbox.push(data)
+    if (!outboxTimeout) {
+      outboxTimeout = setTimeout(() => {
+        outboxTimeout = undefined
+        flushOutbox()
+      }, 50)
+    }
+  }
 
   /**
    * Normalize id to a string key for caches and dedup.
@@ -74,10 +96,6 @@ function createAvatarHelper(
 
   // Concurrency control queue
   const downloadQueue = newQueue(AVATAR_DOWNLOAD_CONCURRENCY)
-
-  // Approximate byte budget (fallback: 50MB)
-  let byteBudget = 0
-  const BYTE_BUDGET_MAX = 50 * 1024 * 1024
 
   function sleep(ms: number) {
     return new Promise<void>(resolve => setTimeout(resolve, ms))
@@ -181,72 +199,28 @@ function createAvatarHelper(
     })
   }
 
-  /**
-   * Get avatar bytes by fileId with global dedup.
-   * If the fileId was downloaded before, reuse bytes to avoid re-downloading.
-   */
-  async function getAvatarBytes(
-    fileId: string | undefined,
-    downloadFn: () => Promise<Buffer | undefined>,
-  ): Promise<{ byte: Buffer, mimeType: string } | undefined> {
-    const mimeTypeDefault = 'image/jpeg'
-    if (fileId) {
-      const cached = fileIdByteCache.get(fileId)
-      if (cached)
-        return cached
-    }
-    const byte = await downloadFn()
-    if (!byte)
-      return undefined
-    const result = { byte, mimeType: sniffMime(byte) || mimeTypeDefault }
-    if (fileId)
-      fileIdByteCache.set(fileId, result)
-    return result
-  }
-
   function applyAvatarResult(
     kind: 'user' | 'chat',
     key: string,
-    idRaw: string | number,
+    _idRaw: string | number,
     fileId: string | undefined,
     cache: ReturnType<typeof lru<AvatarCacheEntry>>,
     negativeCache: ReturnType<typeof lru<boolean>>,
-    result: { byte: Buffer, mimeType: string },
+    result: { mimeType: string },
   ) {
-    const prev = cache.get(key)
-    if (prev?.byte)
-      byteBudget -= prev.byte.length
-    cache.set(key, { fileId, mimeType: result.mimeType, byte: result.byte })
-    byteBudget += result.byte.length
-    if (fileId)
-      fileIdByteCache.set(fileId, { byte: result.byte, mimeType: result.mimeType })
+    cache.set(key, { fileId, mimeType: result.mimeType })
+
     if (negativeCache.get(key))
       negativeCache.delete(key)
-    if (byteBudget > BYTE_BUDGET_MAX) {
-      logger.warn('Avatar byte budget exceeded; clearing caches')
-      userAvatarCache.clear()
-      chatAvatarCache.clear()
-      dialogEntityCache.clear()
-      noUserAvatarCache.clear()
-      noChatAvatarCache.clear()
-      fileIdByteCache.clear()
-      byteBudget = 0
-    }
 
-    if (kind === 'user') {
-      ctx.emitter.emit('entity:avatar:data', { userId: key, byte: result.byte, mimeType: result.mimeType, fileId })
-    }
-    else {
-      const idNum = typeof idRaw === 'string' ? Number(idRaw) : idRaw
-      ctx.emitter.emit('dialog:avatar:data', { chatId: idNum, byte: result.byte, mimeType: result.mimeType, fileId })
-    }
+    queueOutbox({ kind, id: key, mimeType: result.mimeType, fileId })
   }
 
   async function loadAvatarFromStorage(
     kind: 'user' | 'chat',
     key: string,
     expectedFileId?: string,
-  ): Promise<{ byte: Buffer, mimeType: string, fileId?: string } | undefined> {
+  ): Promise<{ mimeType: string, fileId?: string } | undefined> {
     try {
       const record = (await avatarModels.findAvatarByEntity(ctx.getDB(), kind, key)).orUndefined()
       if (!record)
@@ -255,15 +229,7 @@ function createAvatarHelper(
         return undefined
 
       const mimeType = record.mime_type || 'image/jpeg'
-
-      if (record.storage_path && mediaBinaryProvider) {
-        const loaded = await mediaBinaryProvider.load({ kind: 'avatar', path: record.storage_path })
-        if (loaded)
-          return { byte: Buffer.from(loaded), mimeType, fileId: record.file_id || undefined }
-      }
-
-      if (record.avatar_bytes)
-        return { byte: Buffer.from(record.avatar_bytes), mimeType, fileId: record.file_id || undefined }
+      return { mimeType, fileId: record.file_id || undefined }
     }
     catch (error) {
       logger.withError(error as Error).debug('Failed to load avatar from storage')
@@ -337,8 +303,8 @@ function createAvatarHelper(
       if (isUser && opts.expectedFileId) {
         const cachedEarly = cache.get(key)
         logger.withFields({ userId: key, expectedFileId: opts.expectedFileId, cachedFileId: cachedEarly?.fileId }).verbose('User avatar early cache validation')
-        if (cachedEarly && cachedEarly.fileId === opts.expectedFileId && cachedEarly.byte && cachedEarly.mimeType) {
-          ctx.emitter.emit('entity:avatar:data', { userId: key, byte: cachedEarly.byte, mimeType: cachedEarly.mimeType, fileId: opts.expectedFileId })
+        if (cachedEarly && cachedEarly.fileId === opts.expectedFileId && cachedEarly.mimeType) {
+          queueOutbox({ kind: 'user', id: key, mimeType: cachedEarly.mimeType, fileId: opts.expectedFileId })
           return
         }
       }
@@ -376,13 +342,13 @@ function createAvatarHelper(
         logger.withFields({ userId: key, resolvedFileId: fileId }).verbose('Resolved fileId from entity')
 
       const cached = cache.get(key)
-      if (cached && cached.byte && cached.mimeType && ((fileId && cached.fileId === fileId) || !fileId)) {
-        applyAvatarResult(kind, key, idRaw, fileId, cache, negative, { byte: cached.byte, mimeType: cached.mimeType })
+      if (cached && cached.mimeType && ((fileId && cached.fileId === fileId) || !fileId)) {
+        applyAvatarResult(kind, key, idRaw, fileId, cache, negative, { mimeType: cached.mimeType })
         return
       }
 
-      const result = await getAvatarBytes(fileId, () => downloadSmallAvatar(entity))
-      if (!result) {
+      const byte = await downloadSmallAvatar(entity)
+      if (!byte) {
         if (!fileId) {
           negative.set(key, true)
           logger.withFields({ [idLabel]: isUser ? key : idRaw }).verbose(`${isUser ? 'User' : 'Chat'} has no avatar; record sentinel and skip`)
@@ -393,6 +359,8 @@ function createAvatarHelper(
         return
       }
 
+      const mimeType = sniffMime(byte)
+      const result = { byte, mimeType }
       await persistAvatar(kind, key, fileId, result)
       applyAvatarResult(kind, key, idRaw, fileId, cache, negative, result)
     }
@@ -411,6 +379,12 @@ function createAvatarHelper(
 
   async function fetchDialogAvatar(chatId: string | number, opts: { entityOverride?: AvatarEntity } = {}): Promise<void> {
     await fetchAvatarCore('chat', chatId, { entityOverride: opts.entityOverride })
+  }
+
+  async function fetchAvatars(items: AvatarRequest[]): Promise<void> {
+    // Process items in parallel
+    // fetchAvatarCore manages internal concurrency via downloadQueue, so it's safe to fire them all.
+    await Promise.allSettled(items.map(item => fetchAvatarCore(item.kind, item.id, { expectedFileId: item.fileId })))
   }
 
   /**
@@ -432,9 +406,9 @@ function createAvatarHelper(
       return
     }
     const existing = cache.get(key)
-    if (!existing || !existing.byte) {
+    if (!existing) {
       logger.withFields({ [idLabel]: key, fileId }).debug(`Priming ${kind} avatar cache with fileId`)
-      cache.set(key, { fileId, mimeType: '', byte: undefined })
+      cache.set(key, { fileId, mimeType: '' })
     }
   }
 
@@ -475,7 +449,7 @@ function createAvatarHelper(
 
         const fileId = resolveAvatarFileId(dialog.entity as AvatarEntity)
         const cached = chatAvatarCache.get(key)
-        if (cached && cached.byte && cached.mimeType && ((fileId && cached.fileId === fileId) || !fileId))
+        if (cached && cached.mimeType && ((fileId && cached.fileId === fileId) || !fileId))
           return
 
         const stored = await loadAvatarFromStorage('chat', key)
@@ -484,9 +458,9 @@ function createAvatarHelper(
           return
         }
 
-        // Delegates concurrency via global downloadQueue, with fileId-level dedup
-        const result = await getAvatarBytes(fileId, () => downloadSmallAvatar(dialog.entity as AvatarEntity))
-        if (!result) {
+        // Delegates concurrency via global downloadQueue
+        const byte = await downloadSmallAvatar(dialog.entity as AvatarEntity)
+        if (!byte) {
           if (!fileId) {
             noChatAvatarCache.set(key, true)
             logger.withFields({ chatId: id }).verbose('Chat has no avatar; record sentinel and skip batch fetch')
@@ -497,6 +471,8 @@ function createAvatarHelper(
           return
         }
 
+        const mimeType = sniffMime(byte)
+        const result = { byte, mimeType }
         await persistAvatar('chat', key, fileId, result)
         applyAvatarResult('chat', key, id, fileId, chatAvatarCache, noChatAvatarCache, result)
       }
@@ -513,6 +489,7 @@ function createAvatarHelper(
     fetchUserAvatar,
     fetchDialogAvatar,
     fetchDialogAvatars,
+    fetchAvatars, // Exported new batch method
     dialogEntityCache,
     primeUserAvatarCache: primeUserAvatarCacheCore,
     primeChatAvatarCache: primeChatAvatarCacheCore,
@@ -523,7 +500,6 @@ function createAvatarHelper(
       dialogEntityCache.clear()
       noUserAvatarCache.clear()
       noChatAvatarCache.clear()
-      fileIdByteCache.clear()
       logger.log('Avatar cache manually cleared')
     },
     getCacheStats: () => ({
@@ -532,10 +508,8 @@ function createAvatarHelper(
       entities: dialogEntityCache.size,
       noUserAvatars: noUserAvatarCache.size,
       noChatAvatars: noChatAvatarCache.size,
-      fileIdBytes: fileIdByteCache.size,
       maxSize: MAX_AVATAR_CACHE_SIZE,
       ttl: `${AVATAR_CACHE_TTL / 1000}s`,
-      byteBudget,
     }),
     primeUserAvatarCacheBatch: (list: Array<{ userId: string, fileId: string }>) => {
       for (const { userId, fileId } of list)
@@ -568,7 +542,7 @@ export function useAvatarHelper(
 
 /**
  * Create AvatarResolver for message pipeline.
- * For each message, opportunistically fetch sender's avatar and emit bytes.
+ * For each message, opportunistically fetch sender's avatar.
  * Returns no message mutations (Ok([])) to avoid duplicate storage writes.
  */
 export function createAvatarResolver(

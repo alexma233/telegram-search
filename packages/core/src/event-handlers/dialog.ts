@@ -18,10 +18,6 @@ export function registerDialogEventHandlers(ctx: CoreContext, logger: Logger) {
       ctx.emitter.emit('storage:record:dialogs', { dialogs, accountId })
     })
 
-    // Prioritized single-avatar fetch for viewport-visible items
-    ctx.emitter.on('dialog:avatar:fetch', async ({ chatId }) => {
-      logger.withFields({ chatId }).verbose('Fetching single dialog avatar')
-      await dialogService.fetchSingleDialogAvatar(String(chatId))
-    })
+    // dialog:avatar:fetch handler removed in favor of unified avatar:fetch
   }
 }

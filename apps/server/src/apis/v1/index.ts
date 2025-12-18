@@ -108,5 +108,51 @@ export function v1api(db: CoreDB, models: Models, mediaBinaryProvider: MediaBina
     }
   }))
 
+  app.get('/avatars/:fileId', defineEventHandler(async (event) => {
+    const fileId = getRouterParam(event, 'fileId')
+
+    if (!fileId) {
+      return new HTTPError('File ID is required', { status: 400 })
+    }
+
+    try {
+      const avatar = (await models.avatarModels.findAvatarByFileId(db, fileId)).orUndefined()
+
+      if (!avatar) {
+        return new HTTPError('Avatar not found', { status: 404 })
+      }
+
+      let bytes: Uint8Array | undefined
+
+      if (mediaBinaryProvider && avatar.storage_path) {
+        bytes = await mediaBinaryProvider.load({ kind: 'avatar', path: avatar.storage_path }) ?? undefined
+      }
+
+      if (!bytes && avatar.avatar_bytes) {
+        bytes = new Uint8Array(avatar.avatar_bytes as unknown as ArrayBufferLike)
+      }
+
+      if (!bytes || bytes.length === 0) {
+        return new HTTPError('Avatar content not found', { status: 404 })
+      }
+
+      const fileType = avatar.mime_type
+        || (await fileTypeFromBuffer(bytes))?.mime
+        || 'application/octet-stream'
+
+      return new Response(Buffer.from(bytes), {
+        headers: {
+          'Content-Type': fileType,
+          'Content-Length': bytes.length.toString(),
+          'Cache-Control': 'public, max-age=604800, immutable',
+        },
+      })
+    }
+    catch (error) {
+      useLogger('v1api:avatars').withError(error).error('Failed to load avatar')
+      return new HTTPError('Failed to load avatar', { status: 500, cause: error })
+    }
+  }))
+
   return app
 }

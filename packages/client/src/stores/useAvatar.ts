@@ -17,6 +17,12 @@ type ID = string | number
 
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
+interface AvatarRequest {
+  kind: 'user' | 'chat'
+  id: string
+  fileId?: string
+}
+
 /**
  * Create a centralized avatar store for user and chat avatars.
  * Manages in-memory cache, TTL expiration, and provides helper methods
@@ -34,6 +40,35 @@ export const useAvatarStore = defineStore('avatar', () => {
   const inflightUserFetchIds = ref<Set<string>>(new Set())
   // Track in-flight user avatar prefills to avoid duplicate work
   const inflightUserPrefillIds = ref<Set<string>>(new Set())
+
+  // Queue for batching avatar fetches
+  let fetchQueue: AvatarRequest[] = []
+  let flushTimeout: ReturnType<typeof setTimeout> | undefined
+
+  function flushFetchQueue() {
+    if (fetchQueue.length === 0)
+      return
+    const items = [...fetchQueue]
+    fetchQueue = []
+
+    // Send batch
+    try {
+      websocketStore.sendEvent('avatar:fetch', { items })
+    }
+    catch (e) {
+      useLogger('avatar').withError(e).warn('Batch fetch failed')
+    }
+  }
+
+  function queueFetch(kind: 'user' | 'chat', id: string, fileId?: string) {
+    fetchQueue.push({ kind, id, fileId })
+    if (!flushTimeout) {
+      flushTimeout = setTimeout(() => {
+        flushTimeout = undefined
+        flushFetchQueue()
+      }, 50) // 50ms batch window
+    }
+  }
 
   // Normalize id to a non-empty string key
   function toKey(id: ID) {
@@ -157,11 +192,11 @@ export const useAvatarStore = defineStore('avatar', () => {
 
   /**
    * Ensure a user's avatar is available in cache.
-   * If missing, triggers a lazy fetch via core event 'entity:avatar:fetch'.
+   * If missing, triggers a lazy fetch via core event 'avatar:fetch'.
    * Ensure a user's avatar is available in cache.
    * Cache-first: if present and not expired, skip.
    * Dedupe: if a fetch for the same user is already in-flight, skip.
-   * Otherwise, mark in-flight and send 'entity:avatar:fetch'.
+   * Otherwise, mark in-flight and send 'avatar:fetch'.
    * Optional fileId allows core to validate cache before fetching.
    */
   function ensureUserAvatar(userId: ID, fileId?: string, forceRefresh?: boolean) {
@@ -179,10 +214,10 @@ export const useAvatarStore = defineStore('avatar', () => {
 
     try {
       inflightUserFetchIds.value.add(key)
-      websocketStore.sendEvent('entity:avatar:fetch', { userId: key, fileId })
+      queueFetch('user', key, fileId)
     }
     catch (error) {
-      useLogger('avatar').withError(error).warn('ensureUserAvatar sendEvent failed')
+      useLogger('avatar').withError(error).warn('ensureUserAvatar queueFetch failed')
     }
   }
 
@@ -198,7 +233,7 @@ export const useAvatarStore = defineStore('avatar', () => {
 
   /**
    * Mark a user avatar fetch as completed.
-   * Should be called after 'entity:avatar:data' is handled or on error.
+   * Should be called after 'avatar:data' is handled or on error.
    */
   function markUserFetchCompleted(userId: ID): void {
     if (!userId)
@@ -208,7 +243,7 @@ export const useAvatarStore = defineStore('avatar', () => {
 
   /**
    * Ensure a chat's avatar is available in cache.
-   * If missing or expired, triggers prioritized fetch via 'dialog:avatar:fetch'.
+   * If missing or expired, triggers prioritized fetch via 'avatar:fetch'.
    */
   function ensureChatAvatar(chatId: ID, expectedFileId?: string) {
     if (!chatId)
@@ -222,10 +257,10 @@ export const useAvatarStore = defineStore('avatar', () => {
       return
     try {
       inflightChatFetchIds.value.add(key)
-      websocketStore.sendEvent('dialog:avatar:fetch', { chatId: key })
+      queueFetch('chat', key, expectedFileId)
     }
     catch (error) {
-      useLogger('avatar').withError(error).warn('ensureChatAvatar sendEvent failed')
+      useLogger('avatar').withError(error).warn('ensureChatAvatar queueFetch failed')
     }
   }
 
@@ -241,7 +276,7 @@ export const useAvatarStore = defineStore('avatar', () => {
 
   /**
    * Mark a prioritized chat avatar fetch as completed.
-   * Should be called once a 'dialog:avatar:data' arrives or on error.
+   * Should be called once a 'avatar:data' arrives or on error.
    */
   function markChatFetchCompleted(chatId: ID): void {
     if (!chatId)

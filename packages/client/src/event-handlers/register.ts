@@ -2,6 +2,7 @@ import type { ClientRegisterEventHandlerFn } from './index'
 
 import { registerAccountEventHandlers } from './account'
 import { registerBasicEventHandlers } from './auth'
+import { registerAvatarEventHandlers } from './avatar'
 import { registerDialogEventHandlers } from './dialog'
 import { registerEntityEventHandlers } from './entity'
 import { registerMessageEventHandlers } from './message'
@@ -20,4 +21,5 @@ export function registerAllEventHandlers(
   registerDialogEventHandlers(registerEventHandler)
   registerStorageEventHandlers(registerEventHandler)
   registerMessageEventHandlers(registerEventHandler)
+  registerAvatarEventHandlers(registerEventHandler)
 }
