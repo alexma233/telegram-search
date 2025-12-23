@@ -21,8 +21,28 @@ vi.mock('../../utils/min-interval', () => {
   }
 })
 
-function createMockCtx(client: any) {
+function createMockDb(row?: { chatType?: string, accessHash?: string }) {
+  const select = vi.fn(() => ({
+    from: vi.fn(() => ({
+      where: vi.fn(() => ({
+        limit: vi.fn(() => (row ? [row] : [])),
+      })),
+    })),
+  }))
+
+  const updateWhere = vi.fn(async () => {})
+  const update = vi.fn(() => ({
+    set: vi.fn(() => ({
+      where: updateWhere,
+    })),
+  }))
+
+  return { select, update }
+}
+
+function createMockCtx(client: any, dbRow?: { chatType?: string, accessHash?: string }) {
   const withError = vi.fn((error: unknown) => (error instanceof Error ? error : new Error(String(error))))
+  const db = createMockDb(dbRow)
 
   const ctx: CoreContext = {
     emitter: {} as unknown as CoreEmitter,
@@ -34,7 +54,7 @@ function createMockCtx(client: any) {
     getClient: () => client,
     setCurrentAccountId: () => {},
     getCurrentAccountId: () => 'acc-1',
-    getDB: () => ({} as unknown as CoreDB),
+    getDB: () => db as unknown as CoreDB,
     withError,
     cleanup: () => {},
     setMyUser: () => {},
@@ -44,7 +64,7 @@ function createMockCtx(client: any) {
     metrics: undefined,
   }
 
-  return { ctx, withError }
+  return { ctx, withError, db }
 }
 
 function createTask() {
@@ -262,5 +282,65 @@ describe('takeout service', () => {
     const finished = calls.find(q => q instanceof Api.InvokeWithTakeout && (q).query instanceof Api.account.FinishTakeoutSession)
     expect(finished).toBeTruthy()
     expect((finished).query.success).toBe(true)
+  })
+
+  it('takeoutMessages retries once with refreshed peer on CHANNEL_INVALID', async () => {
+    let firstHistory = true
+
+    const client = {
+      getInputEntity: vi.fn(async () => new Api.InputPeerChannel({
+        channelId: bigInt(123),
+        accessHash: bigInt(1),
+      })),
+      getEntity: vi.fn(async () => new Api.Channel({
+        id: bigInt(123),
+        accessHash: bigInt(999),
+        title: 'channel',
+      })),
+      invoke: vi.fn(async (query: any) => {
+        if (query instanceof Api.account.InitTakeoutSession) {
+          return { id: bigInt(1) }
+        }
+
+        if (query instanceof Api.InvokeWithTakeout) {
+          const inner = (query).query
+          if (inner instanceof Api.messages.GetHistory) {
+            if (firstHistory) {
+              firstHistory = false
+              throw new Error('CHANNEL_INVALID')
+            }
+            return { messages: [] }
+          }
+          if (inner instanceof Api.account.FinishTakeoutSession) {
+            return {}
+          }
+        }
+
+        throw new Error('unexpected query')
+      }),
+    }
+
+    const { ctx, db } = createMockCtx(client, { chatType: 'channel', accessHash: '1' })
+
+    const service = createTakeoutService(ctx, logger)
+    const task = createTask()
+
+    const yielded: any[] = []
+    for await (const m of service.takeoutMessages('123', {
+      pagination: { limit: 10, offset: 0 },
+      minId: 0,
+      maxId: 0,
+      skipMedia: true,
+      task,
+      expectedCount: 1,
+      disableAutoProgress: false,
+      syncOptions: undefined,
+    })) {
+      yielded.push(m)
+    }
+
+    expect(yielded).toEqual([])
+    expect(client.getEntity).toHaveBeenCalledTimes(1)
+    expect(db.update).toHaveBeenCalled()
   })
 })

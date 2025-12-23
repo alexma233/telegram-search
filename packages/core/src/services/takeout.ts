@@ -8,11 +8,9 @@ import type { TakeoutOpts } from '../types/events'
 import bigInt from 'big-integer'
 
 import { Err, Ok } from '@unbird/result'
-import { and, eq } from 'drizzle-orm'
 import { Api } from 'telegram'
 
 import { TELEGRAM_HISTORY_INTERVAL_MS } from '../constants'
-import { joinedChatsTable } from '../schemas/joined-chats'
 import { createMinIntervalWaiter } from '../utils/min-interval'
 import { resolvePeerByChatId } from '../utils/peer'
 
@@ -165,21 +163,7 @@ export function createTakeoutService(ctx: CoreContext, logger: Logger) {
           const msg = error instanceof Error ? error.message : String(error)
           if (msg.includes('CHANNEL_INVALID') || msg.includes('PEER_ID_INVALID')) {
             logger.withFields({ chatId }).warn('Peer invalid during GetHistory; retrying with freshly resolved peer')
-            const freshPeer = await ctx.getClient().getInputEntity(chatId)
-            // Best-effort backfill so future runs stop failing.
-            try {
-              const accessHash = (freshPeer as any)?.accessHash?.toString?.()
-              if (accessHash) {
-                await ctx.getDB()
-                  .update(joinedChatsTable)
-                  .set({ access_hash: accessHash })
-                  .where(and(
-                    eq(joinedChatsTable.platform, 'telegram'),
-                    eq(joinedChatsTable.chat_id, chatId),
-                  ))
-              }
-            }
-            catch {}
+            const freshPeer = await resolvePeerByChatId(ctx, chatId, { refresh: true })
 
             result = await ctx.getClient().invoke(
               new Api.InvokeWithTakeout({
