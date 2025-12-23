@@ -1,10 +1,11 @@
 import type { Result } from '@unbird/result'
-import type { Entity } from 'telegram/define'
 
+import type { Entity } from '../../libs/gramjs/types'
 import type { CoreEntity } from '../types/events'
 
 import { Err, Ok } from '@unbird/result'
-import { Api } from 'telegram'
+
+import { Api } from '../../libs/gramjs'
 
 export function resolveEntity(entity: Entity): Result<CoreEntity> {
   if (entity instanceof Api.User) {

@@ -1,15 +1,13 @@
 import type { Logger } from '@guiiai/logg'
 import type { ProxyConfig } from '@tg-search/common'
 import type { Result } from '@unbird/result'
-import type { ProxyInterface } from 'telegram/network/connection/TCPMTProxy'
 
 import type { CoreContext } from '../context'
 
 import { isBrowser, parseProxyUrl } from '@tg-search/common'
 import { Err, Ok } from '@unbird/result'
-import { Api, TelegramClient } from 'telegram'
-import { StringSession } from 'telegram/sessions'
 
+import { Api, TelegramClient } from '../../libs/gramjs'
 import { waitForEvent } from '../utils/promise'
 
 export type ConnectionService = ReturnType<ReturnType<typeof createConnectionService>>

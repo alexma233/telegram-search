@@ -1,6 +1,6 @@
 import type { Logger } from '@guiiai/logg'
-import type { Api } from 'telegram'
 
+import type { Api } from '../../libs/gramjs'
 import type { CoreContext } from '../context'
 import type { ChatMessageStatsModels } from '../models/chat-message-stats'
 import type { TakeoutService } from '../services'

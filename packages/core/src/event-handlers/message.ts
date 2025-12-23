@@ -1,9 +1,9 @@
 import type { Logger } from '@guiiai/logg'
 
+import type { Api } from '../../libs/gramjs'
 import type { CoreContext } from '../context'
 import type { MessageService } from '../services'
 
-import { Api } from 'telegram/tl'
 import { v4 as uuidv4 } from 'uuid'
 
 import { MESSAGE_PROCESS_BATCH_SIZE } from '../constants'

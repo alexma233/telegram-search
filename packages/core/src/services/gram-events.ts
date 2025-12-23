@@ -1,9 +1,9 @@
 import type { Logger } from '@guiiai/logg'
-import type { EventBuilder } from 'telegram/events/common'
+import type { EventBuilder } from '../../libs/gramjs/events/common'
 
 import type { CoreContext } from '../context'
 
-import { NewMessage, NewMessageEvent } from 'telegram/events'
+import { NewMessage, NewMessageEvent } from '../../libs/gramjs/events'
 
 export type GramEventsService = ReturnType<typeof createGramEventsService>
 

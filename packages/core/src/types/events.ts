@@ -1,7 +1,7 @@
 import type { CorePagination } from '@tg-search/common'
 import type { EventEmitter } from 'eventemitter3'
-import type { Api } from 'telegram'
 
+import type { Api } from '../../libs/gramjs'
 import type { AccountSettings } from './account-settings'
 import type { CoreDialog } from './dialog'
 import type { CoreMessage } from './message'

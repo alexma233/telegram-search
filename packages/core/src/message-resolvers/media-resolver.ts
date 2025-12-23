@@ -13,9 +13,9 @@ import { Buffer } from 'buffer'
 
 import { newQueue } from '@henrygd/queue'
 import { fileTypeFromBuffer } from 'file-type'
-import { Api } from 'telegram'
 import { v4 as uuidv4 } from 'uuid'
 
+import { Api } from '../../libs/gramjs'
 import { MEDIA_DOWNLOAD_CONCURRENCY } from '../constants'
 import { must0 } from '../models/utils/must'
 

@@ -1,7 +1,7 @@
 import type { Logger } from '@guiiai/logg'
 import type { Result } from '@unbird/result'
-import type { Api } from 'telegram'
 
+import type { Api } from '../../libs/gramjs'
 import type { SyncOptions } from '../types/events'
 import type { CoreMessage } from '../types/message'
 

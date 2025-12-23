@@ -4,7 +4,8 @@ import type { Dialog } from 'telegram/tl/custom/dialog'
 import type { DialogType } from '../types'
 
 import { Err, Ok } from '@unbird/result'
-import { Api } from 'telegram'
+
+import { Api } from '../../libs/gramjs'
 
 /**
  * Convert a Telegram `Dialog` to minimal `CoreDialog` data.

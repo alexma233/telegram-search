@@ -1,15 +1,15 @@
 import type { Logger } from '@guiiai/logg'
 import type { Result } from '@unbird/result'
-import type { EntityLike } from 'telegram/define'
 
+import type { EntityLike } from '../../libs/gramjs/types'
 import type { CoreContext } from '../context'
 import type { TakeoutOpts } from '../types/events'
 
 import bigInt from 'big-integer'
 
 import { Err, Ok } from '@unbird/result'
-import { Api } from 'telegram'
 
+import { Api } from '../../libs/gramjs'
 import { TELEGRAM_HISTORY_INTERVAL_MS } from '../constants'
 import { createMinIntervalWaiter } from '../utils/min-interval'
 

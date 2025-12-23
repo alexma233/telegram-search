@@ -6,9 +6,9 @@ import type { CoreMessage, CoreMessageForward, CoreMessageReply } from '../types
 import bigInt from 'big-integer'
 
 import { Err, Ok } from '@unbird/result'
-import { Api } from 'telegram'
 import { v4 as uuidv4 } from 'uuid'
 
+import { Api } from '../../libs/gramjs'
 import { parseMediaId, parseMediaType } from './media'
 
 export function convertToCoreMessage(message: Api.Message): Result<CoreMessage> {

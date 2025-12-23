@@ -1,6 +1,5 @@
 import type { Logger } from '@guiiai/logg'
 import type { Result } from '@unbird/result'
-import type { Dialog } from 'telegram/tl/custom/dialog'
 
 import type { CoreContext } from '../context'
 import type { CoreDialog } from '../types/dialog'

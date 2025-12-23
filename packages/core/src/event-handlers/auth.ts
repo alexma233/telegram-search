@@ -3,8 +3,6 @@ import type { Logger } from '@guiiai/logg'
 import type { CoreContext } from '../context'
 import type { ConnectionService } from '../services'
 
-import { StringSession } from 'telegram/sessions'
-
 export function registerAuthEventHandlers(ctx: CoreContext, logger: Logger) {
   logger = logger.withContext('core:auth:event')
 

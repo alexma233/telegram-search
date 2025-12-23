@@ -1,6 +1,6 @@
 import type { Logger } from '@guiiai/logg'
-import type { Api } from 'telegram'
 
+import type { Api } from '../../libs/gramjs'
 import type { CoreContext } from '../context'
 import type { MessageResolverRegistryFn } from '../message-resolvers'
 import type { SyncOptions } from '../types/events'

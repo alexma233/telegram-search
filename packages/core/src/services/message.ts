@@ -4,7 +4,8 @@ import type { CoreContext } from '../context'
 import type { FetchMessageOpts } from '../types/events'
 
 import { Err, Ok } from '@unbird/result'
-import { Api } from 'telegram'
+
+import { Api } from '../../libs/gramjs'
 
 export type MessageService = ReturnType<typeof createMessageService>
 

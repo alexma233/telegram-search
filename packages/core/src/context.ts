@@ -1,7 +1,7 @@
 import type { Logger } from '@guiiai/logg'
 import type { CoreMetrics } from '@tg-search/common'
-import type { TelegramClient } from 'telegram'
 
+import type { TelegramClient } from '../libs/gramjs'
 import type { CoreDB } from './db'
 import type { Models } from './models'
 import type { AccountSettings } from './types/account-settings'

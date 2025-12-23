@@ -1,18 +1,17 @@
-/* eslint-disable unicorn/prefer-node-protocol */
 import type { Logger } from '@guiiai/logg'
 import type { Result } from '@unbird/result'
-import type { Dialog } from 'telegram/tl/custom/dialog'
 
 import type { MessageResolver, MessageResolverOpts } from '.'
 import type { CoreContext } from '../context'
 
+// eslint-disable-next-line unicorn/prefer-node-protocol
 import { Buffer } from 'buffer'
 
 import { newQueue } from '@henrygd/queue'
 import { Ok } from '@unbird/result'
-import { Api } from 'telegram'
 import { lru } from 'tiny-lru'
 
+import { Api } from '../../libs/gramjs'
 import { AVATAR_CACHE_TTL, AVATAR_DOWNLOAD_CONCURRENCY, MAX_AVATAR_CACHE_SIZE } from '../constants'
 
 /**

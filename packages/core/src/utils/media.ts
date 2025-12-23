@@ -1,6 +1,6 @@
 import type { CoreMessageMediaType } from '../types/media'
 
-import { Api } from 'telegram'
+import { Api } from '../../libs/gramjs'
 
 export function parseMediaType(apiMedia: Api.TypeMessageMedia): CoreMessageMediaType {
   switch (true) {
