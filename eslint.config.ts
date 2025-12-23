@@ -12,6 +12,7 @@ const config = defineConfig({
   vue: true,
 }, {
   ignores: [
+    './packages/core/libs/gramjs/**',
     'cspell.config.yaml',
     'cspell.config.yml',
     '**/drizzle/**',
