@@ -1,36 +1,14 @@
-import { crc32 } from '../Helpers';
-
-export interface GenerationEntryConfig {
-    name: string;
-    constructorId: number;
-    argsConfig: Record<string, GenerationArgConfig>;
-    subclassOfId: number;
-    result: string;
-    isFunction?: boolean;
-    namespace: string | undefined;
-}
-
-export interface GenerationArgConfig {
-    isVector: boolean;
-    isFlag: boolean;
-    skipConstructorId: boolean;
-    flagGroup: number;
-    flagIndex: number;
-    flagIndicator: boolean;
-    type: string;
-    useVectorId: boolean | undefined;
-}
+import { crc32 } from "../Helpers";
+import type { DateLike } from "../define";
 
 const snakeToCamelCase = (name: string) => {
     const result = name.replace(/(?:^|_)([a-z])/g, (_, g) => g.toUpperCase());
-    return result.replace(/_/g, '');
+    return result.replace(/_/g, "");
 };
-const variableSnakeToCamelCase = (str: string) => str.replace(
-    /([-_][a-z])/g,
-    (group) => group.toUpperCase()
-        .replace('-', '')
-        .replace('_', ''),
-);
+const variableSnakeToCamelCase = (str: string) =>
+    str.replace(/([-_][a-z])/g, (group) =>
+        group.toUpperCase().replace("-", "").replace("_", "")
+    );
 
 const CORE_TYPES = new Set([
     0xbc799737, // boolFalse#bc799737 = Bool;
@@ -53,71 +31,64 @@ const AUTH_KEY_TYPES = new Set([
     0x3072cfa1, // gzip_packed
 ]);
 
-const findAll = (regex: RegExp, str: string, matches: string[][] = []) => {
-    if (!regex.flags.includes('g')) {
-        regex = new RegExp(regex.source, 'g');
-    }
-
-    const res = regex.exec(str);
-
-    if (res) {
-        matches.push(res.slice(1));
-        findAll(regex, str, matches);
-    }
-
-    return matches;
-};
-
-const fromLine = (line: string, isFunction?: boolean) => {
-    const match = line.match(/([\w.]+)(?:#([0-9a-fA-F]+))?(?:\s{?\w+:[\w\d<>#.?!]+}?)*\s=\s([\w\d<>#.?]+);$/);
+const fromLine = (line: string, isFunction: boolean) => {
+    const match = line.match(
+        /([\w.]+)(?:#([0-9a-fA-F]+))?(?:\s{?\w+:[\w\d<>#.?!]+}?)*\s=\s([\w\d<>#.?]+);$/
+    );
     if (!match) {
         // Probably "vector#1cb5c415 {t:Type} # [ t ] = Vector t;"
         throw new Error(`Cannot parse TLObject ${line}`);
     }
 
     const argsMatch = findAll(/({)?(\w+):([\w\d<>#.?!]+)}?/, line);
-    const currentConfig: GenerationEntryConfig = {
+    const currentConfig: any = {
         name: match[1],
         constructorId: parseInt(match[2], 16),
         argsConfig: {},
         subclassOfId: crc32(match[3]),
         result: match[3],
-        isFunction,
+        isFunction: isFunction,
         namespace: undefined,
     };
     if (!currentConfig.constructorId) {
-        const hexId = '';
+        const hexId = "";
         let args;
 
         if (Object.values(currentConfig.argsConfig).length) {
             args = ` ${Object.keys(currentConfig.argsConfig)
                 .map((arg) => arg.toString())
-                .join(' ')}`;
+                .join(" ")}`;
         } else {
-            args = '';
+            args = "";
         }
 
-        const representation = `${currentConfig.name}${hexId}${args} = ${currentConfig.result}`
-            .replace(/(:|\?)bytes /g, '$1string ')
-            .replace(/</g, ' ')
-            .replace(/>|{|}/g, '')
-            .replace(/ \w+:flags\d*\.\d+\?true/g, '');
+        const representation =
+            `${currentConfig.name}${hexId}${args} = ${currentConfig.result}`
+                .replace(/(:|\?)bytes /g, "$1string ")
+                .replace(/</g, " ")
+                .replace(/>|{|}/g, "")
+                .replace(/ \w+:flags(\d+)?\.\d+\?true/g, "");
 
-        if (currentConfig.name === 'inputMediaInvoice') {
+        if (currentConfig.name === "inputMediaInvoice") {
             // eslint-disable-next-line no-empty
-            if (currentConfig.name === 'inputMediaInvoice') {
+            if (currentConfig.name === "inputMediaInvoice") {
             }
         }
 
-        currentConfig.constructorId = crc32(Buffer.from(representation, 'utf8'));
+        currentConfig.constructorId = crc32(
+            Buffer.from(representation, "utf8")
+        );
     }
     for (const [brace, name, argType] of argsMatch) {
         if (brace === undefined) {
-            currentConfig.argsConfig[variableSnakeToCamelCase(name)] = buildArgConfig(name, argType);
+            // @ts-ignore
+            currentConfig.argsConfig[variableSnakeToCamelCase(name)] =
+                buildArgConfig(name, argType);
         }
     }
-    if (currentConfig.name.includes('.')) {
-        [currentConfig.namespace, currentConfig.name] = currentConfig.name.split(/\.(.+)/);
+    if (currentConfig.name.includes(".")) {
+        [currentConfig.namespace, currentConfig.name] =
+            currentConfig.name.split(/\.(.+)/);
     }
     currentConfig.name = snakeToCamelCase(currentConfig.name);
     /*
@@ -127,45 +98,56 @@ const fromLine = (line: string, isFunction?: boolean) => {
           delete  currentConfig.argsConfig[arg]
         }
       }
-    } */
+    }*/
     return currentConfig;
 };
 
 function buildArgConfig(name: string, argType: string) {
-    name = name === 'self' ? 'is_self' : name;
+    name = name === "self" ? "is_self" : name;
     // Default values
-    const currentConfig: GenerationArgConfig = {
+    const currentConfig: any = {
         isVector: false,
         isFlag: false,
         skipConstructorId: false,
-        flagGroup: 0,
+        flagName: null,
         flagIndex: -1,
         flagIndicator: true,
-        type: '',
-        useVectorId: undefined,
+        type: null,
+        useVectorId: null,
     };
 
+    // Special case: some types can be inferred, which makes it
+    // less annoying to type. Currently the only type that can
+    // be inferred is if the name is 'random_id', to which a
+    // random ID will be assigned if left as None (the default)
+    const canBeInferred = name === "random_id";
+
     // The type can be an indicator that other arguments will be flags
-    if (argType !== '#') {
+    if (argType !== "#") {
         currentConfig.flagIndicator = false;
         // Strip the exclamation mark always to have only the name
-        currentConfig.type = argType.replace(/^!+/, '');
+        currentConfig.type = argType.replace(/^!+/, "");
 
-        // The type may be a flag (flags[N].IDX?REAL_TYPE)
+        // The type may be a flag (flags.IDX?REAL_TYPE)
         // Note that 'flags' is NOT the flags name; this
         // is determined by a previous argument
-        // However, we assume that the argument will always be called 'flags[N]'
-        const flagMatch = currentConfig.type.match(/flags(\d*)\.(\d+)\?([\w<>.]+)/);
+        // However, we assume that the argument will always be starts with 'flags'
+        // @ts-ignore
+        const flagMatch = currentConfig.type.match(
+            /(flags(?:\d+)?).(\d+)\?([\w<>.]+)/
+        );
 
         if (flagMatch) {
             currentConfig.isFlag = true;
-            currentConfig.flagGroup = Number(flagMatch[1] || 1);
+            // As of layer 140, flagName can be "flags" or "flags2"
+            currentConfig.flagName = flagMatch[1];
             currentConfig.flagIndex = Number(flagMatch[2]);
             // Update the type to match the exact type, not the "flagged" one
-            [, , , currentConfig.type] = flagMatch;
+            currentConfig.type = flagMatch[3];
         }
 
         // Then check if the type is a Vector<REAL_TYPE>
+        // @ts-ignore
         const vectorMatch = currentConfig.type.match(/[Vv]ector<([\w\d.]+)>/);
 
         if (vectorMatch) {
@@ -173,7 +155,8 @@ function buildArgConfig(name: string, argType: string) {
 
             // If the type's first letter is not uppercase, then
             // it is a constructor and we use (read/write) its ID.
-            currentConfig.useVectorId = currentConfig.type.charAt(0) === 'V';
+            // @ts-ignore
+            currentConfig.useVectorId = currentConfig.type.charAt(0) === "V";
 
             // Update the type to match the one inside the vector
             [, currentConfig.type] = vectorMatch;
@@ -181,10 +164,8 @@ function buildArgConfig(name: string, argType: string) {
 
         // See use_vector_id. An example of such case is ipPort in
         // help.configSpecial
-        if (/^[a-z]$/.test(currentConfig.type.split('.')
-            .pop()!
-            .charAt(0))
-        ) {
+        // @ts-ignore
+        if (/^[a-z]$/.test(currentConfig.type.split(".").pop().charAt(0))) {
             currentConfig.skipConstructorId = true;
         }
 
@@ -200,24 +181,33 @@ function buildArgConfig(name: string, argType: string) {
         //     this.type = 'date';
         // }
     }
+    // workaround
+    if (currentConfig.type == "future_salt") {
+        currentConfig.type = "FutureSalt";
+    }
     return currentConfig;
 }
 
-export function* parseTl(content: string, methods: any[] = [], ignoreIds = CORE_TYPES) {
-    (methods || []).reduce((o, m) => ({
-        ...o,
-        [m.name]: m,
-    }), {});
-    const objAll: GenerationEntryConfig[] = [];
-    const objByName: Record<string, GenerationEntryConfig> = {};
-    const objByType: Record<string, GenerationEntryConfig[]> = {};
+const parseTl = function* (
+    content: string,
+    layer: string,
+    methods: any[] = [],
+    ignoreIds = CORE_TYPES
+) {
+    const methodInfo = (methods || []).reduce(
+        (o, m) => ({ ...o, [m.name]: m }),
+        {}
+    );
+    const objAll = [];
+    const objByName: any = {};
+    const objByType: any = {};
 
     const file = content;
 
     let isFunction = false;
 
-    for (let line of file.split('\n')) {
-        const commentIndex = line.indexOf('//');
+    for (let line of file.split("\n")) {
+        const commentIndex = line.indexOf("//");
 
         if (commentIndex !== -1) {
             line = line.slice(0, commentIndex);
@@ -233,7 +223,7 @@ export function* parseTl(content: string, methods: any[] = [], ignoreIds = CORE_
 
         if (match) {
             const [, followingTypes] = match;
-            isFunction = followingTypes === 'functions';
+            isFunction = followingTypes === "functions";
             continue;
         }
 
@@ -255,8 +245,7 @@ export function* parseTl(content: string, methods: any[] = [], ignoreIds = CORE_
                 objByType[result.result].push(result);
             }
         } catch (e: any) {
-            if (!e.toString()
-                .includes('vector#1cb5c415')) {
+            if (!e.toString().includes("vector#1cb5c415")) {
                 throw e;
             }
         }
@@ -265,11 +254,10 @@ export function* parseTl(content: string, methods: any[] = [], ignoreIds = CORE_
     // Once all objects have been parsed, replace the
     // string type from the arguments with references
     for (const obj of objAll) {
-        // console.log(obj)
         if (AUTH_KEY_TYPES.has(obj.constructorId)) {
             for (const arg in obj.argsConfig) {
-                if (obj.argsConfig[arg].type === 'string') {
-                    obj.argsConfig[arg].type = 'bytes';
+                if (obj.argsConfig[arg].type === "string") {
+                    obj.argsConfig[arg].type = "bytes";
                 }
             }
         }
@@ -278,11 +266,26 @@ export function* parseTl(content: string, methods: any[] = [], ignoreIds = CORE_
     for (const obj of objAll) {
         yield obj;
     }
-}
+};
+
+const findAll = (regex: RegExp, str: string, matches: any = []) => {
+    if (!regex.flags.includes("g")) {
+        regex = new RegExp(regex.source, "g");
+    }
+
+    const res = regex.exec(str);
+
+    if (res) {
+        matches.push(res.slice(1));
+        findAll(regex, str, matches);
+    }
+
+    return matches;
+};
 
 export function serializeBytes(data: Buffer | string | any) {
     if (!(data instanceof Buffer)) {
-        if (typeof data === 'string') {
+        if (typeof data == "string") {
             data = Buffer.from(data);
         } else {
             throw Error(`Bytes or str expected, not ${data.constructor.name}`);
@@ -302,27 +305,42 @@ export function serializeBytes(data: Buffer | string | any) {
         if (padding !== 0) {
             padding = 4 - padding;
         }
-        r.push(Buffer.from([254, data.length % 256, (data.length >> 8) % 256, (data.length >> 16) % 256]));
+        r.push(
+            Buffer.from([
+                254,
+                data.length % 256,
+                (data.length >> 8) % 256,
+                (data.length >> 16) % 256,
+            ])
+        );
         r.push(data);
     }
-    r.push(Buffer.alloc(padding)
-        .fill(0));
+    r.push(Buffer.alloc(padding).fill(0));
 
     return Buffer.concat(r);
 }
 
-export function serializeDate(dt: Date | number) {
+export function serializeDate(dt: DateLike | Date) {
     if (!dt) {
-        return Buffer.alloc(4)
-            .fill(0);
+        return Buffer.alloc(4).fill(0);
     }
     if (dt instanceof Date) {
         dt = Math.floor((Date.now() - dt.getTime()) / 1000);
     }
-    if (typeof dt === 'number') {
+    if (typeof dt == "number") {
         const t = Buffer.alloc(4);
         t.writeInt32LE(dt, 0);
         return t;
     }
     throw Error(`Cannot interpret "${dt}" as a date`);
 }
+
+export {
+    findAll,
+    parseTl,
+    buildArgConfig,
+    fromLine,
+    CORE_TYPES,
+    snakeToCamelCase,
+    variableSnakeToCamelCase,
+};

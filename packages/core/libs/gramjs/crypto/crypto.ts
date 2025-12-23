@@ -1,170 +1,150 @@
-import AES from '@cryptography/aes';
+import { default as AES } from "@cryptography/aes";
+import { i2ab, ab2i } from "./converters";
+import { getWords } from "./words";
 
-class Counter {
-  public counter: Buffer<ArrayBuffer>;
+export class Counter {
+    _counter: Buffer;
 
-  constructor(initialValue: Buffer) {
-    this.counter = Buffer.from(initialValue);
-  }
-
-  increment() {
-    for (let i = 15; i >= 0; i--) {
-      if (this.counter[i] === 255) {
-        this.counter[i] = 0;
-      } else {
-        this.counter[i]++;
-        break;
-      }
+    constructor(initialValue: any) {
+        this._counter = Buffer.from(initialValue);
     }
-  }
+
+    increment() {
+        for (let i = 15; i >= 0; i--) {
+            if (this._counter[i] === 255) {
+                this._counter[i] = 0;
+            } else {
+                this._counter[i]++;
+                break;
+            }
+        }
+    }
 }
 
-class CTR {
-  private _counter: Counter;
+export class CTR {
+    private _counter: Counter;
+    private _remainingCounter?: Buffer;
+    private _remainingCounterIndex: number;
+    private _aes: AES;
 
-  private _carryBlock: Buffer | undefined;
+    constructor(key: Buffer, counter: any) {
+        if (!(counter instanceof Counter)) {
+            counter = new Counter(counter);
+        }
 
-  private _carryOffset: number;
+        this._counter = counter;
 
-  private _aes: AES;
+        this._remainingCounter = undefined;
+        this._remainingCounterIndex = 16;
 
-  constructor(key: Buffer, counter: Counter | Buffer) {
-    if (!(counter instanceof Counter)) {
-      counter = new Counter(counter);
+        this._aes = new AES(getWords(key));
     }
 
-    this._counter = counter;
-
-    this._carryBlock = undefined;
-    this._carryOffset = 0;
-
-    this._aes = new AES(key);
-  }
-
-  update(plainText: Buffer<ArrayBuffer>) {
-    return this.encrypt(plainText);
-  }
-
-  encrypt(plain: Buffer): Buffer {
-    const aes = this._aes;
-    const ctr = this._counter;
-
-    const src = plain;
-    const n = src.length;
-
-    const dst = Buffer.allocUnsafe(n);
-
-    let pos = 0;
-
-    // 1) Consume any carried keystream from the previous call
-    if (this._carryBlock) {
-      const take = Math.min(16 - this._carryOffset, n);
-      for (let j = 0; j < take; j++) {
-        dst[pos + j] = src[pos + j] ^ this._carryBlock[this._carryOffset + j];
-      }
-      pos += take;
-      this._carryOffset += take;
-
-      if (this._carryOffset === 16) {
-        this._carryBlock = undefined;
-        this._carryOffset = 0;
-      }
+    update(plainText: any) {
+        return this.encrypt(plainText);
     }
 
-    // Temporary keystream block for this call
-    const keystream = Buffer.allocUnsafe(16);
+    encrypt(plainText: any) {
+        const encrypted = Buffer.from(plainText);
 
-    // 2) Full 16-byte blocks
-    while (pos + 16 <= n) {
-      const words = aes.encrypt(ctr.counter);
-      writeU32WordsBE(words, keystream);
-      ctr.increment();
+        for (let i = 0; i < encrypted.length; i++) {
+            if (this._remainingCounterIndex === 16) {
+                this._remainingCounter = Buffer.from(
+                    i2ab(this._aes.encrypt(ab2i(this._counter._counter)))
+                );
+                this._remainingCounterIndex = 0;
+                this._counter.increment();
+            }
+            if (this._remainingCounter) {
+                encrypted[i] ^=
+                    this._remainingCounter[this._remainingCounterIndex++];
+            }
+        }
 
-      for (let j = 0; j < 16; j++) {
-        dst[pos + j] = src[pos + j] ^ keystream[j];
-      }
-      pos += 16;
+        return encrypted;
     }
-
-    // 3) Tail (<16 bytes) — store carryover for next call
-    if (pos < n) {
-      const words = aes.encrypt(ctr.counter);
-      writeU32WordsBE(words, keystream);
-      ctr.increment();
-
-      let used = 0;
-      for (; pos < n; pos++, used++) {
-        dst[pos] = src[pos] ^ keystream[used];
-      }
-      this._carryBlock = keystream;
-      this._carryOffset = used;
-    }
-
-    return dst;
-  }
 }
-
-export type CtrImpl = CTR;
 
 // endregion
 export function createDecipheriv(algorithm: string, key: Buffer, iv: Buffer) {
-  if (algorithm.includes('ECB')) {
-    throw new Error('Not supported');
-  } else {
-    return new CTR(key, iv);
-  }
+    if (algorithm.includes("ECB")) {
+        throw new Error("Not supported");
+    } else {
+        return new CTR(key, iv);
+    }
 }
 
 export function createCipheriv(algorithm: string, key: Buffer, iv: Buffer) {
-  if (algorithm.includes('ECB')) {
-    throw new Error('Not supported');
-  } else {
-    return new CTR(key, iv);
-  }
+    if (algorithm.includes("ECB")) {
+        throw new Error("Not supported");
+    } else {
+        return new CTR(key, iv);
+    }
 }
 
 export function randomBytes(count: number) {
-  const bytes = new Uint8Array(count);
-  crypto.getRandomValues(bytes);
-  return bytes;
+    const bytes = new Uint8Array(count);
+    crypto.getRandomValues(bytes);
+    return bytes;
 }
 
-class Hash {
-  private data = new Uint8Array(0);
+export class Hash {
+    private readonly algorithm: string;
+    private data?: Uint8Array;
 
-  constructor(private algorithm: 'sha1' | 'sha256') { }
-
-  update(data: ArrayLike<number>) {
-    // We shouldn't be needing new Uint8Array but it doesn't
-    // work without it
-    this.data = new Uint8Array(data);
-  }
-
-  async digest() {
-    if (this.algorithm === 'sha1') {
-      return Buffer.from(await self.crypto.subtle.digest('SHA-1', this.data));
-    } else {
-      return Buffer.from(await self.crypto.subtle.digest('SHA-256', this.data));
+    constructor(algorithm: string) {
+        this.algorithm = algorithm;
     }
-  }
+
+    update(data: Buffer) {
+        //We shouldn't be needing new Uint8Array but it doesn't
+        //work without it
+        this.data = new Uint8Array(data);
+    }
+
+    async digest() {
+        if (this.data) {
+            if (this.algorithm === "sha1") {
+                return Buffer.from(
+                    await self.crypto.subtle.digest("SHA-1", this.data)
+                );
+            } else if (this.algorithm === "sha256") {
+                return Buffer.from(
+                    await self.crypto.subtle.digest("SHA-256", this.data)
+                );
+            }
+        }
+        return Buffer.alloc(0);
+    }
 }
 
-export async function pbkdf2(password: Buffer<ArrayBuffer>, salt: Buffer<ArrayBuffer>, iterations: number) {
-  const passwordKey = await crypto.subtle.importKey('raw', password, { name: 'PBKDF2' }, false, ['deriveBits']);
-  return Buffer.from(await crypto.subtle.deriveBits({
-    name: 'PBKDF2',
-    hash: 'SHA-512',
-    salt,
-    iterations,
-  }, passwordKey, 512));
+export async function pbkdf2Sync(
+    password: any,
+    salt: any,
+    iterations: any,
+    ...args: any
+) {
+    const passwordKey = await crypto.subtle.importKey(
+        "raw",
+        password,
+        { name: "PBKDF2" },
+        false,
+        ["deriveBits"]
+    );
+    return Buffer.from(
+        await crypto.subtle.deriveBits(
+            {
+                name: "PBKDF2",
+                hash: "SHA-512",
+                salt,
+                iterations,
+            },
+            passwordKey,
+            512
+        )
+    );
 }
 
-export function createHash(algorithm: 'sha1' | 'sha256') {
-  return new Hash(algorithm);
-}
-
-function writeU32WordsBE(words: Uint32Array, out: Buffer) {
-  for (let i = 0; i < words.length; i++) {
-    out.writeUInt32BE(words[i], i * 4);
-  }
+export function createHash(algorithm: string) {
+    return new Hash(algorithm);
 }

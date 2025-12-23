@@ -1,25 +1,17 @@
-export abstract class MTProtoRequest {
+export class MTProtoRequest {
     private sent: boolean;
-
     private sequence: number;
-
-    private msgId: bigint;
-
+    private msgId: number;
     private readonly dirty: boolean;
-
     private sendTime: number;
-
     private confirmReceived: boolean;
-
     private constructorId: number;
-
     private readonly confirmed: boolean;
-
     private responded: boolean;
 
     constructor() {
         this.sent = false;
-        this.msgId = 0n; // long
+        this.msgId = 0; // long
         this.sequence = 0;
 
         this.dirty = false;
@@ -33,7 +25,7 @@ export abstract class MTProtoRequest {
         this.responded = false;
     }
 
-    // These should not be overrode
+    // these should not be overrode
     onSendSuccess() {
         this.sendTime = new Date().getTime();
         this.sent = true;
@@ -44,13 +36,20 @@ export abstract class MTProtoRequest {
     }
 
     needResend() {
-        return this.dirty || (this.confirmed && !this.confirmReceived && new Date().getTime() - this.sendTime > 3000);
+        return (
+            this.dirty ||
+            (this.confirmed &&
+                !this.confirmReceived &&
+                new Date().getTime() - this.sendTime > 3000)
+        );
     }
 
     // These should be overrode
-    abstract onSend(): void;
+    onSend() {
+        throw Error("Not overload " + this.constructor.name);
+    }
 
-    abstract onResponse(_buffer: Buffer): void;
+    onResponse(buffer: Buffer) {}
 
-    abstract onException(_exception: Error): void;
+    onException(exception: Error) {}
 }

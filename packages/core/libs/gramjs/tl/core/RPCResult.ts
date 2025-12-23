@@ -1,35 +1,27 @@
+import { Api } from "../api";
+import type { BinaryReader } from "../../extensions";
+import { GZIPPacked } from "./";
+import bigInt from "big-integer";
 
-import type { BinaryReader } from '../../extensions';
-
-import Api from '../api';
-
-import GZIPPacked from './GZIPPacked';
-
-export default class RPCResult {
+export class RPCResult {
     static CONSTRUCTOR_ID = 0xf35c6d01;
-
-    static classType = 'constructor';
-
+    static classType = "constructor";
     private CONSTRUCTOR_ID: number;
-
-    private reqMsgId: bigint;
-
+    private reqMsgId: bigInt.BigInteger;
     private body?: Buffer;
-
     private error?: Api.RpcError;
-
     private classType: string;
 
     constructor(
-        reqMsgId: bigint,
+        reqMsgId: bigInt.BigInteger,
         body?: Buffer,
-        error?: Api.RpcError,
+        error?: Api.RpcError
     ) {
         this.CONSTRUCTOR_ID = 0xf35c6d01;
         this.reqMsgId = reqMsgId;
         this.body = body;
         this.error = error;
-        this.classType = 'constructor';
+        this.classType = "constructor";
     }
 
     static async fromReader(reader: BinaryReader) {
@@ -39,13 +31,13 @@ export default class RPCResult {
             return new RPCResult(
                 msgId,
                 undefined,
-                Api.RpcError.fromReader(reader),
+                Api.RpcError.fromReader(reader)
             );
         }
         if (innerCode === GZIPPacked.CONSTRUCTOR_ID) {
             return new RPCResult(
                 msgId,
-                (await GZIPPacked.fromReader(reader)).data,
+                (await GZIPPacked.fromReader(reader)).data
             );
         }
         reader.seek(-4);

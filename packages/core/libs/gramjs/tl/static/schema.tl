@@ -1,7 +1,3 @@
-// Core types (no need to gen)
-
-//vector#1cb5c415 {t:Type} # [ t ] = Vector t;
-
 ///////////////////////////////
 /// Authorization key creation
 ///////////////////////////////
@@ -12,6 +8,8 @@ p_q_inner_data#83c95aec pq:string p:string q:string nonce:int128 server_nonce:in
 p_q_inner_data_dc#a9f55f95 pq:string p:string q:string nonce:int128 server_nonce:int128 new_nonce:int256 dc:int = P_Q_inner_data;
 p_q_inner_data_temp#3c6a84d4 pq:string p:string q:string nonce:int128 server_nonce:int128 new_nonce:int256 expires_in:int = P_Q_inner_data;
 p_q_inner_data_temp_dc#56fddf88 pq:string p:string q:string nonce:int128 server_nonce:int128 new_nonce:int256 dc:int expires_in:int = P_Q_inner_data;
+
+bind_auth_key_inner#75a3f765 nonce:long temp_auth_key_id:long perm_auth_key_id:long temp_session_id:long expires_at:int = BindAuthKeyInner;
 
 server_DH_params_fail#79cb045d nonce:int128 server_nonce:int128 new_nonce_hash:int128 = Server_DH_Params;
 server_DH_params_ok#d0e8075c nonce:int128 server_nonce:int128 encrypted_answer:string = Server_DH_Params;
@@ -32,7 +30,6 @@ destroy_auth_key_fail#ea109b13 = DestroyAuthKeyRes;
 
 req_pq#60469778 nonce:int128 = ResPQ;
 req_pq_multi#be7e8ef1 nonce:int128 = ResPQ;
-req_pq_multi_new#51b410fd nonce:int128 = ResPQ;
 
 req_DH_params#d712e4be nonce:int128 server_nonce:int128 p:string q:string public_key_fingerprint:long encrypted_data:string = Server_DH_Params;
 
@@ -69,7 +66,7 @@ rpc_answer_dropped_running#cd78e586 = RpcDropAnswer;
 rpc_answer_dropped#a43ad8b7 msg_id:long seq_no:int bytes:int = RpcDropAnswer;
 
 future_salt#0949d9dc valid_since:int valid_until:int salt:long = FutureSalt;
-future_salts#ae500895 req_msg_id:long now:int salts:vector<FutureSalt> = FutureSalts;
+future_salts#ae500895 req_msg_id:long now:int salts:vector<future_salt> = FutureSalts;
 
 pong#347773c5 msg_id:long ping_id:long = Pong;
 
@@ -100,7 +97,9 @@ tlsBlockRandom length:int = TlsBlock;
 tlsBlockZero length:int = TlsBlock;
 tlsBlockDomain = TlsBlock;
 tlsBlockGrease seed:int = TlsBlock;
+tlsBlockPublicKey = TlsBlock;
 tlsBlockScope entries:Vector<TlsBlock> = TlsBlock;
+tlsBlockPermutation entries:Vector<Vector<TlsBlock>> = TlsBlock;
 
 ---functions---
 

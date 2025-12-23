@@ -1,9 +1,11 @@
-import { Api } from '.';
+export const LAYER = 193;
 
-const tlobjects: Record<number, any> = {};
+import { Api } from "./";
+
+const tlobjects: any = {};
 
 for (const tl of Object.values(Api)) {
-    if ('CONSTRUCTOR_ID' in tl) {
+    if ("CONSTRUCTOR_ID" in tl) {
         tlobjects[tl.CONSTRUCTOR_ID] = tl;
     } else {
         for (const sub of Object.values(tl)) {
@@ -11,7 +13,4 @@ for (const tl of Object.values(Api)) {
         }
     }
 }
-
-export const LAYER = 220;
-
 export { tlobjects };

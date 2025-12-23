@@ -1,24 +1,18 @@
-import type { WrappedError } from '../../../api/gramjs/helpers/misc';
-import type TelegramClient from './TelegramClient';
-
-import { EmailUnconfirmedError } from '../errors';
-import Api from '../tl/api';
-
-import { generateRandomBytes } from '../Helpers';
-import { computeCheck, computeDigest } from '../Password';
+import { generateRandomBytes } from "../Helpers";
+import { computeCheck, computeDigest } from "../Password";
+import type { TelegramClient } from "./TelegramClient";
+import { Api } from "../tl";
+import { errors } from "../index";
 
 export interface TwoFaParams {
-  isCheckPassword?: boolean;
-  currentPassword?: string;
-  newPassword?: string;
-  hint?: string;
-  email?: string;
-  emailCodeCallback?: (length: number) => Promise<string>;
-  onEmailCodeError?: (err: Error) => void;
+    isCheckPassword?: boolean;
+    currentPassword?: string;
+    newPassword?: string;
+    hint?: string;
+    email?: string;
+    emailCodeCallback?: (length: number) => Promise<string>;
+    onEmailCodeError?: (err: Error) => void;
 }
-
-export type TmpPasswordResult = Api.account.TmpPassword | WrappedError | undefined;
-export type PasswordResult = Api.TypeInputCheckPasswordSRP | WrappedError | undefined;
 
 /**
  * Changes the 2FA settings of the logged in user.
@@ -46,6 +40,7 @@ export type PasswordResult = Api.TypeInputCheckPasswordSRP | WrappedError | unde
  to it must also be set. This callback may be asynchronous.
  It should return a string with the code. The length of the
  code will be passed to the callback as an input parameter.
+ * @param onEmailCodeError: Called when an error happens while sending an email.
 
  If the callback returns an invalid code, it will raise an rpc error with the message
  ``CODE_INVALID``
@@ -57,104 +52,89 @@ export type PasswordResult = Api.TypeInputCheckPasswordSRP | WrappedError | unde
  "EMAIL_HASH_EXPIRED" if the user took too long to verify their email
  */
 export async function updateTwoFaSettings(
-  client: TelegramClient,
-  {
-    isCheckPassword,
-    currentPassword,
-    newPassword,
-    hint = '',
-    email,
-    emailCodeCallback,
-    onEmailCodeError,
-  }: TwoFaParams,
-) {
-  if (!newPassword && !currentPassword) {
-    throw new Error('Neither `currentPassword` nor `newPassword` is present');
-  }
-
-  if (email && !(emailCodeCallback && onEmailCodeError)) {
-    throw new Error('`email` present without `emailCodeCallback` and `onEmailCodeError`');
-  }
-
-  const pwd = await client.invoke(new Api.account.GetPassword());
-
-  const newAlgo = pwd.newAlgo;
-
-  if (newAlgo instanceof Api.PasswordKdfAlgoUnknown) {
-    throw new Error('Password algorithm is unknown');
-  }
-
-  newAlgo.salt1 = Buffer.concat([newAlgo.salt1, generateRandomBytes(32)]);
-  if (!pwd.hasPassword && currentPassword) {
-    currentPassword = undefined;
-  }
-
-  const password = currentPassword ? await computeCheck(pwd, currentPassword) : new Api.InputCheckPasswordEmpty();
-
-  if (isCheckPassword) {
-    await client.invoke(new Api.auth.CheckPassword({ password }));
-    return;
-  }
-
-  try {
-    await client.invoke(new Api.account.UpdatePasswordSettings({
-      password,
-      newSettings: new Api.account.PasswordInputSettings({
-        newAlgo,
-        newPasswordHash: newPassword ? await computeDigest(newAlgo, newPassword) : Buffer.alloc(0),
-        hint,
+    client: TelegramClient,
+    {
+        isCheckPassword,
+        currentPassword,
+        newPassword,
+        hint = "",
         email,
-        // not explained what it does and it seems to always be set to empty in tdesktop
-        newSecureSettings: undefined,
-      }),
-    }));
-  } catch (e) {
-    if (e instanceof EmailUnconfirmedError) {
-      while (true) {
-        try {
-          const code = await emailCodeCallback!(e.codeLength);
-
-          if (!code) {
-            throw new Error('Code is empty');
-          }
-
-          await client.invoke(new Api.account.ConfirmPasswordEmail({ code }));
-          break;
-        } catch (err: any) {
-          onEmailCodeError!(err);
-        }
-      }
-    } else {
-      throw e;
+        emailCodeCallback,
+        onEmailCodeError,
+    }: TwoFaParams
+) {
+    if (!newPassword && !currentPassword) {
+        throw new Error(
+            "Neither `currentPassword` nor `newPassword` is present"
+        );
     }
-  }
-}
 
-export async function getTmpPassword(client: TelegramClient, currentPassword: string, ttl = 60) {
-  const pwd = await client.invoke(new Api.account.GetPassword());
+    if (email && !(emailCodeCallback && onEmailCodeError)) {
+        throw new Error(
+            "`email` present without `emailCodeCallback` and `onEmailCodeError`"
+        );
+    }
 
-  if (!pwd) {
-    return undefined;
-  }
+    const pwd = await client.invoke(new Api.account.GetPassword());
 
-  const inputPassword = await computeCheck(pwd, currentPassword);
-  const result = await client.invoke(new Api.account.GetTmpPassword({
-    password: inputPassword,
-    period: ttl,
-  }));
+    if (!(pwd.newAlgo instanceof Api.PasswordKdfAlgoUnknown)) {
+        pwd.newAlgo.salt1 = Buffer.concat([
+            pwd.newAlgo.salt1,
+            generateRandomBytes(32),
+        ]);
+    }
+    if (!pwd.hasPassword && currentPassword) {
+        currentPassword = undefined;
+    }
 
-  return result;
-}
+    const password = currentPassword
+        ? await computeCheck(pwd, currentPassword!)
+        : new Api.InputCheckPasswordEmpty();
 
-export async function getCurrentPassword(
-  client: TelegramClient,
-  currentPassword?: string,
-): Promise<PasswordResult> {
-  const pwd = await client.invoke(new Api.account.GetPassword());
+    if (isCheckPassword) {
+        await client.invoke(new Api.auth.CheckPassword({ password }));
+        return;
+    }
+    if (pwd.newAlgo instanceof Api.PasswordKdfAlgoUnknown) {
+        throw new Error("Unknown password encryption method");
+    }
+    try {
+        await client.invoke(
+            new Api.account.UpdatePasswordSettings({
+                password,
+                newSettings: new Api.account.PasswordInputSettings({
+                    newAlgo: pwd.newAlgo,
+                    newPasswordHash: newPassword
+                        ? await computeDigest(pwd.newAlgo, newPassword)
+                        : Buffer.alloc(0),
+                    hint,
+                    email,
+                    // not explained what it does and it seems to always be set to empty in tdesktop
+                    newSecureSettings: undefined,
+                }),
+            })
+        );
+    } catch (e) {
+        if (e instanceof errors.EmailUnconfirmedError) {
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                try {
+                    const code = await emailCodeCallback!(e.codeLength);
 
-  if (!pwd) {
-    return undefined;
-  }
+                    if (!code) {
+                        throw new Error("Code is empty");
+                    }
 
-  return currentPassword ? await computeCheck(pwd, currentPassword) : new Api.InputCheckPasswordEmpty();
+                    await client.invoke(
+                        new Api.account.ConfirmPasswordEmail({ code })
+                    );
+                    break;
+                } catch (err: any) {
+                    onEmailCodeError!(err);
+                }
+            }
+        } else {
+            throw e;
+        }
+    }
 }

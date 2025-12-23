@@ -1,27 +1,21 @@
-import { inflate } from 'pako/dist/pako_inflate';
+import { serializeBytes } from "../";
+import { inflate } from "pako";
+import type { BinaryReader } from "../../extensions";
 
-import type { BinaryReader } from '../../extensions';
-
-import { serializeBytes } from '..';
-
-export default class GZIPPacked {
+export class GZIPPacked {
     static CONSTRUCTOR_ID = 0x3072cfa1;
-
-    static classType = 'constructor';
-
-    data: Buffer<ArrayBuffer>;
-
+    static classType = "constructor";
+    data: Buffer;
     private CONSTRUCTOR_ID: number;
-
     private classType: string;
 
-    constructor(data: Buffer<ArrayBuffer>) {
+    constructor(data: Buffer) {
         this.data = data;
         this.CONSTRUCTOR_ID = 0x3072cfa1;
-        this.classType = 'constructor';
+        this.classType = "constructor";
     }
 
-    static async gzipIfSmaller(contentRelated: boolean, data: Buffer<ArrayBuffer>) {
+    static async gzipIfSmaller(contentRelated: boolean, data: Buffer) {
         if (contentRelated && data.length > 512) {
             const gzipped = await new GZIPPacked(data).toBytes();
             if (gzipped.length < data.length) {
@@ -31,10 +25,10 @@ export default class GZIPPacked {
         return data;
     }
 
-    static gzip(input: Buffer<ArrayBuffer>) {
+    static gzip(input: Buffer) {
         return Buffer.from(input);
         // TODO this usually makes it faster for large requests
-        // return Buffer.from(deflate(input, { level: 9, gzip: true }))
+        //return Buffer.from(deflate(input, { level: 9, gzip: true }))
     }
 
     static ungzip(input: Buffer) {
@@ -50,10 +44,10 @@ export default class GZIPPacked {
         ]);
     }
 
-    static read(reader: BinaryReader) {
+    static async read(reader: BinaryReader) {
         const constructor = reader.readInt(false);
         if (constructor !== GZIPPacked.CONSTRUCTOR_ID) {
-            throw new Error('not equal');
+            throw new Error("not equal");
         }
         return GZIPPacked.gzip(reader.tgReadBytes());
     }

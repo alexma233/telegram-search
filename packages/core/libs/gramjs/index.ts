@@ -1,21 +1,15 @@
-export { Api } from './tl';
-export * as errors from './errors';
-export * as extensions from './extensions';
-export * as connection from './network';
-export * as sessions from './sessions';
-export * as tl from './tl';
+export { Api } from "./tl";
+import * as tl from "./tl";
+export { TelegramClient } from "./client/TelegramClient";
+export { Connection } from "./network";
+export { version } from "./Version";
+export { Logger } from "./extensions/Logger";
+import * as utils from "./Utils";
+import * as errors from "./errors";
+import * as sessions from "./sessions";
+import * as extensions from "./extensions";
+import * as helpers from "./Helpers";
+import * as client from "./client";
+import * as password from "./Password";
 
-import type { SizeType, Update } from './client/TelegramClient';
-
-import TelegramClient from './client/TelegramClient';
-export * as helpers from './Helpers';
-export * as utils from './Utils';
-
-export {
-  TelegramClient,
-};
-
-export type {
-  Update,
-  SizeType,
-};
+export { utils, errors, sessions, extensions, helpers, tl, password, client };
