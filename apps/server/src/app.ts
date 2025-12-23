@@ -62,7 +62,7 @@ function configureServer(logger: Logger, flags: RuntimeFlags, config: Config) {
     return Response.json({ success: true })
   }))
 
-  collectDefaultMetrics({ prefix: 'telegram_search_' })
+  collectDefaultMetrics()
   app.get('/metrics', defineEventHandler(async () => {
     const metrics = await register.metrics()
     return new Response(metrics, {

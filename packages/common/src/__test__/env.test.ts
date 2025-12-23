@@ -91,17 +91,15 @@ describe('parseEnvToConfig', () => {
     })
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-    let config: Config
-
     // Patch a logger to capture warn
     const logger = {
       withFields: vi.fn(() => ({
         warn: warnSpy,
-        debug: vi.fn(),
+        log: vi.fn(),
       })),
     }
 
-    config = parseEnvToConfig(env, logger as any)
+    const config = parseEnvToConfig(env, logger as any)
 
     // It should prefer https in url because useSSL is true in this case.
     expect(config.minio?.url).toBe('https://minio.example.com:1234')

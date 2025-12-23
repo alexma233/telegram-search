@@ -1,5 +1,6 @@
 import type { ComputedRef, Ref } from 'vue'
 
+import { useLogger } from '@guiiai/logg'
 import { prefillChatAvatarIntoStore, prefillUserAvatarIntoStore, useAvatarStore, useBridgeStore } from '@tg-search/client'
 import { onMounted, unref, watch } from 'vue'
 
@@ -44,7 +45,7 @@ async function ensureCore(
       return
   }
   catch (error) {
-    console.warn('[useEnsureAvatar] Prefill avatar failed', error)
+    useLogger('useEnsureAvatar').withError(error).warn('Prefill avatar failed')
   }
   finally {
     if (opts.inflightPrefillIds)

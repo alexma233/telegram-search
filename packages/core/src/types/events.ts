@@ -35,7 +35,7 @@ export interface ConnectionEventFromCore {
   'auth:password:needed': () => void
   'auth:connected': () => void
   'auth:disconnected': () => void
-  'auth:error': (data: { error: unknown }) => void
+  'auth:error': () => void
 }
 
 // ============================================================================
@@ -53,7 +53,7 @@ export interface SessionEventFromCore {
 // ============================================================================
 
 export interface AccountEventToCore {
-  'account:me:fetch': () => void
+  'account:setup': () => void
 }
 
 export interface AccountEventFromCore {

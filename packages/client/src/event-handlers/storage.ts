@@ -1,5 +1,7 @@
 import type { ClientRegisterEventHandler } from '.'
 
+import { useLogger } from '@guiiai/logg'
+
 import { useChatStore } from '../stores/useChat'
 import { useMessageStore } from '../stores/useMessage'
 import { prefillChatAvatarIntoStore } from '../utils/avatar-cache'
@@ -21,7 +23,7 @@ export function registerStorageEventHandlers(
       }
       catch (error) {
         // Warn-only logging to comply with lint rules
-        console.warn('[Avatar] Batch prefillChatAvatarIntoStore failed', error)
+        useLogger('storage:dialogs').withError(error).warn('Batch prefillChatAvatarIntoStore failed')
       }
     })
   })

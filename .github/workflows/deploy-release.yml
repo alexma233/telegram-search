@@ -1,11 +1,18 @@
-name: Deploy
+name: Deploy Release
 
-on: [push]
+on:
+  workflow_dispatch:
+  schedule:
+    # Run nightly at 08:00 UTC every day
+    - cron: '0 8 * * *'
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy
+    name: Deploy Release
     permissions:
       contents: read
       deployments: write
@@ -23,17 +30,6 @@ jobs:
 
       - run: pnpm i -g wrangler@4
       - run: pnpm install --frozen-lockfile
-
-      - name: Determine deployment branch
-        id: deployment_branch
-        run: |
-          if [[ $GITHUB_REF == refs/tags/v* ]]; then
-            echo "branch=release" >> $GITHUB_OUTPUT
-            echo "tag_name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          else
-            BRANCH_NAME=${GITHUB_REF#refs/heads/}
-            echo "branch=${BRANCH_NAME}" >> $GITHUB_OUTPUT
-          fi
 
       - name: Build
         run: |
@@ -55,5 +51,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy apps/web/dist --project-name=telegramsearch --branch=${{ steps.deployment_branch.outputs.branch }}
+          command: pages deploy apps/web/dist --project-name=telegramsearch --branch=release
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}

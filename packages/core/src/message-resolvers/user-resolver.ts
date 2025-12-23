@@ -65,7 +65,7 @@ export function createUserResolver(ctx: CoreContext, logger: Logger, userModels:
     }
     catch (err) {
       userBlockedList.add(fromId)
-      logger.withFields({ fromId, err }).warn('Failed to resolve or save user')
+      logger.withFields({ fromId }).withError(err).warn('Failed to resolve or save user')
       return undefined
     }
   }

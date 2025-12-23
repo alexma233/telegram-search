@@ -2,6 +2,7 @@
 import type { ChatGroup } from '@tg-search/client'
 import type { CoreDialog } from '@tg-search/core/types'
 
+import { useLogger } from '@guiiai/logg'
 import { prefillChatAvatarIntoStore, useChatStore, useSettingsStore } from '@tg-search/client'
 import { storeToRefs } from 'pinia'
 import { VList } from 'virtua/vue'
@@ -62,7 +63,7 @@ async function prefillChatAvatarsParallel(list: CoreDialog[]) {
     await Promise.all(tasks)
   }
   catch (error) {
-    console.warn('Failed to prefill chat avatars', error)
+    useLogger('avatars').withError(error).warn('Failed to prefill chat avatars')
   }
 }
 

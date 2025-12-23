@@ -5,6 +5,8 @@
  * periodic cleanup and monitoring stats.
  */
 
+import { useLogger } from '@guiiai/logg'
+
 // DB configuration
 const AVATAR_DB_NAME = 'tg-avatar-cache'
 const AVATAR_STORE = 'records'
@@ -15,6 +17,7 @@ const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const MAX_CACHE_BYTES_DEFAULT = 50 * 1024 * 1024 // 50 MB
 
 type ID = string | number
+const logger = useLogger('avatars')
 
 export interface AvatarCacheRecord {
   /**
@@ -56,7 +59,7 @@ async function openDb(): Promise<IDBDatabase | null> {
             db.deleteObjectStore(AVATAR_STORE)
         }
         catch (e) {
-          console.warn('[AvatarCache] failed deleting old store', e)
+          logger.withError(e).warn('failed deleting old store')
         }
         db.createObjectStore(AVATAR_STORE, { keyPath: 'scopeId' })
       }
@@ -65,7 +68,7 @@ async function openDb(): Promise<IDBDatabase | null> {
     }
     catch (err) {
       // Fallback when IndexedDB throws in restricted environments
-      console.warn('[AvatarCache] openDb error', err)
+      logger.withError(err).warn('openDb error')
       resolve(null)
     }
   })
@@ -141,7 +144,7 @@ async function persistAvatar(
     await putRecord(db, record)
   }
   catch (err) {
-    console.warn('[AvatarCache] persistAvatar failed', err)
+    logger.withError(err).warn('persistAvatar failed')
   }
 }
 
@@ -180,7 +183,7 @@ export async function loadUserAvatarFromCache(userId: ID): Promise<{ url: string
     })
   }
   catch (err) {
-    console.warn('[AvatarCache] loadUserAvatarFromCache failed', err)
+    logger.withError(err).warn('loadUserAvatarFromCache failed')
     return undefined
   }
 
@@ -201,7 +204,7 @@ export async function loadUserAvatarFromCache(userId: ID): Promise<{ url: string
     return result
   }
   catch (err) {
-    console.warn('[AvatarCache] objectURL failed', err)
+    logger.withError(err).warn('objectURL failed')
     return undefined
   }
 }
@@ -228,7 +231,7 @@ export async function loadChatAvatarFromCache(chatId: ID): Promise<{ url: string
     })
   }
   catch (err) {
-    console.warn('[AvatarCache] loadChatAvatarFromCache failed', err)
+    logger.withError(err).warn('loadChatAvatarFromCache failed')
     return undefined
   }
 
@@ -249,7 +252,7 @@ export async function loadChatAvatarFromCache(chatId: ID): Promise<{ url: string
     return result
   }
   catch (err) {
-    console.warn('[AvatarCache] objectURL failed', err)
+    logger.withError(err).warn('objectURL failed')
     return undefined
   }
 }
@@ -288,7 +291,7 @@ export async function evictExpiredOrOversized(_maxBytes: number = MAX_CACHE_BYTE
     })
   }
   catch (err) {
-    console.warn('[AvatarCache] evictExpiredOrOversized scan failed', err)
+    logger.withError(err).warn('evictExpiredOrOversized scan failed')
     return 0
   }
 
@@ -318,7 +321,7 @@ export async function clearAvatarCache(): Promise<void> {
     await clearStore(db)
   }
   catch (err) {
-    console.warn('[AvatarCache] clearAvatarCache failed', err)
+    logger.withError(err).warn('clearAvatarCache failed')
   }
 }
 

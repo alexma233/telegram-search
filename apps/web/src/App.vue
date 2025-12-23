@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // https://github.com/moeru-ai/airi/blob/bd497051fe7090dc021888f127ae7b0d78095210/apps/stage-web/src/App.vue
 
+import { useLogger } from '@guiiai/logg'
 import { evictExpiredOrOversized, useAvatarStore, useBootstrapStore, useSettingsStore } from '@tg-search/client'
 import { storeToRefs } from 'pinia'
 import { hideSplashScreen } from 'vite-plugin-splash-screen/runtime'
@@ -35,14 +36,14 @@ function setupAvatarCleanupScheduler() {
   // Also evict expired or oversized records from IndexedDB (50MB budget)
   evictExpiredOrOversized().catch((error) => {
     // Warn-only logging to comply with lint rules
-    console.warn('[Avatar] Failed to evict records on init', error)
+    useLogger('avatars').withError(error).warn('Failed to evict records on init')
   })
   // 15 minutes interval
   avatarCleanupTimer = window.setInterval(() => {
     avatarStore.cleanupExpired()
     evictExpiredOrOversized().catch((error) => {
       // Warn-only logging to comply with lint rules
-      console.warn('[Avatar] Failed to evict records in interval', error)
+      useLogger('avatars').withError(error).warn('Failed to evict records in interval')
     })
   }, 15 * 60 * 1000)
 }
