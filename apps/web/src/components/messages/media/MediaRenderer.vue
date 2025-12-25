@@ -241,73 +241,87 @@ function handlePlaceholderClick() {
     {{ JSON.stringify(processedMedia, null, 2) }}
   </code>
 
-  <div v-if="message.content" class="mb-2 whitespace-pre-wrap text-gray-900 dark:text-gray-100">
-    {{ message.content }}
+  <!-- Forwarded Message Layout -->
+  <div v-if="message.forward?.isForward" class="my-1 rounded-r border-l-4 border-primary/30 bg-muted/10 py-1 pl-2">
+    <div class="mb-0.5 select-none text-xs font-medium text-muted-foreground">
+      Forwarded from {{ message.forward.forwardFromChatName || 'Unknown' }}
+    </div>
+    <div class="text-sm text-foreground/90">
+      <span v-if="message.content" class="block break-all line-clamp-1">{{ message.content }}</span>
+      <span v-if="processedMedia.type === 'photo'" class="block text-muted-foreground">【图片】</span>
+    </div>
   </div>
 
-  <!-- Loading state with dynamic placeholder sizing based on actual image dimensions -->
-  <div v-if="isLoading" class="flex items-center">
-    <div
-      class="max-w-xs w-full animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"
-      :style="processedMedia.width && processedMedia.height
-        ? { aspectRatio: `${processedMedia.width} / ${processedMedia.height}`, height: 'auto' }
-        : { height: '12rem' }"
-    />
-  </div>
+  <!-- Regular Message Layout -->
+  <div v-else>
+    <div v-if="message.content" class="mb-2 whitespace-pre-wrap text-gray-900 dark:text-gray-100">
+      {{ message.content }}
+    </div>
 
-  <!-- Error info (debug only) -->
-  <div v-if="finalError && debugMode" class="mt-1 flex items-center gap-2 rounded bg-red-100 p-2 dark:bg-red-900">
-    <div class="i-lucide-alert-circle h-4 w-4 text-red-500" />
-    <span class="text-sm text-red-700 dark:text-red-300">{{ finalError }}</span>
-  </div>
-
-  <!-- Media content / placeholder -->
-  <template v-if="processedMedia.type !== 'unknown'">
-    <!-- Normal media rendering when no permanent error -->
-    <div v-if="processedMedia.src && !hasPermanentError">
-      <MediaWebpage
-        v-if="processedMedia.type === 'webpage'"
-        :processed-media="processedMedia"
-        @error="runtimeError = 'Webpage failed to load'"
-      />
-
-      <img
-        v-else-if="processedMedia.type === 'photo'"
-        :src="processedMedia.src"
-        class="h-auto max-w-xs rounded-lg"
-        :style="processedMedia.width && processedMedia.height
-          ? { aspectRatio: `${processedMedia.width} / ${processedMedia.height}` }
-          : {}"
-        alt="Image"
-        @error="handleImageError"
-      >
-
-      <video
-        v-else-if="processedMedia.mimeType?.startsWith('video/')"
-        :src="processedMedia.src"
-        class="h-auto max-w-[12rem] rounded-lg"
-        alt="Video"
-        autoplay loop muted playsinline
-        @error="handleStickerError"
-      />
-
+    <!-- Loading state with dynamic placeholder sizing based on actual image dimensions -->
+    <div v-if="isLoading" class="flex items-center">
       <div
-        v-else-if="processedMedia.type === 'sticker'"
-        ref="tgsContainer"
-        class="h-auto max-w-[12rem] rounded-lg"
+        class="w-full max-w-xs animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"
+        :style="processedMedia.width && processedMedia.height
+          ? { aspectRatio: `${processedMedia.width} / ${processedMedia.height}`, height: 'auto' }
+          : { height: '12rem' }"
       />
     </div>
 
-    <!-- Fallback placeholder when media has permanently failed -->
-    <div
-      v-else-if="hasPermanentError"
-      class="h-48 max-w-xs flex cursor-pointer items-center justify-center border border-gray-300 rounded-lg border-dashed bg-gray-50 text-gray-400 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-500"
-      @click="handlePlaceholderClick"
-    >
-      <div class="flex flex-col items-center gap-1">
-        <div class="i-lucide-image-off h-6 w-6" />
-        <span class="text-xs">Media unavailable. Click to retry.</span>
-      </div>
+    <!-- Error info (debug only) -->
+    <div v-if="finalError && debugMode" class="mt-1 flex items-center gap-2 rounded bg-red-100 p-2 dark:bg-red-900">
+      <div class="i-lucide-alert-circle h-4 w-4 text-red-500" />
+      <span class="text-sm text-red-700 dark:text-red-300">{{ finalError }}</span>
     </div>
-  </template>
+
+    <!-- Media content / placeholder -->
+    <template v-if="processedMedia.type !== 'unknown'">
+      <!-- Normal media rendering when no permanent error -->
+      <div v-if="processedMedia.src && !hasPermanentError">
+        <MediaWebpage
+          v-if="processedMedia.type === 'webpage'"
+          :processed-media="processedMedia"
+          @error="runtimeError = 'Webpage failed to load'"
+        />
+
+        <img
+          v-else-if="processedMedia.type === 'photo'"
+          :src="processedMedia.src"
+          class="h-auto max-w-xs rounded-lg"
+          :style="processedMedia.width && processedMedia.height
+            ? { aspectRatio: `${processedMedia.width} / ${processedMedia.height}` }
+            : {}"
+          alt="Image"
+          @error="handleImageError"
+        >
+
+        <video
+          v-else-if="processedMedia.mimeType?.startsWith('video/')"
+          :src="processedMedia.src"
+          class="h-auto max-w-[12rem] rounded-lg"
+          alt="Video"
+          autoplay loop muted playsinline
+          @error="handleStickerError"
+        />
+
+        <div
+          v-else-if="processedMedia.type === 'sticker'"
+          ref="tgsContainer"
+          class="h-auto max-w-[12rem] rounded-lg"
+        />
+      </div>
+
+      <!-- Fallback placeholder when media has permanently failed -->
+      <div
+        v-else-if="hasPermanentError"
+        class="flex h-48 max-w-xs cursor-pointer items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-gray-400 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-500"
+        @click="handlePlaceholderClick"
+      >
+        <div class="flex flex-col items-center gap-1">
+          <div class="i-lucide-image-off h-6 w-6" />
+          <span class="text-xs">Media unavailable. Click to retry.</span>
+        </div>
+      </div>
+    </template>
+  </div>
 </template>
