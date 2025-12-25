@@ -242,12 +242,12 @@ function handlePlaceholderClick() {
   </code>
 
   <!-- Forwarded Message Layout -->
-  <div v-if="message.forward?.isForward" class="my-1 rounded-r border-l-4 border-primary/30 bg-muted/10 py-1 pl-2">
-    <div class="mb-0.5 select-none text-xs font-medium text-muted-foreground">
+  <div v-if="message.forward?.isForward" class="my-1 border-l-4 border-primary/30 rounded-r bg-muted/10 py-1 pl-2">
+    <div class="mb-0.5 select-none text-xs text-muted-foreground font-medium">
       Forwarded from {{ message.forward.forwardFromChatName || 'Unknown' }}
     </div>
     <div class="text-sm text-foreground/90">
-      <span v-if="message.content" class="block break-all line-clamp-1">{{ message.content }}</span>
+      <span v-if="message.content" class="line-clamp-1 block break-all">{{ message.content }}</span>
       <span v-if="processedMedia.type === 'photo'" class="block text-muted-foreground">【图片】</span>
     </div>
   </div>
@@ -261,7 +261,7 @@ function handlePlaceholderClick() {
     <!-- Loading state with dynamic placeholder sizing based on actual image dimensions -->
     <div v-if="isLoading" class="flex items-center">
       <div
-        class="w-full max-w-xs animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"
+        class="max-w-xs w-full animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"
         :style="processedMedia.width && processedMedia.height
           ? { aspectRatio: `${processedMedia.width} / ${processedMedia.height}`, height: 'auto' }
           : { height: '12rem' }"
@@ -314,7 +314,7 @@ function handlePlaceholderClick() {
       <!-- Fallback placeholder when media has permanently failed -->
       <div
         v-else-if="hasPermanentError"
-        class="flex h-48 max-w-xs cursor-pointer items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-gray-400 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-500"
+        class="h-48 max-w-xs flex cursor-pointer items-center justify-center border border-gray-300 rounded-lg border-dashed bg-gray-50 text-gray-400 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-500"
         @click="handlePlaceholderClick"
       >
         <div class="flex flex-col items-center gap-1">
