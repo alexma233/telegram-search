@@ -30,12 +30,14 @@ vi.mock('minio', () => {
 })
 
 const config: MinioConfig = {
-  endpoint: 'localhost',
-  port: 9000,
+  url: 'http://localhost:9000',
   accessKey: 'access',
   secretKey: 'secret',
-  useSSL: false,
   bucket: 'telegram-media-test',
+
+  port: 9000,
+  useSSL: false,
+  endPoint: 'http://localhost:9000',
 }
 
 describe('storage/minio - initMinioMediaStorage', () => {

@@ -10,7 +10,7 @@ export function registerAccountEventHandlers(ctx: CoreContext, logger: Logger, a
   return (accountService: AccountService) => {
     let hasBootstrappedDialogs = false
 
-    ctx.emitter.on('account:me:fetch', async () => {
+    ctx.emitter.on('account:setup', async () => {
       logger.verbose('Getting me info')
       const account = (await accountService.fetchMyAccount()).expect('Failed to get me info')
 
@@ -19,6 +19,7 @@ export function registerAccountEventHandlers(ctx: CoreContext, logger: Logger, a
 
       const dbAccount = await accountModels.recordAccount(ctx.getDB(), 'telegram', account.id)
       ctx.setCurrentAccountId(dbAccount.id)
+      ctx.setMyUser(account)
 
       logger.withFields({ accountId: dbAccount.id }).verbose('Set current account ID')
 

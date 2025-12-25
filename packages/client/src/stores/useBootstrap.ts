@@ -3,7 +3,7 @@ import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { useBridgeStore } from '../composables/useBridge'
-import { useAuthStore } from './useAuth'
+import { useAccountStore } from './useAccount'
 import { useChatStore } from './useChat'
 
 export type BootstrapPhase = 'idle' | 'authing' | 'accountReady' | 'ready'
@@ -22,7 +22,7 @@ export type BootstrapPhase = 'idle' | 'authing' | 'accountReady' | 'ready'
 export const useBootstrapStore = defineStore('bootstrap', () => {
   const logger = useLogger('BootstrapStore')
   const bridgeStore = useBridgeStore()
-  const authStore = useAuthStore()
+  const accountStore = useAccountStore()
   const chatStore = useChatStore()
 
   const phase = ref<BootstrapPhase>('idle')
@@ -38,7 +38,7 @@ export const useBootstrapStore = defineStore('bootstrap', () => {
       return
     }
 
-    logger.debug('Starting frontend bootstrap')
+    logger.log('Starting frontend bootstrap')
 
     // Ensure transport layer (websocket or core-bridge) is initialized.
     if (typeof bridgeStore.init === 'function')
@@ -46,9 +46,9 @@ export const useBootstrapStore = defineStore('bootstrap', () => {
 
     phase.value = 'authing'
 
-    // Delegate auto-login logic to AuthStore; it will try to restore the
+    // Delegate auto-login logic to AccountStore; it will try to restore the
     // active slot using stored session if available.
-    authStore.init()
+    accountStore.init()
   }
 
   /**
@@ -60,7 +60,7 @@ export const useBootstrapStore = defineStore('bootstrap', () => {
     if (phase.value === 'ready')
       return
 
-    logger.debug('Marking account as ready; initializing chat store')
+    logger.verbose('Marking account as ready; initializing chat store')
     phase.value = 'accountReady'
 
     // Hydrate dialogs for the active account. In core-bridge mode, core

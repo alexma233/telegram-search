@@ -3,7 +3,7 @@ import type { InferInput } from 'valibot'
 
 import { useLogger } from '@guiiai/logg'
 import { tool } from '@xsai/tool'
-import { generateText } from 'xsai'
+import { generateText, streamText } from 'xsai'
 
 import * as v from 'valibot'
 
@@ -21,6 +21,8 @@ interface Message {
   role: 'system' | 'user' | 'assistant'
   content: string
 }
+
+export type LLMMessage = Message
 
 export interface ToolCallRecord {
   name: string
@@ -42,6 +44,7 @@ interface SearchMessagesParams {
   limit: number
   fromUserId?: string | null
   timeRange?: { start?: number | null, end?: number | null } | null
+  chatIds?: string[] | null
 }
 
 interface RetrieveContextParams {
@@ -75,6 +78,10 @@ export function useAIChatLogic() {
         v.number(),
         v.description('Maximum number of messages to retrieve (recommended: 5-10)'),
       ),
+      chatIds: v.optional(v.pipe(
+        v.array(v.string()),
+        v.description('List of chat IDs to restrict search to. If provided, only messages from these chats will be returned.'),
+      )),
     })
 
     return await tool({
@@ -90,11 +97,11 @@ Parameters:
         const startTime = Date.now()
         logger.withFields({ params }).log('searchMessages tool called')
 
-        // Call executor with required params only (filters removed)
         const results = await executor({
           ...params,
           fromUserId: undefined,
           timeRange: undefined,
+          chatIds: params.chatIds || undefined,
         })
         const duration = Date.now() - startTime
 
@@ -299,6 +306,34 @@ Parameters:
   }
 
   /**
+   * Simple streaming text generation without tool calling.
+   * Used by lightweight features like unread summary generation.
+   */
+  async function streamSimpleText(
+    llmConfig: LLMConfig,
+    messages: Message[],
+    onTextDelta: (delta: string) => void,
+  ): Promise<void> {
+    logger.withFields({
+      messagesCount: messages.length,
+    }).log('Starting simple LLM streaming')
+
+    const { textStream } = streamText({
+      baseURL: llmConfig.apiBase,
+      model: llmConfig.model,
+      apiKey: llmConfig.apiKey,
+      messages,
+      temperature: llmConfig.temperature ?? 0.7,
+      maxTokens: llmConfig.maxTokens,
+    })
+
+    const iterable = textStream as unknown as AsyncIterable<string>
+    for await (const text of iterable) {
+      onTextDelta(text)
+    }
+  }
+
+  /**
    * Build system prompt
    */
   function buildSystemPrompt(): string {
@@ -330,5 +365,6 @@ Remember: Only use tools when necessary. For greetings or general questions, res
     createRetrieveContextTool,
     callLLMWithTools,
     buildSystemPrompt,
+    streamSimpleText,
   }
 }

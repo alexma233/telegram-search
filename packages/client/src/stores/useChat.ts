@@ -5,17 +5,41 @@ import { useLocalStorage } from '@vueuse/core'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { computed } from 'vue'
 
+import { IS_CORE_MODE } from '../../constants'
 import { useBridgeStore } from '../composables/useBridge'
 
 export const useChatStore = defineStore('chat', () => {
-  const computedChatKey = computed(() => `chat/chats/${useBridgeStore().activeSessionId}`)
-  const chats = useLocalStorage<CoreDialog[]>(computedChatKey, [])
+  const bridgeStore = useBridgeStore()
+  const allChats = useLocalStorage<Record<string, CoreDialog[]>>('v2/chat/chats', {})
 
-  const getChat = (id: string) => {
+  const chats = computed({
+    get: () => {
+      const userId = bridgeStore.activeSession?.me?.id
+      if (!userId)
+        return []
+      return allChats.value[userId] ?? []
+    },
+    set: (v) => {
+      const userId = bridgeStore.activeSession?.me?.id
+      if (!userId)
+        return
+
+      allChats.value = {
+        ...allChats.value,
+        [userId]: v,
+      }
+    },
+  })
+
+  function getChat(id: string) {
     return chats.value.find(chat => chat.id === Number(id))
   }
 
-  const init = () => {
+  function fetchChats() {
+    bridgeStore.sendEvent('dialog:fetch')
+  }
+
+  function init() {
     useLogger('ChatStore').log('Init dialogs')
 
     if (chats.value.length === 0) {
@@ -25,14 +49,15 @@ export const useChatStore = defineStore('chat', () => {
       // login, and there is no stable accountId yet when this runs, so we
       // avoid firing storage:fetch:dialogs to prevent "Current account ID not set"
       // noise from the core context.
-      if (!import.meta.env.VITE_WITH_CORE)
-        useBridgeStore().sendEvent('storage:fetch:dialogs')
+      if (!IS_CORE_MODE)
+        bridgeStore.sendEvent('storage:fetch:dialogs')
     }
   }
 
   return {
     init,
     getChat,
+    fetchChats,
     chats,
   }
 })

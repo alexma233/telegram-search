@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useLogger } from '@guiiai/logg'
 import { inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -9,7 +10,7 @@ const emits = defineEmits<{ (e: 'update'): void }>()
 const ToasterRootInjectionKey = Symbol('ToasterRoot')
 const { t } = useI18n()
 
-const toastRoot = inject(ToasterRootInjectionKey, { close: (id: string) => console.warn('No toast root provided, cannot close toast', id) })
+const toastRoot = inject(ToasterRootInjectionKey, { close: (id: string) => useLogger('pwa').withFields({ id }).warn('No toast root provided, cannot close toast') })
 
 function handleUpdate() {
   emits('update')

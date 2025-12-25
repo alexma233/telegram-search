@@ -35,7 +35,7 @@ export interface ConnectionEventFromCore {
   'auth:password:needed': () => void
   'auth:connected': () => void
   'auth:disconnected': () => void
-  'auth:error': (data: { error: unknown }) => void
+  'auth:error': () => void
 }
 
 // ============================================================================
@@ -53,7 +53,7 @@ export interface SessionEventFromCore {
 // ============================================================================
 
 export interface AccountEventToCore {
-  'account:me:fetch': () => void
+  'account:setup': () => void
 }
 
 export interface AccountEventFromCore {
@@ -81,12 +81,21 @@ export interface MessageEventToCore {
   'message:fetch': (data: FetchMessageOpts) => void
   'message:fetch:abort': (data: { taskId: string }) => void
   'message:fetch:specific': (data: { chatId: string, messageIds: number[] }) => void
+  'message:fetch:unread': (data: FetchUnreadMessageOpts) => void
   'message:send': (data: { chatId: string, content: string }) => void
+  'message:read': (data: { chatId: string }) => void
+}
+
+export interface FetchUnreadMessageOpts {
+  chatId: string
+  limit?: number
+  startTime?: number
 }
 
 export interface MessageEventFromCore {
   'message:fetch:progress': (data: { taskId: string, progress: number }) => void
   'message:data': (data: { messages: CoreMessage[] }) => void
+  'message:unread-data': (data: { messages: CoreMessage[] }) => void
 }
 
 export interface FetchMessageOpts {
@@ -211,6 +220,7 @@ export interface CoreMessageSearchParams {
   pagination?: CorePagination
 
   // Additional filters for RAG
+  chatIds?: string[] // Filter by specific chats
   fromUserId?: string // Filter by user who sent the message
   timeRange?: {
     start?: number // Unix timestamp in seconds
@@ -368,6 +378,10 @@ export type ToCoreEvent = ClientInstanceEventToCore
 
 export type CoreEvent = FromCoreEvent & ToCoreEvent
 
-export type CoreEventData<T> = T extends (data: infer D) => void ? D : never
+export type ExtractData<T> = (T extends (data: infer D) => void ? D : never)
+
+export interface CoreEventMeta {
+  tracingId: string
+}
 
 export type CoreEmitter = EventEmitter<CoreEvent>

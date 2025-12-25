@@ -17,3 +17,6 @@ dev-dist/
 .netlify
 tsconfig.tsbuildinfo
 coverage/
+*.heapsnapshot
+*.cpuprofile
+*.local

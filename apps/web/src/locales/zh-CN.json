@@ -17,6 +17,10 @@
     "retrievedInfo": "检索到的相关信息",
     "searchQuery": "搜索查询",
     "searchingContext": "搜索相关上下文...",
+    "selectScope": "搜索会话范围",
+    "selectScopeDescription": "选择特定的对话进行搜索，留空则搜索所有对话。",
+    "confirmFilter": "确认筛选",
+    "cancelFilter": "取消筛选",
     "send": "发送",
     "timeFilter": "时间过滤",
     "totalMessages": "总消息数",
@@ -39,6 +43,7 @@
     "forceLoadNewer": "强制加载更新的消息",
     "forceLoadOlder": "强制加载更早的消息",
     "messageSent": "消息已发送",
+    "summarize": "生成摘要",
     "search": "搜索",
     "searchContent": "搜索内容",
     "send": "发送",
@@ -220,6 +225,23 @@
     "timeRange": "时间范围",
     "totalMessages": "总消息数",
     "unsyncedMessages": "未同步消息"
+  },
+  "summaryDialog": {
+    "title": "未读消息摘要",
+    "noUnreadMessages": "没有未读消息",
+    "noUnreadMessagesDescription": "没有找到未读消息。",
+    "fetchFailed": "获取消息失败",
+    "noApiKey": "未在设置中找到 LLM API Key",
+    "configureApiKey": "请在设置中配置 LLM API Key。",
+    "summaryFailed": "生成摘要失败",
+    "summaryFailedNote": "（生成失败）",
+    "messagesMarkedRead": "消息已标记为已读",
+    "close": "关闭",
+    "markAsRead": "标记为已读",
+    "regenerate": "重新生成",
+    "summary": "摘要",
+    "sources": "来源",
+    "noSources": "没有来源"
   },
   "virtualMessageList": {
     "scrolling": "加载中"

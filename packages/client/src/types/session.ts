@@ -1,10 +1,16 @@
 import type { CoreUserEntity } from '@tg-search/core'
 
-export interface SessionContext {
+/**
+ * Persistent session representation in localStorage.
+ * Flattens metadata and core session info.
+ */
+export interface StoredSession {
+  uuid: string
+
   /**
-   * @deprecated Use account store's isReady instead
+   * Indicates if the session is fully authenticated and ready to use.
    */
-  isConnected?: boolean
+  isReady?: boolean
 
   me?: CoreUserEntity
 
@@ -13,18 +19,13 @@ export interface SessionContext {
    * Core never persists this; it only forwards updated values.
    */
   session?: string
+
+  /**
+   * Type of the session (websocket or core-bridge).
+   * Used to distinguish between sessions in different modes.
+   */
+  type?: 'websocket' | 'core-bridge'
 }
 
-/**
- * Persistent session representation in localStorage for browser-core mode.
- *
- * Shape is intentionally kept in sync with websocket adapter:
- * - uuid: stable identifier
- * - metadata: UI-related context
- * - sessionString: raw Telegram session string (if/when needed)
- */
-export interface StoredSession {
-  uuid: string
-  metadata?: SessionContext
-  sessionString?: string
-}
+// Deprecated alias for backward compatibility during refactor, if needed
+export type SessionContext = Partial<Omit<StoredSession, 'uuid'>>

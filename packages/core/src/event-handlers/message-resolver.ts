@@ -18,7 +18,7 @@ export function registerMessageResolverEventHandlers(ctx: CoreContext, logger: L
       logger.withFields({ count: messages.length, isTakeout, syncOptions, forceRefetch }).verbose('Processing messages')
 
       if (!isTakeout) {
-        messageResolverService.processMessages(messages, { takeout: isTakeout, syncOptions, forceRefetch }).catch((error) => {
+        messageResolverService.processMessages(messages, { takeout: false, syncOptions, forceRefetch }).catch((error) => {
           logger.withError(error).warn('Failed to process realtime messages')
         })
 
@@ -27,7 +27,7 @@ export function registerMessageResolverEventHandlers(ctx: CoreContext, logger: L
 
       // Only use queue for takeout mode to avoid overwhelming the system.
       void queue.add(async () => {
-        messageResolverService.processMessages(messages, { takeout: isTakeout, syncOptions, forceRefetch }).catch((error) => {
+        messageResolverService.processMessages(messages, { takeout: true, syncOptions, forceRefetch }).catch((error) => {
           logger.withError(error).warn('Failed to process takeout messages')
         })
       })

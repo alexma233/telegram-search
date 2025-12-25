@@ -1,8 +1,9 @@
 import type { ClientRegisterEventHandler } from '.'
 
+import { useLogger } from '@guiiai/logg'
+
 import { useBridgeStore } from '../composables/useBridge'
 import { useAvatarStore } from '../stores/useAvatar'
-import { useBootstrapStore } from '../stores/useBootstrap'
 import { persistUserAvatar } from '../utils/avatar-cache'
 import { bytesToBlob, canDecodeAvatar } from '../utils/image'
 
@@ -15,16 +16,10 @@ export function registerEntityEventHandlers(
 ) {
   registerEventHandler('entity:me:data', (data) => {
     const bridgeStore = useBridgeStore()
-    const bootstrapStore = useBootstrapStore()
 
-    const activeSession = bridgeStore.getActiveSession()
+    const activeSession = bridgeStore.activeSession
     if (activeSession)
       activeSession.me = data
-
-    // Now that core has recorded the account and set currentAccountId,
-    // signal frontend bootstrap that the account context is ready. This
-    // will perform client-side post-bootstrap work (e.g. hydrate dialogs).
-    bootstrapStore.markAccountReady()
   })
 
   // User avatar bytes -> blob url
@@ -40,7 +35,7 @@ export function registerEntityEventHandlers(
     }
     catch (error) {
       // Warn-only logging to comply with lint rules
-      console.warn('[Avatar] Failed to reconstruct user avatar byte', { userId: data.userId }, error)
+      useLogger('avatars').withError(error).warn('Failed to reconstruct user avatar byte', { userId: data.userId })
     }
 
     if (!buffer) {
@@ -68,7 +63,7 @@ export function registerEntityEventHandlers(
     }
     catch (error) {
       // Warn-only logging to comply with lint rules
-      console.warn('[Avatar] persistUserAvatar failed', { userId: data.userId }, error)
+      useLogger('avatars').withError(error).warn('persistUserAvatar failed', { userId: data.userId })
     }
 
     avatarStore.setUserAvatar(data.userId, { blobUrl: url, fileId: data.fileId, mimeType: data.mimeType })
@@ -79,6 +74,6 @@ export function registerEntityEventHandlers(
     // Clean up ArrayBuffer references to help the GC reclaim memory
     buffer = undefined
 
-    // console.warn('[Avatar] Updated user avatar', { userId: data.userId, fileId: data.fileId })
+    useLogger('avatars').withFields({ userId: data.userId, fileId: data.fileId }).debug('Updated user avatar')
   })
 }

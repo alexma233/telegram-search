@@ -1,5 +1,7 @@
 import type { ClientRegisterEventHandlerFn } from '.'
 
+import { useLogger } from '@guiiai/logg'
+
 import { useAvatarStore } from '../stores/useAvatar'
 import { useChatStore } from '../stores/useChat'
 import { persistChatAvatar } from '../utils/avatar-cache'
@@ -12,6 +14,8 @@ import { bytesToBlob, canDecodeAvatar } from '../utils/image'
 export function registerDialogEventHandlers(
   registerEventHandler: ClientRegisterEventHandlerFn,
 ) {
+  const logger = useLogger('avatars')
+
   // Base dialog list
   registerEventHandler('dialog:data', (data) => {
     useChatStore().chats = data.dialogs
@@ -33,7 +37,7 @@ export function registerDialogEventHandlers(
       const chat = chatStore.chats.find(c => c.id === data.chatId)
       if (chat && data.fileId && chat.avatarFileId !== data.fileId)
         chat.avatarFileId = data.fileId
-      console.warn('[Avatar] Skip update; cache valid', { chatId: data.chatId, fileId: data.fileId })
+      logger.withFields({ chatId: data.chatId, fileId: data.fileId }).warn('Skip update; cache valid')
       return
     }
 
@@ -47,12 +51,12 @@ export function registerDialogEventHandlers(
     }
     catch (error) {
       // Warn-only logging to comply with lint rules
-      console.warn('[Avatar] Failed to reconstruct chat avatar byte', { chatId: data.chatId }, error)
+      logger.withFields({ chatId: data.chatId }).withError(error).warn('Failed to reconstruct chat avatar byte')
     }
 
     if (!buffer) {
       // Use warn to comply with lint rule: allow only warn/error
-      console.warn('[Avatar] Missing byte for chat avatar')
+      logger.withFields({ chatId: data.chatId }).warn('Missing byte for chat avatar')
       return
     }
 
@@ -75,7 +79,7 @@ export function registerDialogEventHandlers(
     }
     catch (error) {
       // Warn-only logging to comply with lint rules
-      console.warn('[Avatar] persistChatAvatar failed', { chatId: data.chatId }, error)
+      logger.withFields({ chatId: data.chatId }).withError(error).warn('persistChatAvatar failed')
     }
 
     // Update chat store fields
@@ -96,6 +100,6 @@ export function registerDialogEventHandlers(
     // Clean up ArrayBuffer references to help the GC reclaim memory
     buffer = undefined
 
-    console.warn('[Avatar] Updated chat avatar', { chatId: data.chatId, fileId: data.fileId })
+    logger.withFields({ chatId: data.chatId, fileId: data.fileId }).warn('Updated chat avatar')
   })
 }

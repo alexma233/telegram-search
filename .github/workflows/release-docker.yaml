@@ -6,9 +6,10 @@ permissions:
 
 on:
   workflow_dispatch:
+  schedule:
+    # Run nightly at 08:00 UTC every day
+    - cron: '0 8 * * *'
   push:
-    branches:
-      - main
     tags:
       - 'v*'
     paths-ignore:
@@ -59,20 +60,20 @@ jobs:
           IMAGE_REPO="ghcr.io/${{ github.repository }}"
 
           # If the current commit is tagged, treat it as a release.
-          # This prevents "push main" from always overriding release tags with nightly.
           EXACT_TAG="$(git describe --tags --exact-match 2>/dev/null || true)"
 
-          TAGS=()
+          VERSIONS=()
           IS_VERSIONED_RELEASE="false"
 
           if [[ -n "$EXACT_TAG" ]]; then
             IMAGE_VERSION="${EXACT_TAG#v}"
             IS_VERSIONED_RELEASE="true"
-          # Nightly build: push to main (when current commit is NOT tagged)
-          elif [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == "refs/heads/main" ]]; then
+          # Nightly build: scheduled daily build (and workflow_dispatch when not on a tagged commit)
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]] || \
+               [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && -z "$EXACT_TAG" ]]; then
             SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
-            TAGS+=("$IMAGE_REPO:nightly")
-            TAGS+=("$IMAGE_REPO:nightly-$SHORT_SHA")
+            VERSIONS+=("nightly")
+            VERSIONS+=("nightly-$SHORT_SHA")
           else
             IMAGE_VERSION="${{ steps.version.outputs.version }}"
             IS_VERSIONED_RELEASE="true"
@@ -80,28 +81,33 @@ jobs:
 
           if [[ "$IS_VERSIONED_RELEASE" == "true" ]]; then
             if [[ "$IMAGE_VERSION" == *beta* ]]; then
-              TAGS+=("$IMAGE_REPO:$IMAGE_VERSION")
-              TAGS+=("$IMAGE_REPO:beta")
+              VERSIONS+=("$IMAGE_VERSION")
+              VERSIONS+=("beta")
             else
-              TAGS+=("$IMAGE_REPO:$IMAGE_VERSION")
-              TAGS+=("$IMAGE_REPO:latest")
+              VERSIONS+=("$IMAGE_VERSION")
+              VERSIONS+=("latest")
             fi
           fi
 
-          if [[ ${#TAGS[@]} -eq 0 ]]; then
+          if [[ ${#VERSIONS[@]} -eq 0 ]]; then
             echo "No image tags generated; refusing to push an untagged image." >&2
             exit 1
           fi
+
+          TAGS=()
+          for v in "${VERSIONS[@]}"; do
+            TAGS+=("$IMAGE_REPO:$v")
+          done
 
           echo "tags<<EOF" >> "$GITHUB_OUTPUT"
           printf '%s\n' "${TAGS[@]}" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
-      - name: Build and Push
+      - name: Build and Push App
         uses: docker/build-push-action@v6
         with:
           context: ./
-          file: ./Dockerfile
+          file: ./docker/Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha

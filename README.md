@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-   [<a href="https://search.lingogram.app">Try it Now</a>] [<a href="./docs/README_CN.md">简体中文</a>] [<a href="./docs/README_JA.md">日本語</a>]
+  [<a href="https://search.lingogram.app">立即体验</a>] [<a href="./docs/README_EN.md">English</a>] [<a href="./docs/README_JA.md">日本語</a>]
 </p>
 
 <p align="center">
@@ -32,135 +32,99 @@
   </a>
 </p>
 
-**Easily find and export your Telegram messages with powerful semantic search, supporting all languages and unsegmented sentences.**
+> [!TIP]
+> 您是否曾因 Telegram 无法搜索中文聊天记录而苦恼？
+> 
+> 或者想查找一条重要消息，却因消息过多而难以定位？
+>
+> 现在，使用 Telegram Search，您可以轻松查找和导出自己的 Telegram 消息。强大的语义搜索支持所有语言，完美应对无分词句子的检索场景。
+> 
+> 同时支持向量搜索，实现句子级别的模糊匹配，让查找更智能、更准确。
 
-Make message retrieval fast, accurate, and privacy-friendly — self-host or try online.
-
-## 💖 Sponsors
+## 💖 赞助者
 
 ![Sponsors](https://github.com/luoling8192/luoling8192/raw/master/sponsorkit/sponsors.svg)
 
-## ✅ What Can It Do
+## ✅ 功能特性
 
-### 📦 Export & Backup
-- [x] Export to PostgreSQL or in-browser database (PGlite)
-- [x] Universal export format for easy import to any database
-- [ ] One-click export to CSV / JSON
+### 📦 导出与备份
+- [x] 支持多种数据库导出聊天记录：PGlite、PostgreSQL
+- [x] 媒体资源可自动导出至 MinIO 对象存储
+- [x] 消息导出时自动完成向量嵌入和分词处理
+- [x] 实时同步，自动拉取最新对话内容
 
-### 🔍 Search Your Chat History
-- [x] Keyword search: multi-language support (Chinese, English, etc.)
-- [x] Natural language search: find messages like asking a question
-- [x] Smart filters: by contact/group, time range, with attachments, etc.
+### 🔍 聊天记录搜索
+- [x] 智能分词精准检索，支持多语言
+- [x] 支持模糊匹配与向量语义搜索，查找更高效
+- [x] RAG 智能问答：直接与 AI 对话，基于历史上下文实时解答
 
-### 🔄 Sync & Storage
-- [x] Incremental sync: sync while using
-- [x] Storage options: server (PostgreSQL + pgvector) or browser-only mode (PGlite)
-- [ ] Resume from breakpoint: auto-continue after failure
+## 🛣️ 未来规划
 
-### 🧠 AI Capabilities
-- [x] Ask AI about your chats: query current chat or selected range
-- [ ] AI message summary: auto-extract key points, todos, conclusions
-- [x] AI-powered search: natural language queries with pinpointed results
-- [x] AI chat: converse with AI based on your chat context
-- [ ] AI analysis: trends, sentiment, keywords, insights from links & files
-- [ ] Local model support: local Embedding / inference (no cloud required)
+### 🧠 AI 赋能
+- [ ] 自动生成会话总结
+- [ ] 超级大脑：基于历史消息自动抽取人物与事件知识图谱
 
-### 🔗 Media & Links (Planned)
-- [ ] Deep indexing for links & images: web summaries, image OCR/descriptions
-- [ ] Attachment content extraction: PDFs, images, audio/video key frames & text
+### 🔗 媒体与链接功能
+- [ ] 智能整理“已保存消息”收藏夹，更高效管理重要内容
+- [ ] 链接与图片深度索引：实现网页智能摘要、图片 OCR 文字识别与智能描述，赋能搜索与内容整理
 
-### 🌐 More Platforms (Planned)
-- [ ] Multi-client support: Discord, etc.
+### 🌐 多平台扩展
+- [ ] 增加 Telegram Bot 支持，满足更多消息管理需求
+- [ ] 支持扩展至 Discord 及其他社交/通讯平台，实现跨平台统一检索与备份
 
-## 🌐 Try it Now
+## 🎉 立即使用
 
-We provide an online version where you can experience all features of Telegram Search without self-deployment.
+我们提供了一个在线体验版，无需自行部署，即可体验 Telegram Search 的全部功能。
 
-> [!NOTE]
-> We promise not to collect any user privacy data, you can use it with confidence
+访问以下网址开始使用：https://search.lingogram.app
 
-Visit: https://search.lingogram.app
+> [!WARNING]
+> 本项目未发行任何虚拟货币，请警惕相关诈骗风险。
+>
+> 本软件仅供您导出和检索个人聊天记录使用，切勿将其用于任何违法用途。
 
-## 🚀 Quick Start (Self-Hosted)
+## 🚀 快速开始
 
-### 1-Minute Start with Docker
+1. 新建一个空目录，用于存放 Telegram Search 的配置和数据：
+```bash
+mkdir telegram-search
+cd telegram-search
+```
+
+2. 下载 Docker Compose 文件并启动全部服务（包括数据库、MinIO 等）：
+```bash
+curl -L https://raw.githubusercontent.com/groupultra/telegram-search/refs/heads/main/docker/docker-compose.yml -o docker-compose.yml
+curl -L https://raw.githubusercontent.com/groupultra/telegram-search/refs/heads/main/docker/.env.example -o .env
+docker compose -f docker-compose.yml up -d
+```
+
+3. 然后打开 **http://localhost:3333** 即可使用 🎉
+
+### 自定义环境变量
 
 > [!IMPORTANT]
-> The simplest way to get started — no configuration needed. All features work with sensible defaults.
+> AI Embedding & LLM 设置现在在应用内**按账户**配置（设置 → API）。
+>
+> 请在修改完成 `.env` 文件后，再次执行 `docker compose -f docker-compose.yml up -d` 启动服务。
 
-```bash
-docker run -d --name telegram-search \
-  -p 3333:3333 \
-  -v telegram-search-data:/app/data \
-  ghcr.io/groupultra/telegram-search:latest
-```
+| 环境变量                      | 说明                                                                         | 示例值                                                |
+| ----------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `TELEGRAM_API_ID`             | 从 [my.telegram.org](https://my.telegram.org/apps) 获取的 Telegram 应用 ID   |                                                       |
+| `TELEGRAM_API_HASH`           | 从 [my.telegram.org](https://my.telegram.org/apps) 获取的 Telegram 应用 Hash |                                                       |
+| `DATABASE_TYPE`               | 数据库类型，可选 `postgres` 或 `pglite`                                      | `pglite`                                              |
+| `DATABASE_URL`                | PostgreSQL 连接字符串（仅在 `DATABASE_TYPE=postgres` 时填写）                | `postgresql://postgres:123456@pgvector:5432/postgres` |
+| `PROXY_URL`                   | 代理地址（支持如 `socks5://user:pass@host:port` 等格式）                     | `socks5://user:pass@host:port`                        |
+| `PORT`                        | 后端服务 HTTP/WebSocket 监听端口                                             | `3333`                                                |
+| `HOST`                        | 后端服务监听地址                                                             | `0.0.0.0`                                             |
+| `BACKEND_URL`                 | Nginx 作为反向代理时用于 `/api` 和 `/ws` 的上游后端地址                      | `http://127.0.0.1:3333`                               |
+| `MINIO_URL`                   | MinIO 服务地址                                                               | `http://minio:9000`                                   |
+| `MINIO_ACCESS_KEY`            | MinIO 访问密钥                                                               | `minioadmin`                                          |
+| `MINIO_SECRET_KEY`            | MinIO 访问密钥对应的密钥                                                     | `minioadmin`                                          |
+| `MINIO_BUCKET`                | MinIO 存储桶名称                                                             | `telegram-media`                                      |
 
-Then open **http://localhost:3333** 🎉
+## 💻 开发指南
 
-### Advanced Setup (Optional, Environment Variables)
-
-<details>
-<summary>🔧 Environment Variables</summary>
-
-> [!TIP]
-> All environment variables are optional. Customize only if needed.
-
-| Variable | Description |
-| --- | --- |
-| `TELEGRAM_API_ID` | Telegram app ID from [my.telegram.org](https://my.telegram.org/apps) |
-| `TELEGRAM_API_HASH` | Telegram app hash |
-| `DATABASE_TYPE` | `postgres` or `pglite` (default: `pglite`) |
-| `DATABASE_URL` | PostgreSQL connection string (only when `DATABASE_TYPE=postgres`) |
-| `PROXY_URL` | Proxy URL (e.g. `socks5://user:pass@host:port`) |
-| `PORT` | Backend HTTP/WebSocket port inside the container (default: `3000`) |
-| `HOST` | Backend listen host inside the container (default: `0.0.0.0`) |
-| `BACKEND_URL` | Nginx upstream URL for `/api` and `/ws` (default: `http://127.0.0.1:3000`) |
-
-> [!IMPORTANT]
-> AI Embedding & LLM settings are now configured **per account inside the app** (Settings → API).  
-> Environment variables like `EMBEDDING_API_KEY`, `EMBEDDING_MODEL`, etc. are deprecated and will be removed in a future release.
-
-**Example with PostgreSQL:**
-
-```bash
-docker run -d --name telegram-search \
-  -p 3333:3333 \
-  -v telegram-search-data:/app/data \
-  -e TELEGRAM_API_ID=611335 \
-  -e TELEGRAM_API_HASH=d524b414d21f4d37f08684c1df41ac9c \
-  -e DATABASE_TYPE=postgres \
-  -e DATABASE_URL=postgresql://<postgres-host>:5432/postgres \
-  ghcr.io/groupultra/telegram-search:latest
-```
-
-**Proxy formats:**
-- SOCKS5: `socks5://user:pass@host:port`
-- SOCKS4: `socks4://user:pass@host:port`
-- HTTP: `http://user:pass@host:port`
-- MTProxy: `mtproxy://secret@host:port`
-
-📖 **Full environment variable reference:** [docs/ENVIRONMENT.md](./docs/ENVIRONMENT.md)
-
-</details>
-
-### Start with Docker Compose
-
-1. Clone repository.
-
-2. Run docker compose to start all services including the database:
-
-```bash
-docker compose up -d
-```
-
-3. Access `http://localhost:3333` to open the search interface.
-
-## 💻 Development Guide
-
-> [!CAUTION]
-> Development requires **Node.js >= 24.11** and **pnpm**. Make sure you have them installed.
-
-### Browser-Only Mode
+### 纯浏览器模式
 
 ```bash
 git clone https://github.com/groupultra/telegram-search.git
@@ -170,55 +134,25 @@ cp .env.example .env
 pnpm run dev
 ```
 
-### Server Mode (with Backend)
+### 服务器模式
 
 ```bash
 git clone https://github.com/groupultra/telegram-search.git
 cd telegram-search
 pnpm install
 
-# Copy and adjust environment variables (Telegram keys, DB type/URL, proxy, etc.)
 cp .env.example .env
-# Optionally override in .env.local (ignored by Git)
 
-# Start PostgreSQL with pgvector (or point DATABASE_URL to your own DB)
-docker compose up -d pgvector
+docker compose -f docker/docker-compose.dev.yml up -d pgvector minio
 
-# Start backend & frontend (two terminals)
-pnpm run server:dev  # Terminal 1: WebSocket server (uses .env/.env.local via dotenvx)
-pnpm run web:dev     # Terminal 2: Vue frontend
+pnpm run server:dev
+pnpm run web:dev
 ```
 
-📖 **More development details:** [CONTRIBUTING.md](./CONTRIBUTING.md)
-
-## 🏗️ Architecture
-
-This project is a **monorepo** with event-driven architecture:
-
-- **`apps/web`**: Vue 3 frontend
-- **`apps/server`**: WebSocket server
-- **`packages/client`**: Client adapters & stores (Pinia)
-- **`packages/core`**: Event bus (EventEmitter3), services, database models (Drizzle ORM)
-- **`packages/common`**: Logger & utilities
-
-**Key Technologies:**
-- Event-driven with `CoreContext` (EventEmitter3)
-- Real-time communication via WebSocket
-- PostgreSQL + pgvector OR PGlite (in-browser)
-- Message processing pipeline: Embedding, Jieba, Link, Media, User resolvers
-
-📖 **Full architecture details, event flow, and diagrams:** [CONTRIBUTING.md](./CONTRIBUTING.md)
-
-## 🚨 Warnings
-> [!WARNING]
-> We have not issued any virtual currency, please do not be deceived.
-
-> [!CAUTION]
-> This software can only export your own chat records for search, please do not use it for illegal purposes.
+📖 **更多开发细节和架构细节：** [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 ## 🚀 Activity
 
 ![Alt](https://repobeats.axiom.co/api/embed/69d5ef9f5e72cd7901b32ff71b5f359bc7ca42ea.svg "Repobeats analytics image")
 
 [![Star History Chart](https://api.star-history.com/svg?repos=groupultra/telegram-search&type=Date)](https://star-history.com/#groupultra/telegram-search&Date)
-

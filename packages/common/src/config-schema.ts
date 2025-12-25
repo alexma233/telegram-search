@@ -70,18 +70,22 @@ export const telegramConfigSchema = object({
 
 export const minioConfigSchema = object({
   bucket: optional(string(), 'telegram-media'),
-  endpoint: optional(string()),
-  port: optional(number()),
+  url: optional(string()),
   accessKey: optional(string()),
   secretKey: optional(string()),
-  useSSL: optional(boolean()),
-})
 
-export const otelConfigSchema = object({
-  endpoint: optional(string()),
-  serviceName: optional(string()),
-  serviceVersion: optional(string()),
-  headers: optional(object({})),
+  /**
+   * @deprecated Use url instead
+   */
+  endPoint: optional(string()),
+  /**
+   * @deprecated Use url instead
+   */
+  port: optional(number(), 9000),
+  /**
+   * @deprecated Use url instead
+   */
+  useSSL: optional(boolean(), false),
 })
 
 export const apiConfigSchema = object({
@@ -92,14 +96,12 @@ export const configSchema = object({
   database: optional(databaseConfigSchema, {}),
   api: optional(apiConfigSchema, {}),
   minio: optional(minioConfigSchema, {}),
-  otel: optional(otelConfigSchema, {}),
 })
 
 export type Config = InferOutput<typeof configSchema>
 export type ProxyConfig = InferOutput<typeof proxyConfigSchema>
 export type DatabaseConfig = InferOutput<typeof databaseConfigSchema>
 export type MinioConfig = InferOutput<typeof minioConfigSchema>
-export type OtelConfig = InferOutput<typeof otelConfigSchema>
 
 export function generateDefaultConfig(): Config {
   const defaultConfig = safeParse(configSchema, {})

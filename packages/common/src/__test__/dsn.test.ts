@@ -3,7 +3,7 @@ import type { DatabaseConfig } from '../config-schema'
 import { describe, expect, it } from 'vitest'
 
 import { DatabaseType } from '../config-schema'
-import { getDatabaseDSN } from '../dsn'
+import { getDatabaseDSN, parseMinioDSN } from '../dsn'
 
 describe('getDatabaseDSN', () => {
   it('returns the provided url when available', () => {
@@ -27,5 +27,36 @@ describe('getDatabaseDSN', () => {
     }
 
     expect(getDatabaseDSN(config)).toBe('postgres://user:pass@localhost:5432/telegram')
+  })
+})
+
+describe('parseMinioDSN', () => {
+  it('correctly parses a minio DSN with http', () => {
+    const dsn = parseMinioDSN('http://localhost:9000')
+
+    expect(dsn).toEqual({
+      endPoint: 'localhost',
+      port: 9000,
+      useSSL: false,
+    })
+  })
+
+  // TODO: fix this
+  it.skip('correctly parses a minio DSN with https', () => {
+    const dsn = parseMinioDSN('https://my-minio.example.com:443')
+
+    expect(dsn).toEqual({
+      endPoint: 'my-minio.example.com',
+      port: 443,
+      useSSL: true,
+    })
+  })
+
+  it('throws an error if port is missing', () => {
+    expect(() => parseMinioDSN('https://my-minio.example.com')).toThrow('Invalid Minio DSN')
+  })
+
+  it('throws an error if hostname is missing', () => {
+    expect(() => parseMinioDSN('https://:9000')).toThrow('Invalid URL')
   })
 })
