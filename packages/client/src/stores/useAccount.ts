@@ -105,6 +105,10 @@ export const useAccountStore = defineStore('account', () => {
 
     isReady.value = true
 
+    if (activeSession.value) {
+      activeSession.value.isReady = true
+    }
+
     logger.verbose('Fetching config for new session')
     bridgeStore.sendEvent('config:fetch')
   }

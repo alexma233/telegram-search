@@ -9,6 +9,7 @@ export interface StoredSession {
 
   /**
    * Indicates if the session is fully authenticated and ready to use.
+   * Needs `account:ready` event to be emitted.
    */
   isReady?: boolean
 

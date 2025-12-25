@@ -8,7 +8,7 @@ import type { MediaBinaryProvider } from './types'
 import { useLogger } from '@guiiai/logg'
 
 import { createCoreContext } from './context'
-import { afterConnectedEventHandler, basicEventHandler, useEventHandler } from './event-handler'
+import { afterConnectedEventHandler, basicEventHandler, useEventHandler } from './event-handlers'
 import { models } from './models'
 
 export function createCoreInstance(

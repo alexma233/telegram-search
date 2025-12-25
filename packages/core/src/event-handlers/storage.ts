@@ -102,9 +102,11 @@ export function registerStorageEventHandlers(ctx: CoreContext, logger: Logger, d
         id: Number(chat.chat_id),
         name: chat.chat_name,
         type: chat.chat_type,
+        isContact: chat.is_contact ?? undefined,
         messageCount: chatMessageStats?.message_count,
         lastMessageDate: chat.dialog_date ? new Date(chat.dialog_date) : undefined,
         pinned: !!chat.is_pinned,
+        folderIds: chat.folder_ids ?? [],
         accessHash: chat.access_hash ?? undefined,
       } satisfies CoreDialog
     })
@@ -127,6 +129,13 @@ export function registerStorageEventHandlers(ctx: CoreContext, logger: Logger, d
 
     const result = await dbModels.chatModels.recordChats(ctx.getDB(), dialogs, accountId)
     logger.withFields({ count: result.length }).verbose('Successfully recorded dialogs')
+  })
+
+  ctx.emitter.on('storage:record:chat-folders', async ({ folders, accountId }) => {
+    logger.withFields({ count: folders.length }).verbose('Recording chat folders mapping')
+
+    await dbModels.chatFolderModels.updateChatFolders(ctx.getDB(), accountId, folders)
+    logger.verbose('Successfully updated chat folders mapping')
   })
 
   ctx.emitter.on('storage:search:messages', async (params) => {

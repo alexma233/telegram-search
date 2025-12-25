@@ -10,6 +10,7 @@ export function registerBasicEventHandlers(
 ) {
   const accountStore = useAccountStore()
   const { activeSession } = storeToRefs(accountStore)
+  const logger = useLogger('Auth')
 
   registerEventHandler('auth:code:needed', () => {
     useAccountStore().auth.needCode = true
@@ -20,13 +21,11 @@ export function registerBasicEventHandlers(
   })
 
   registerEventHandler('auth:connected', () => {
-    if (activeSession.value) {
-      activeSession.value.isReady = true
-    }
+    logger.log('Auth connected')
   })
 
   registerEventHandler('auth:disconnected', () => {
-    useLogger('Auth').log('Auth disconnected, cleaning up session metadata')
+    logger.log('Auth disconnected, cleaning up session metadata')
     if (activeSession.value) {
       activeSession.value.isReady = false
       activeSession.value.session = undefined

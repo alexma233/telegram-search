@@ -3,7 +3,7 @@ import type { EventEmitter } from 'eventemitter3'
 import type { Api } from 'telegram'
 
 import type { AccountSettings } from './account-settings'
-import type { CoreDialog } from './dialog'
+import type { CoreChatFolder, CoreDialog } from './dialog'
 import type { CoreMessage } from './message'
 import type { CoreTask, CoreTaskData } from './task'
 
@@ -120,6 +120,7 @@ export interface FetchMessageOpts {
 
 export interface DialogEventToCore {
   'dialog:fetch': () => void
+  'dialog:folders:fetch': () => void
   /**
    * Request fetching a single dialog's avatar immediately.
    * Used by frontend to prioritize avatars within viewport.
@@ -129,6 +130,7 @@ export interface DialogEventToCore {
 
 export interface DialogEventFromCore {
   'dialog:data': (data: { dialogs: CoreDialog[] }) => void
+  'dialog:folders:data': (data: { folders: CoreChatFolder[] }) => void
   /**
    * Emit avatar bytes for a single dialog. Frontend should convert bytes to blobUrl
    * and attach it to the corresponding chat. This event is incremental and small-sized.
@@ -196,6 +198,7 @@ export interface StorageEventToCore {
 
   'storage:fetch:dialogs': (data: { accountId: string }) => void
   'storage:record:dialogs': (data: { dialogs: CoreDialog[], accountId: string }) => void
+  'storage:record:chat-folders': (data: { folders: CoreChatFolder[], accountId: string }) => void
 
   'storage:search:messages': (data: CoreMessageSearchParams) => void
 

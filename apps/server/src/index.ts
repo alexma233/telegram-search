@@ -5,7 +5,7 @@ import process from 'node:process'
 
 import figlet from 'figlet'
 
-import { initLogger, setGlobalHookPostLog, useLogger } from '@guiiai/logg'
+import { initLogger, LoggerFormat, setGlobalHookPostLog, useLogger } from '@guiiai/logg'
 import { parseEnvFlags, parseEnvToConfig } from '@tg-search/common'
 import { models } from '@tg-search/core'
 import { emitOtelLog } from '@tg-search/observability'
@@ -89,12 +89,18 @@ async function bootstrap() {
     registerOtel({ version: pkg.version, debug: otelDebug })
 
     setGlobalHookPostLog((log: Log, formattedOutput: string) => {
-      const rawContext = removeHyperLinks(log.context)
-      const rawFields = formattedOutput?.split(log.message)[1]?.trim()
       const fieldsSnake = toSnakeCaseFields(log.fields)
-      const message = `[${rawContext}] ${log.message} ${rawFields}`
 
-      emitOtelLog(log.level, rawContext, message, fieldsSnake)
+      if (flags.logFormat === LoggerFormat.Pretty) {
+        const rawContext = removeHyperLinks(log.context)
+        const rawFields = formattedOutput?.split(log.message)[1]?.trim()
+        const message = `[${rawContext}] ${log.message} ${rawFields}`
+
+        emitOtelLog(log.level, rawContext, message, fieldsSnake)
+      }
+      else {
+        emitOtelLog(log.level, log.context, formattedOutput, fieldsSnake)
+      }
     })
   }
 

@@ -30,7 +30,9 @@ export type DBInsertChat = typeof joinedChatsTable.$inferInsert
 export type DBSelectChat = typeof joinedChatsTable.$inferSelect
 export type DBSelectChatWithAccount = DBSelectChat & {
   is_pinned: boolean | null
+  is_contact: boolean | null
   access_hash: string | null
+  folder_ids: number[] | null
 }
 
 export type DBInsertPhoto = typeof photosTable.$inferInsert

@@ -1,5 +1,5 @@
 export type * from '../context'
-export type * from '../event-handler'
+export type * from '../event-handlers'
 export type * from '../instance'
 export type * from '../services'
 export type * from './account-settings'

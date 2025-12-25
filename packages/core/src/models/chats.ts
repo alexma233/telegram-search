@@ -41,6 +41,10 @@ async function recordChats(db: CoreDB, chats: CoreDialog[], accountId: string): 
 
     // If accountId is provided, automatically link to account_joined_chats
     if (accountId && joinedChats.length > 0) {
+      // Check if ANY of the input dialogs contain folder information.
+      // If none do (typical for basic getDialogs sync), we should NOT overwrite existing folder mapping in DB.
+      const hasFolderData = chats.some(c => c.folderIds !== undefined)
+
       await tx
         .insert(accountJoinedChatsTable)
         .values(joinedChats.map((chat) => {
@@ -49,6 +53,8 @@ async function recordChats(db: CoreDB, chats: CoreDialog[], accountId: string): 
             account_id: accountId,
             joined_chat_id: chat.id,
             is_pinned: originalChat?.pinned || false,
+            is_contact: originalChat?.isContact || false,
+            folder_ids: originalChat?.folderIds || [],
             access_hash: originalChat?.accessHash,
           }
         }))
@@ -56,6 +62,8 @@ async function recordChats(db: CoreDB, chats: CoreDialog[], accountId: string): 
           target: [accountJoinedChatsTable.account_id, accountJoinedChatsTable.joined_chat_id],
           set: {
             is_pinned: sql`excluded.is_pinned`,
+            is_contact: sql`excluded.is_contact`,
+            ...(hasFolderData ? { folder_ids: sql`excluded.folder_ids` } : {}),
             access_hash: sql`excluded.access_hash`,
           },
         })
@@ -90,6 +98,8 @@ async function fetchChatsByAccountId(db: CoreDB, accountId: string): PromiseResu
       dialog_date: joinedChatsTable.dialog_date,
       access_hash: accountJoinedChatsTable.access_hash,
       is_pinned: accountJoinedChatsTable.is_pinned,
+      is_contact: accountJoinedChatsTable.is_contact,
+      folder_ids: accountJoinedChatsTable.folder_ids,
       created_at: joinedChatsTable.created_at,
       updated_at: joinedChatsTable.updated_at,
     })

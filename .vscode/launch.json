@@ -24,6 +24,10 @@
       "name": "Run Script: dev:server",
       "request": "launch",
       "command": "pnpm run dev:server",
+      "env": {
+        "OTEL_ENABLED": "true",
+        "LOG_LEVEL": "debug"
+      },
       "cwd": "${workspaceFolder}"
     },
     {

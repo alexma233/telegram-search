@@ -8,8 +8,6 @@ export function registerAccountEventHandlers(ctx: CoreContext, logger: Logger, a
   logger = logger.withContext('core:account:event')
 
   return (accountService: AccountService) => {
-    let hasBootstrappedDialogs = false
-
     ctx.emitter.on('account:setup', async () => {
       logger.verbose('Getting me info')
       const account = (await accountService.fetchMyAccount()).expect('Failed to get me info')
@@ -24,14 +22,6 @@ export function registerAccountEventHandlers(ctx: CoreContext, logger: Logger, a
       logger.withFields({ accountId: dbAccount.id }).verbose('Set current account ID')
 
       ctx.emitter.emit('account:ready', { accountId: dbAccount.id })
-
-      // Bootstrap dialogs once the account context is established. This
-      // ensures that any dialog/storage handlers relying on currentAccountId
-      // see a consistent state.
-      if (!hasBootstrappedDialogs) {
-        hasBootstrappedDialogs = true
-        ctx.emitter.emit('dialog:fetch')
-      }
     })
   }
 }
