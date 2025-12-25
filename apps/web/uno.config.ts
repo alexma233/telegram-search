@@ -13,21 +13,17 @@ import {
 import { presetScrollbar } from 'unocss-preset-scrollbar'
 
 export function sharedUnoConfig() {
-  const enableWebFonts = process.env.NODE_ENV !== 'test' && process.env.NO_WEBFONTS !== 'true'
-
   return defineConfig({
     presets: [
       presetWind3(),
       presetAttributify(),
       presetIcons(),
-      ...(enableWebFonts
-        ? [presetWebFonts({
-            provider: 'google',
-            fonts: {
-              sans: 'Roboto',
-            },
-          })]
-        : []),
+      presetWebFonts({
+        provider: 'google',
+        fonts: {
+          sans: 'Roboto',
+        },
+      }),
       presetAnimations(),
       presetChromatic({
         baseHue: 220.44,
