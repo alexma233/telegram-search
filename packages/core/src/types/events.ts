@@ -122,6 +122,7 @@ export interface MessageEventFromCore {
   'message:data': (data: { messages: CoreMessage[] }) => void
   'message:unread-data': (data: { messages: CoreMessage[] }) => void
   'message:summary-data': (data: { messages: CoreMessage[], mode: SummaryMode }) => void
+  'message:annual-report:progress': (data: { progress: number, label?: string, stage?: 'scan' | 'fetch' }) => void
   'message:annual-report:data': (data: { stats: AnnualReportStats }) => void
 }
 

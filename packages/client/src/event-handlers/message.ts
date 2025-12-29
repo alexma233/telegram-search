@@ -20,6 +20,18 @@ export function registerMessageEventHandlers(
     useLogger('message:summary-data').withFields({ mode, count: messages.length }).debug('Received summary messages')
   })
 
+  registerEventHandler('message:annual-report:progress', ({ progress, label, stage }) => {
+    // Weighted progress for better UX: Scan 0-30%, Fetch 30-100%
+    let weightedProgress = progress
+    if (stage === 'scan') {
+      weightedProgress = Math.round(progress * 0.3)
+    }
+    else {
+      weightedProgress = 30 + Math.round(progress * 0.7)
+    }
+    useAnnualReportStore().setProgress(weightedProgress, label)
+  })
+
   registerEventHandler('message:annual-report:data', ({ stats }) => {
     useAnnualReportStore().setStats(stats)
   })

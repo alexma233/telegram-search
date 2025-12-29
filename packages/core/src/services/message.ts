@@ -345,63 +345,99 @@ export function createMessageService(ctx: CoreContext, logger: Logger) {
     })
   }
 
-  async function* fetchAnnualMyMessages(year: number): AsyncGenerator<Api.Message[]> {
-    if (!await ctx.getClient().isUserAuthorized()) {
-      logger.error('User not authorized')
-      return
-    }
-
+  async function getAnnualReportPlan(year: number) {
     const startTime = Math.floor(new Date(year, 0, 1).getTime() / 1000)
 
-    try {
-      logger.withFields({ year }).log('Fetching annual my messages across all chats')
-      const dialogs = await ctx.getClient().getDialogs()
+    ctx.emitter.emit('message:annual-report:progress', {
+      progress: 0,
+      label: 'Fetching dialogs list...',
+      stage: 'scan',
+    })
+    const dialogs = await ctx.getClient().getDialogs()
 
-      for (const dialog of dialogs) {
-        if (!dialog.entity)
-          continue
+    let totalCount = 0
+    const plan: Array<{ peer: Api.TypeInputPeer, count: number, chatId: number, chatName: string }> = []
 
-        const peer = dialog.inputEntity
-        let offsetId = 0
+    const dialogsCount = dialogs.length
+    for (let i = 0; i < dialogsCount; i++) {
+      const dialog = dialogs[i]
+      if (!dialog.entity)
+        continue
 
-        while (true) {
-          const result = await ctx.getClient().invoke(new Api.messages.Search({
-            peer,
-            q: '',
-            fromId: new Api.InputPeerSelf(),
-            minDate: startTime,
-            maxDate: 0,
-            offsetId,
-            addOffset: 0,
-            limit: 100,
-            filter: new Api.InputMessagesFilterEmpty(),
-            hash: bigInt(0),
-          }))
+      // Emit scan progress (normalized to 0-100 for Phase 1)
+      const scanProgress = Math.round((i / dialogsCount) * 100)
+      ctx.emitter.emit('message:annual-report:progress', {
+        progress: scanProgress,
+        label: `Scanning chats: ${i + 1} / ${dialogsCount}`,
+        stage: 'scan',
+      })
 
-          if (!(result instanceof Api.messages.MessagesSlice) && !(result instanceof Api.messages.Messages) || result.messages.length === 0) {
-            break
-          }
+      const result = await ctx.getClient().invoke(new Api.messages.Search({
+        peer: dialog.inputEntity,
+        q: '',
+        fromId: new Api.InputPeerSelf(),
+        minDate: startTime,
+        maxDate: 0,
+        offsetId: 0,
+        addOffset: 0,
+        limit: 1,
+        filter: new Api.InputMessagesFilterEmpty(),
+        hash: bigInt(0),
+      }))
 
-          const messages = result.messages.filter(isValidApiMessage)
-          if (messages.length > 0) {
-            yield messages
-          }
-
-          if (result.messages.length < 100)
-            break
-
-          offsetId = result.messages[result.messages.length - 1].id
-
-          const lastMessage = result.messages[result.messages.length - 1]
-          if ('date' in lastMessage && lastMessage.date < startTime)
-            break
-
-          await new Promise(resolve => setTimeout(resolve, 150))
+      if ((result instanceof Api.messages.MessagesSlice || result instanceof Api.messages.Messages) && 'count' in result) {
+        const count = result.count || result.messages.length
+        if (count > 0 && dialog.id) {
+          totalCount += count
+          plan.push({
+            peer: dialog.inputEntity,
+            count,
+            chatId: dialog.id.toJSNumber(),
+            chatName: dialog.name || dialog.id.toString(),
+          })
         }
       }
+      await new Promise(resolve => setTimeout(resolve, 50))
     }
-    catch (error) {
-      ctx.withError(error, 'Fetch annual my messages failed')
+
+    return { totalCount, plan }
+  }
+
+  async function* executeAnnualReportPlan(plan: Array<{ peer: Api.TypeInputPeer, count: number, chatId: number, chatName: string }>, year: number) {
+    const startTime = Math.floor(new Date(year, 0, 1).getTime() / 1000)
+
+    for (const item of plan) {
+      let offsetId = 0
+      while (true) {
+        const result = await ctx.getClient().invoke(new Api.messages.Search({
+          peer: item.peer,
+          q: '',
+          fromId: new Api.InputPeerSelf(),
+          minDate: startTime,
+          maxDate: 0,
+          offsetId,
+          addOffset: 0,
+          limit: 100,
+          filter: new Api.InputMessagesFilterEmpty(),
+          hash: bigInt(0),
+        }))
+
+        if ((!(result instanceof Api.messages.MessagesSlice) && !(result instanceof Api.messages.Messages)) || result.messages.length === 0) {
+          break
+        }
+
+        const messages = result.messages.filter(isValidApiMessage)
+        if (messages.length > 0) {
+          yield { messages, chatId: item.chatId, chatName: item.chatName }
+        }
+
+        if (result.messages.length < 100)
+          break
+
+        offsetId = result.messages[result.messages.length - 1].id
+
+        await new Promise(resolve => setTimeout(resolve, 150))
+      }
     }
   }
 
@@ -412,6 +448,7 @@ export function createMessageService(ctx: CoreContext, logger: Logger) {
     fetchUnreadMessages,
     fetchRecentMessagesByTimeRange,
     markAsRead,
-    fetchAnnualMyMessages,
+    getAnnualReportPlan,
+    executeAnnualReportPlan,
   }
 }

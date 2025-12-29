@@ -7,10 +7,11 @@ import { useI18n } from 'vue-i18n'
 import Card from '../components/ui/Card.vue'
 
 import { Button } from '../components/ui/Button'
+import { Progress } from '../components/ui/Progress'
 
 const { t } = useI18n()
 const annualReportStore = useAnnualReportStore()
-const { stats, isFetching } = storeToRefs(annualReportStore)
+const { stats, isFetching, progress, progressLabel } = storeToRefs(annualReportStore)
 
 const selectedYear = ref(new Date().getFullYear())
 const years = computed(() => {
@@ -67,6 +68,13 @@ const maxMonth = computed(() => {
           <p class="mt-2 text-muted-foreground">
             {{ t('annualReport.generatingDescription') }}
           </p>
+
+          <div class="mt-8 max-w-md w-full space-y-2">
+            <Progress :progress="progress" />
+            <p v-if="progressLabel" class="text-xs text-muted-foreground">
+              {{ progressLabel }}
+            </p>
+          </div>
         </div>
 
         <template v-else-if="stats">

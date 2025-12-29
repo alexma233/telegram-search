@@ -9,7 +9,6 @@ import { Api } from 'telegram/tl'
 import { v4 as uuidv4 } from 'uuid'
 
 import { MESSAGE_PROCESS_BATCH_SIZE } from '../constants'
-import { getApiChatIdFromMtpPeer } from '../utils/dialog'
 import { convertToCoreMessage } from '../utils/message'
 
 export function registerMessageEventHandlers(ctx: CoreContext, logger: Logger) {
@@ -190,41 +189,47 @@ export function registerMessageEventHandlers(ctx: CoreContext, logger: Logger) {
     ctx.emitter.on('message:fetch:annual-report', async ({ year }) => {
       logger.withFields({ year }).log('Starting annual report fetching')
 
-      const stats: AnnualReportStats = {
-        year,
-        totalMessagesSent: 0,
-        topChats: [],
-        monthlyStats: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, messageCount: 0 })),
-      }
-
-      const chatCounts: Record<number, { name: string, count: number }> = {}
-
       try {
-        const dialogs = await ctx.getClient().getDialogs()
-        const chatNames: Record<number, string> = {}
-        for (const d of dialogs) {
-          if (d.entity) {
-            chatNames[d.id.toJSNumber()] = d.name || d.id.toString()
-          }
+        // Phase 1: Planning (Scanning dialogs)
+        // We let getAnnualReportPlan emit its own scan progress
+        const { totalCount, plan } = await messageService.getAnnualReportPlan(year)
+
+        const stats: AnnualReportStats = {
+          year,
+          totalMessagesSent: 0,
+          topChats: [],
+          monthlyStats: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, messageCount: 0 })),
         }
 
-        for await (const messages of messageService.fetchAnnualMyMessages(year)) {
+        let processedCount = 0
+        const chatCounts: Record<number, { name: string, count: number }> = {}
+
+        // Phase 2: Execution (Fetching messages)
+        for await (const { messages, chatId, chatName } of messageService.executeAnnualReportPlan(plan, year)) {
           ctx.emitter.emit('message:process', { messages })
 
           stats.totalMessagesSent += messages.length
+          processedCount += messages.length
+
           for (const msg of messages) {
             const date = new Date(msg.date * 1000)
             const month = date.getMonth()
             stats.monthlyStats[month].messageCount++
 
-            const chatId = getApiChatIdFromMtpPeer(msg.peerId)
-            if (chatId !== undefined) {
-              if (!chatCounts[chatId]) {
-                chatCounts[chatId] = { name: chatNames[chatId] || 'Unknown', count: 0 }
-              }
-              chatCounts[chatId].count++
+            if (!chatCounts[chatId]) {
+              chatCounts[chatId] = { name: chatName, count: 0 }
             }
+            chatCounts[chatId].count++
           }
+
+          // Emit progress (Phase 2 starts after Phase 1, so we could offset it if we want,
+          // but for now let's keep it simple: progress is relative to message count)
+          const progress = totalCount > 0 ? Math.round((processedCount / totalCount) * 100) : 100
+          ctx.emitter.emit('message:annual-report:progress', {
+            progress,
+            label: `Fetching messages: ${processedCount} / ${totalCount}`,
+            stage: 'fetch',
+          })
         }
 
         stats.topChats = Object.entries(chatCounts)
