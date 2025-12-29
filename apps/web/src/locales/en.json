@@ -223,6 +223,20 @@
     "totalMessages": "Total Messages",
     "unsyncedMessages": "Unsynced Messages"
   },
+  "annualReport": {
+    "annualReport": "Annual Report",
+    "generate": "Generate {year} Report",
+    "generating": "Generating report...",
+    "generatingDescription": "We are looking back at your year on Telegram. This may take a while as we search through all your chats.",
+    "messagesSent": "Messages Sent",
+    "topChats": "Top Conversations",
+    "monthlyActivity": "Monthly Activity",
+    "interactiveSummary": "Interactive Summary",
+    "noData": "No data available for this year",
+    "selectYear": "Select Year",
+    "totalMessages": "Total messages sent",
+    "mostActiveIn": "Most active in {month}"
+  },
   "summaryDialog": {
     "title": "Message Summary",
     "tabUnread": "Unread Messages",

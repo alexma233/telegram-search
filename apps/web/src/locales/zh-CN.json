@@ -223,6 +223,20 @@
     "totalMessages": "总消息数",
     "unsyncedMessages": "未同步消息"
   },
+  "annualReport": {
+    "annualReport": "年度报告",
+    "generate": "生成 {year} 年度报告",
+    "generating": "正在生成报告...",
+    "generatingDescription": "我们正在回顾你这一年在 Telegram 上的点滴。这可能需要一点时间，因为我们需要检索所有的对话记录。",
+    "messagesSent": "发送的消息总数",
+    "topChats": "互动最多的对话",
+    "monthlyActivity": "每月活跃度",
+    "interactiveSummary": "互动总结",
+    "noData": "这一年暂无数据",
+    "selectYear": "选择年份",
+    "totalMessages": "共发送消息",
+    "mostActiveIn": "最活跃的月份是 {month} 月"
+  },
   "summaryDialog": {
     "title": "消息摘要",
     "tabUnread": "未读消息",

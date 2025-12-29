@@ -60,6 +60,12 @@ const userDropdownOpen = ref(false)
       />
 
       <SidebarSelector
+        path="/annual-report"
+        icon="i-lucide-sparkles"
+        :name="t('annualReport.annualReport')"
+      />
+
+      <SidebarSelector
         path="/settings"
         icon="i-lucide-settings"
         :name="t('settings.settings')"

@@ -81,6 +81,7 @@ export interface MessageEventToCore {
   'message:fetch:specific': (data: { chatId: string, messageIds: number[] }) => void
   'message:fetch:unread': (data: FetchUnreadMessageOpts) => void
   'message:fetch:summary': (data: FetchSummaryMessageOpts) => void
+  'message:fetch:annual-report': (data: { year: number }) => void
   'message:send': (data: { chatId: string, content: string }) => void
   'message:read': (data: { chatId: string }) => void
 }
@@ -102,11 +103,26 @@ export interface FetchSummaryMessageOpts {
   limit?: number
 }
 
+export interface AnnualReportStats {
+  year: number
+  totalMessagesSent: number
+  topChats: Array<{
+    chatId: number
+    chatName: string
+    messageCount: number
+  }>
+  monthlyStats: Array<{
+    month: number
+    messageCount: number
+  }>
+}
+
 export interface MessageEventFromCore {
   'message:fetch:progress': (data: { taskId: string, progress: number }) => void
   'message:data': (data: { messages: CoreMessage[] }) => void
   'message:unread-data': (data: { messages: CoreMessage[] }) => void
   'message:summary-data': (data: { messages: CoreMessage[], mode: SummaryMode }) => void
+  'message:annual-report:data': (data: { stats: AnnualReportStats }) => void
 }
 
 export interface FetchMessageOpts {

@@ -2,12 +2,14 @@ import type { Logger } from '@guiiai/logg'
 
 import type { CoreContext } from '../context'
 import type { MessageService } from '../services'
+import type { AnnualReportStats } from '../types/events'
 import type { CoreMessage } from '../types/message'
 
 import { Api } from 'telegram/tl'
 import { v4 as uuidv4 } from 'uuid'
 
 import { MESSAGE_PROCESS_BATCH_SIZE } from '../constants'
+import { getApiChatIdFromMtpPeer } from '../utils/dialog'
 import { convertToCoreMessage } from '../utils/message'
 
 export function registerMessageEventHandlers(ctx: CoreContext, logger: Logger) {
@@ -182,6 +184,58 @@ export function registerMessageEventHandlers(ctx: CoreContext, logger: Logger) {
       }
       catch (e) {
         ctx.withError(e, 'Failed to fetch summary messages')
+      }
+    })
+
+    ctx.emitter.on('message:fetch:annual-report', async ({ year }) => {
+      logger.withFields({ year }).log('Starting annual report fetching')
+
+      const stats: AnnualReportStats = {
+        year,
+        totalMessagesSent: 0,
+        topChats: [],
+        monthlyStats: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, messageCount: 0 })),
+      }
+
+      const chatCounts: Record<number, { name: string, count: number }> = {}
+
+      try {
+        const dialogs = await ctx.getClient().getDialogs()
+        const chatNames: Record<number, string> = {}
+        for (const d of dialogs) {
+          if (d.entity) {
+            chatNames[d.id.toJSNumber()] = d.name || d.id.toString()
+          }
+        }
+
+        for await (const messages of messageService.fetchAnnualMyMessages(year)) {
+          ctx.emitter.emit('message:process', { messages })
+
+          stats.totalMessagesSent += messages.length
+          for (const msg of messages) {
+            const date = new Date(msg.date * 1000)
+            const month = date.getMonth()
+            stats.monthlyStats[month].messageCount++
+
+            const chatId = getApiChatIdFromMtpPeer(msg.peerId)
+            if (chatId !== undefined) {
+              if (!chatCounts[chatId]) {
+                chatCounts[chatId] = { name: chatNames[chatId] || 'Unknown', count: 0 }
+              }
+              chatCounts[chatId].count++
+            }
+          }
+        }
+
+        stats.topChats = Object.entries(chatCounts)
+          .map(([id, data]) => ({ chatId: Number(id), chatName: data.name, messageCount: data.count }))
+          .sort((a, b) => b.messageCount - a.messageCount)
+          .slice(0, 20)
+
+        ctx.emitter.emit('message:annual-report:data', { stats })
+      }
+      catch (e) {
+        ctx.withError(e, 'Failed to generate annual report')
       }
     })
 

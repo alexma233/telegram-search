@@ -3,6 +3,8 @@ import type { Logger } from '@guiiai/logg'
 import type { CoreContext } from '../context'
 import type { FetchMessageOpts } from '../types/events'
 
+import bigInt from 'big-integer'
+
 import { withSpan } from '@tg-search/observability'
 import { Err, Ok } from '@unbird/result'
 import { Api } from 'telegram'
@@ -343,6 +345,66 @@ export function createMessageService(ctx: CoreContext, logger: Logger) {
     })
   }
 
+  async function* fetchAnnualMyMessages(year: number): AsyncGenerator<Api.Message[]> {
+    if (!await ctx.getClient().isUserAuthorized()) {
+      logger.error('User not authorized')
+      return
+    }
+
+    const startTime = Math.floor(new Date(year, 0, 1).getTime() / 1000)
+
+    try {
+      logger.withFields({ year }).log('Fetching annual my messages across all chats')
+      const dialogs = await ctx.getClient().getDialogs()
+
+      for (const dialog of dialogs) {
+        if (!dialog.entity)
+          continue
+
+        const peer = dialog.inputEntity
+        let offsetId = 0
+
+        while (true) {
+          const result = await ctx.getClient().invoke(new Api.messages.Search({
+            peer,
+            q: '',
+            fromId: new Api.InputPeerSelf(),
+            minDate: startTime,
+            maxDate: 0,
+            offsetId,
+            addOffset: 0,
+            limit: 100,
+            filter: new Api.InputMessagesFilterEmpty(),
+            hash: bigInt(0),
+          }))
+
+          if (!(result instanceof Api.messages.MessagesSlice) && !(result instanceof Api.messages.Messages) || result.messages.length === 0) {
+            break
+          }
+
+          const messages = result.messages.filter(isValidApiMessage)
+          if (messages.length > 0) {
+            yield messages
+          }
+
+          if (result.messages.length < 100)
+            break
+
+          offsetId = result.messages[result.messages.length - 1].id
+
+          const lastMessage = result.messages[result.messages.length - 1]
+          if ('date' in lastMessage && lastMessage.date < startTime)
+            break
+
+          await new Promise(resolve => setTimeout(resolve, 150))
+        }
+      }
+    }
+    catch (error) {
+      ctx.withError(error, 'Fetch annual my messages failed')
+    }
+  }
+
   return {
     fetchMessages,
     sendMessage,
@@ -350,5 +412,6 @@ export function createMessageService(ctx: CoreContext, logger: Logger) {
     fetchUnreadMessages,
     fetchRecentMessagesByTimeRange,
     markAsRead,
+    fetchAnnualMyMessages,
   }
 }
