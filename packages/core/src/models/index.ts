@@ -1,6 +1,7 @@
 import type { AccountJoinedChatModels } from './account-joined-chats'
 import type { AccountSettingsModels } from './account-settings'
 import type { AccountModels } from './accounts'
+import type { AnnualReportModels } from './annual-reports'
 import type { ChatFolderModels } from './chat-folders'
 import type { ChatMessageModels } from './chat-message'
 import type { ChatMessageStatsModels } from './chat-message-stats'
@@ -40,6 +41,7 @@ export type {
   AccountJoinedChatModels,
   AccountModels,
   AccountSettingsModels,
+  AnnualReportModels,
   ChatFolderModels,
   ChatMessageModels,
   ChatMessageStatsModels,

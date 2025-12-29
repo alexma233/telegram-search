@@ -243,7 +243,10 @@ export function registerMessageEventHandlers(ctx: CoreContext, logger: Logger, m
 
         // Phase 2: Execution (Fetching messages)
         for await (const { messages, chatId, chatName } of messageService.executeAnnualReportPlan(plan, year)) {
-          ctx.emitter.emit('message:process', { messages })
+          ctx.emitter.emit('message:process', {
+            messages,
+            syncOptions: { syncMedia: false },
+          })
 
           stats.totalMessagesSent += messages.length
           processedCount += messages.length
