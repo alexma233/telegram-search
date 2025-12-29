@@ -356,7 +356,7 @@ export function createMessageService(ctx: CoreContext, logger: Logger) {
     const dialogs = await ctx.getClient().getDialogs()
 
     let totalCount = 0
-    const plan: Array<{ peer: Api.TypeInputPeer, count: number, chatId: number, chatName: string }> = []
+    const plan: Array<{ peer: string, count: number, chatId: number, chatName: string }> = []
 
     const dialogsCount = dialogs.length
     for (let i = 0; i < dialogsCount; i++) {
@@ -390,7 +390,7 @@ export function createMessageService(ctx: CoreContext, logger: Logger) {
         if (count > 0 && dialog.id) {
           totalCount += count
           plan.push({
-            peer: dialog.inputEntity,
+            peer: dialog.id.toString(), // Use string ID for serialization
             count,
             chatId: dialog.id.toJSNumber(),
             chatName: dialog.name || dialog.id.toString(),
@@ -403,14 +403,16 @@ export function createMessageService(ctx: CoreContext, logger: Logger) {
     return { totalCount, plan }
   }
 
-  async function* executeAnnualReportPlan(plan: Array<{ peer: Api.TypeInputPeer, count: number, chatId: number, chatName: string }>, year: number) {
+  async function* executeAnnualReportPlan(plan: Array<{ peer: string, count: number, chatId: number, chatName: string }>, year: number) {
     const startTime = Math.floor(new Date(year, 0, 1).getTime() / 1000)
 
     for (const item of plan) {
       let offsetId = 0
+      const peer = await ctx.getClient().getInputEntity(item.peer)
+
       while (true) {
         const result = await ctx.getClient().invoke(new Api.messages.Search({
-          peer: item.peer,
+          peer,
           q: '',
           fromId: new Api.InputPeerSelf(),
           minDate: startTime,

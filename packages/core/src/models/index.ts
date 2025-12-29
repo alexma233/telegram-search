@@ -12,6 +12,7 @@ import type { UserModels } from './users'
 import { accountJoinedChatModels } from './account-joined-chats'
 import { accountSettingsModels } from './account-settings'
 import { accountModels } from './accounts'
+import { annualReportModels } from './annual-reports'
 import { chatFolderModels } from './chat-folders'
 import { chatMessageModels } from './chat-message'
 import { chatMessageStatsModels } from './chat-message-stats'
@@ -31,6 +32,7 @@ export const models = {
   accountJoinedChatModels,
   accountSettingsModels,
   accountModels,
+  annualReportModels,
 }
 
 export type Models = typeof models

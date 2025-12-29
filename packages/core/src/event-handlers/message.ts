@@ -1,6 +1,7 @@
 import type { Logger } from '@guiiai/logg'
 
 import type { CoreContext } from '../context'
+import type { Models } from '../models'
 import type { MessageService } from '../services'
 import type { AnnualReportStats } from '../types/events'
 import type { CoreMessage } from '../types/message'
@@ -11,7 +12,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { MESSAGE_PROCESS_BATCH_SIZE } from '../constants'
 import { convertToCoreMessage } from '../utils/message'
 
-export function registerMessageEventHandlers(ctx: CoreContext, logger: Logger) {
+export function registerMessageEventHandlers(ctx: CoreContext, logger: Logger, models: Models) {
   logger = logger.withContext('core:message:event')
 
   return (messageService: MessageService) => {
@@ -187,12 +188,48 @@ export function registerMessageEventHandlers(ctx: CoreContext, logger: Logger) {
     })
 
     ctx.emitter.on('message:fetch:annual-report', async ({ year }) => {
-      logger.withFields({ year }).log('Starting annual report fetching')
+      const accountId = ctx.getCurrentAccountId()
+      logger.withFields({ year, accountId }).log('Starting annual report fetching')
 
       try {
-        // Phase 1: Planning (Scanning dialogs)
-        // We let getAnnualReportPlan emit its own scan progress
-        const { totalCount, plan } = await messageService.getAnnualReportPlan(year)
+        // 0. Check for existing report
+        const existingReportResult = await models.annualReportModels.findReport(ctx.getDB(), accountId, year)
+        const existingReport = existingReportResult.orUndefined()
+
+        if (existingReport?.status === 'completed' && existingReport.stats) {
+          logger.log('Found completed annual report in DB')
+          ctx.emitter.emit('message:annual-report:data', { stats: existingReport.stats })
+          return
+        }
+
+        let totalCount = 0
+        let plan: any[] = []
+
+        if (existingReport?.status === 'processing' && existingReport.plan) {
+          logger.log('Resuming annual report from existing plan')
+          totalCount = existingReport.totalCount || 0
+          plan = existingReport.plan as any[]
+        }
+        else {
+          // Phase 1: Planning (Scanning dialogs)
+          ctx.emitter.emit('message:annual-report:progress', {
+            progress: 0,
+            label: 'Scanning dialogs...',
+            stage: 'scan',
+          })
+
+          const scanResult = await messageService.getAnnualReportPlan(year)
+          totalCount = scanResult.totalCount
+          plan = scanResult.plan
+
+          // Initial save to DB
+          await models.annualReportModels.upsertReport(ctx.getDB(), accountId, year, {
+            status: 'processing',
+            totalCount,
+            plan,
+            processedCount: 0,
+          })
+        }
 
         const stats: AnnualReportStats = {
           year,
@@ -222,20 +259,29 @@ export function registerMessageEventHandlers(ctx: CoreContext, logger: Logger) {
             chatCounts[chatId].count++
           }
 
-          // Emit progress (Phase 2 starts after Phase 1, so we could offset it if we want,
-          // but for now let's keep it simple: progress is relative to message count)
+          // Emit progress
           const progress = totalCount > 0 ? Math.round((processedCount / totalCount) * 100) : 100
           ctx.emitter.emit('message:annual-report:progress', {
             progress,
             label: `Fetching messages: ${processedCount} / ${totalCount}`,
             stage: 'fetch',
           })
+
+          // Periodic persistence (every batch)
+          await models.annualReportModels.updateProgress(ctx.getDB(), accountId, year, processedCount, totalCount)
         }
 
         stats.topChats = Object.entries(chatCounts)
           .map(([id, data]) => ({ chatId: Number(id), chatName: data.name, messageCount: data.count }))
           .sort((a, b) => b.messageCount - a.messageCount)
           .slice(0, 20)
+
+        // Final save
+        await models.annualReportModels.upsertReport(ctx.getDB(), accountId, year, {
+          status: 'completed',
+          stats,
+          processedCount: totalCount,
+        })
 
         ctx.emitter.emit('message:annual-report:data', { stats })
       }

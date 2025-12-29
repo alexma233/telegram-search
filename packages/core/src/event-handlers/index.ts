@@ -112,7 +112,7 @@ export function afterConnectedEventHandler(ctx: CoreContext): EventHandler {
     logger = logger.withFields({ accountId })
 
     registerEntityEventHandlers(ctx, logger)(entityService)
-    registerMessageEventHandlers(ctx, logger)(messageService)
+    registerMessageEventHandlers(ctx, logger, models)(messageService)
     registerDialogEventHandlers(ctx, logger, models)(dialogService)
     registerTakeoutEventHandlers(ctx, logger, chatMessageStatsModels)(takeoutService)
     registerGramEventsEventHandlers(ctx, logger)(gramEventsService)
