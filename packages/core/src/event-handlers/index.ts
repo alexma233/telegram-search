@@ -101,10 +101,14 @@ export function afterConnectedEventHandler(ctx: CoreContext): EventHandler {
     const dbAccount = await accountModels.recordAccount(ctx.getDB(), 'telegram', account.id)
     ctx.setCurrentAccountId(dbAccount.id)
 
+    // Trigger sync catch-up in background after account is identified
     ctx.emitter.on('sync:catch-up', async () => {
       await syncService.catchUp()
     })
-    await syncService.catchUp()
+    ctx.emitter.on('sync:reset', async () => {
+      await syncService.reset()
+    })
+    void syncService.catchUp()
     ctx.setMyUser(account)
 
     // Fetch dialogs

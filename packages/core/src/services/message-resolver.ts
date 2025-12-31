@@ -55,7 +55,17 @@ export function createMessageResolverService(ctx: CoreContext, logger: Logger) {
 
       // Embedding or resolve messages
       const promises = Array.from(resolvers.registry.entries())
-        .filter(([name]) => !disabledResolvers.includes(name))
+        .filter(([name]) => {
+          if (disabledResolvers.includes(name))
+            return false
+          if (options.syncOptions?.skipMedia && name === 'media')
+            return false
+          if (options.syncOptions?.skipEmbedding && name === 'embedding')
+            return false
+          if (options.syncOptions?.skipJieba && name === 'jieba')
+            return false
+          return true
+        })
         .map(([name, resolver]) => (async () => {
           logger.withFields({ name }).verbose('Process messages with resolver')
 

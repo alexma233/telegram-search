@@ -7,6 +7,7 @@ import { registerEntityEventHandlers } from './entity'
 import { registerMessageEventHandlers } from './message'
 import { registerServerEventHandlers } from './server'
 import { registerStorageEventHandlers } from './storage'
+import { registerSyncEventHandlers } from './sync'
 import { registerTakeoutEventHandlers } from './takeout'
 
 export function registerAllEventHandlers(
@@ -20,4 +21,5 @@ export function registerAllEventHandlers(
   registerDialogEventHandlers(registerEventHandler)
   registerStorageEventHandlers(registerEventHandler)
   registerMessageEventHandlers(registerEventHandler)
+  registerSyncEventHandlers(registerEventHandler)
 }

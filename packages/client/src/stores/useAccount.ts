@@ -30,6 +30,8 @@ export const useAccountStore = defineStore('account', () => {
 
   const isReady = ref(false)
 
+  const syncStatus = ref<'idle' | 'syncing' | 'error'>('idle')
+
   // --- Actions: Auth ---
 
   /**
@@ -118,6 +120,7 @@ export const useAccountStore = defineStore('account', () => {
   function resetReady() {
     isReady.value = false
     authStatus.value.isLoading = false
+    syncStatus.value = 'idle'
   }
 
   // --- Watchers ---
@@ -175,6 +178,7 @@ export const useAccountStore = defineStore('account', () => {
     auth: authStatus,
     accountSettings,
     isReady,
+    syncStatus,
 
     // Actions
     init,

@@ -12,49 +12,67 @@ export function createSyncService(
 ) {
   logger = logger.withContext('core:sync:service')
 
+  let isSyncing = false
+
   /**
    * Performs a catch-up sync using Telegram's state machine.
    * This is called on reconnect or startup to fill gaps.
    */
   async function catchUp() {
-    const client = ctx.getClient()
-    const accountId = ctx.getCurrentAccountId()
-    const db = ctx.getDB()
-
-    const account = (await accountModels.findAccountByUUID(db, accountId)).orUndefined()
-    if (!account) {
-      logger.error('Failed to find account for sync')
+    if (isSyncing) {
+      logger.verbose('Sync already in progress, skipping')
       return
     }
 
-    if (account.pts === 0) {
-      logger.log('Bootstrapping account state from Telegram')
-      try {
-        const state = await client.invoke(new Api.updates.GetState())
+    isSyncing = true
+    try {
+      const client = ctx.getClient()
+      const accountId = ctx.getCurrentAccountId()
+      const db = ctx.getDB()
+
+      const account = (await accountModels.findAccountByUUID(db, accountId)).orUndefined()
+      if (!account) {
+        logger.error('Failed to find account for sync')
+        return
+      }
+
+      // Get current server state to know the target
+      const serverState = await client.invoke(new Api.updates.GetState())
+
+      // If we don't have a valid sequence date, bootstrap from current server state
+      if (account.date === 0) {
+        logger.log('Bootstrapping account state from Telegram (First sync)')
         await accountModels.updateAccountState(db, accountId, {
-          pts: state.pts,
-          qts: state.qts,
-          seq: state.seq,
-          date: state.date,
+          pts: serverState.pts,
+          qts: serverState.qts,
+          seq: serverState.seq,
+          date: serverState.date,
           lastSyncAt: Date.now(),
         })
-        logger.withFields({ pts: state.pts }).log('Account state bootstrapped')
+        logger.withFields({ pts: serverState.pts, qts: serverState.qts }).log('Account state bootstrapped')
+        return
       }
-      catch (error) {
-        ctx.withError(error, 'Failed to bootstrap account state')
+
+      const targetPts = serverState.pts
+      if (account.pts >= targetPts) {
+        logger.verbose('Account is already up to date', { pts: account.pts })
+        return
       }
-      return
-    }
 
-    logger.withFields({ pts: account.pts }).log('Starting catch-up sync')
+      logger.withFields({
+        currentPts: account.pts,
+        targetPts,
+        gap: targetPts - account.pts,
+      }).log('Starting catch-up sync')
 
-    let currentPts = account.pts
-    let currentQts = account.qts
-    let currentSeq = account.seq
-    let currentDate = account.date
+      ctx.emitter.emit('sync:status', { status: 'syncing' })
 
-    while (true) {
-      try {
+      let currentPts = account.pts
+      let currentQts = account.qts
+      let currentSeq = account.seq
+      let currentDate = account.date
+
+      while (currentPts < targetPts) {
         const difference = await client.invoke(
           new Api.updates.GetDifference({
             pts: currentPts,
@@ -74,17 +92,47 @@ export function createSyncService(
           break
         }
 
-        const messages = 'newMessages' in difference ? difference.newMessages : []
-        if (messages.length > 0) {
-          logger.withFields({ count: messages.length }).log('Syncing messages from difference batch')
-          ctx.emitter.emit('message:process', {
-            messages: messages.filter((m): m is Api.Message => m instanceof Api.Message),
-            isTakeout: false,
-          })
+        // Handle entities (users and chats)
+        const users = 'users' in difference ? difference.users : []
+        const chats = 'chats' in difference ? difference.chats : []
+        if (users.length > 0 || chats.length > 0) {
+          ctx.emitter.emit('entity:process', { users, chats })
         }
 
-        const nextState = 'state' in difference ? difference.state : undefined
+        // Handle messages
+        const messages = 'newMessages' in difference ? difference.newMessages : []
+        const validMessages = messages.filter((m): m is Api.Message => m instanceof Api.Message)
+
+        if (validMessages.length > 0) {
+          const progress = Math.min(100, Math.round((currentPts / targetPts) * 100))
+          logger.withFields({
+            count: validMessages.length,
+            pts: currentPts,
+            progress: `${progress}%`,
+          }).log('Syncing messages batch (Text only)')
+
+          ctx.emitter.emit('message:process', {
+            messages: validMessages,
+            isTakeout: false,
+            // Skip expensive side-effects during massive catch-up to avoid bans
+            syncOptions: {
+              skipMedia: true,
+              skipEmbedding: true,
+              skipJieba: true,
+            },
+          })
+
+          // Faster throttle since we are skiping media
+          await new Promise(resolve => setTimeout(resolve, 20))
+        }
+
+        const nextState = (difference as any).state || (difference as any).intermediateState
         if (nextState) {
+          if (nextState.pts === currentPts && nextState.qts === currentQts && nextState.seq === currentSeq) {
+            logger.warn('Sync state stagnated, breaking loop')
+            break
+          }
+
           currentPts = nextState.pts
           currentQts = nextState.qts
           currentSeq = nextState.seq
@@ -98,23 +146,41 @@ export function createSyncService(
             lastSyncAt: Date.now(),
           })
         }
-
-        if (difference instanceof Api.updates.Difference) {
-          logger.verbose('Sync complete: Final batch processed')
+        else {
           break
         }
 
-        logger.verbose('Difference slice received, continuing sync...')
+        if (difference instanceof Api.updates.Difference) {
+          break
+        }
       }
-      catch (error) {
-        ctx.withError(error, 'Catch-up sync failed')
-        break
-      }
+
+      ctx.emitter.emit('sync:status', { status: 'idle' })
+      logger.log('Sync process finished', { finalPts: currentPts })
+    }
+    catch (error) {
+      ctx.withError(error, 'Catch-up sync failed')
+      ctx.emitter.emit('sync:status', { status: 'error' })
+    }
+    finally {
+      isSyncing = false
     }
   }
 
   return {
     catchUp,
+    reset: async () => {
+      const db = ctx.getDB()
+      const accountId = ctx.getCurrentAccountId()
+      await accountModels.updateAccountState(db, accountId, {
+        pts: 0,
+        qts: 0,
+        seq: 0,
+        date: 0,
+        lastSyncAt: 0,
+      })
+      logger.log('Sync state has been reset to zero')
+    },
   }
 }
 

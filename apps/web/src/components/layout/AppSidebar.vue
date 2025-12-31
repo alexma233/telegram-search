@@ -88,7 +88,15 @@ const userDropdownOpen = ref(false)
           </div>
           <div class="min-w-0 flex flex-1 flex-col">
             <span class="truncate text-sm font-medium">{{ activeSession?.me?.name }}</span>
-            <span class="truncate text-xs text-muted-foreground">{{ accountStore.isReady ? t('settings.connected') : t('settings.disconnected') }}</span>
+            <span class="truncate text-xs text-muted-foreground">
+              {{
+                accountStore.syncStatus === 'syncing'
+                  ? t('sync.syncing')
+                  : accountStore.isReady
+                    ? t('settings.connected')
+                    : t('settings.disconnected')
+              }}
+            </span>
           </div>
           <div class="i-lucide-chevron-up h-4 w-4 shrink-0 text-muted-foreground" />
         </div>

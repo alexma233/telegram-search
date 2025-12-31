@@ -10,10 +10,28 @@ export const accountsTable = pgTable('accounts', {
   platform_user_id: text().notNull().default(''),
   settings: jsonb().$type<AccountSettings>().default(generateDefaultAccountSettings()),
 
-  // Telegram State Machine (PTS/QTS)
+  /**
+   * Telegram State Machine
+   * pts (Peer Transfer Sequence): Normal chat message sequence number.
+   */
   pts: integer().notNull().default(0),
+
+  /**
+   * Telegram State Machine
+   * qts (Secret Chat Sequence): Secret chat message sequence number.
+   */
   qts: integer().notNull().default(0),
+
+  /**
+   * Telegram State Machine
+   * seq: Sequence number.
+   */
   seq: integer().notNull().default(0),
+
+  /**
+   * Telegram State Machine
+   * date: Timestamp, used for some difference queries.
+   */
   date: integer().notNull().default(0),
 
   last_sync_at: bigint({ mode: 'number' }).notNull().default(0),

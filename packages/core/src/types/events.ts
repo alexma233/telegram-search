@@ -155,6 +155,10 @@ export interface DialogEventFromCore {
 
 export interface EntityEventToCore {
   /**
+   * Internal event to process multiple users/chats and save them to cache/DB.
+   */
+  'entity:process': (data: { users: Api.TypeUser[], chats: Api.TypeChat[] }) => void
+  /**
    * Lazy fetch of a user's avatar by userId. Core should respond with 'entity:avatar:data'.
    * Optional fileId allows core to check cache before fetching.
    */
@@ -271,6 +275,11 @@ export interface SyncOptions {
   // Message ID range for sync
   minMessageId?: number
   maxMessageId?: number
+
+  // Anti-ban / Performance flags
+  skipMedia?: boolean
+  skipEmbedding?: boolean
+  skipJieba?: boolean
 }
 
 export interface TakeoutEventToCore {
@@ -330,7 +339,7 @@ export interface TakeoutOpts {
 export interface GramEventsEventToCore {}
 
 export interface GramEventsEventFromCore {
-  'gram:message:received': (data: { message: Api.Message }) => void
+  'gram:message:received': (data: { message: Api.Message, pts?: number, date?: number }) => void
 }
 
 // ============================================================================
@@ -367,6 +376,7 @@ export interface MessageResolverEventFromCore {}
 
 export interface SyncEventToCore {
   'sync:catch-up': () => void
+  'sync:reset': () => void
 }
 
 export interface SyncEventFromCore {
