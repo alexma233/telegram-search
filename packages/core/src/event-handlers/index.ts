@@ -28,6 +28,7 @@ import { createEntityService } from '../services/entity'
 import { createGramEventsService } from '../services/gram-events'
 import { createMessageService } from '../services/message'
 import { createMessageResolverService } from '../services/message-resolver'
+import { createSyncService } from '../services/sync'
 import { createTakeoutService } from '../services/takeout'
 import { registerAccountSettingsEventHandlers } from './account-settings'
 import { registerAuthEventHandlers } from './auth'
@@ -85,6 +86,7 @@ export function afterConnectedEventHandler(ctx: CoreContext): EventHandler {
   const messageService = useService(ctx, logger, createMessageService)
   const dialogService = useService(ctx, logger, createDialogService)
   const takeoutService = useService(ctx, logger, createTakeoutService)
+  const syncService = useService(ctx, logger, createSyncService)
   const gramEventsService = useService(ctx, logger, createGramEventsService)
 
   ctx.emitter.once('auth:connected', async () => {
@@ -98,6 +100,11 @@ export function afterConnectedEventHandler(ctx: CoreContext): EventHandler {
     // Record account in DB
     const dbAccount = await accountModels.recordAccount(ctx.getDB(), 'telegram', account.id)
     ctx.setCurrentAccountId(dbAccount.id)
+
+    ctx.emitter.on('sync:catch-up', async () => {
+      await syncService.catchUp()
+    })
+    await syncService.catchUp()
     ctx.setMyUser(account)
 
     // Fetch dialogs
@@ -115,7 +122,7 @@ export function afterConnectedEventHandler(ctx: CoreContext): EventHandler {
     registerMessageEventHandlers(ctx, logger)(messageService)
     registerDialogEventHandlers(ctx, logger, models)(dialogService)
     registerTakeoutEventHandlers(ctx, logger, chatMessageStatsModels)(takeoutService)
-    registerGramEventsEventHandlers(ctx, logger)(gramEventsService)
+    registerGramEventsEventHandlers(ctx, logger, accountModels)(gramEventsService)
 
     // Dialog bootstrap is now triggered from account:setup handler once
     // currentAccountId has been established, to avoid races where dialog or

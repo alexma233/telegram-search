@@ -61,10 +61,33 @@ async function findAccountByUUID(db: CoreDB, uuid: string): PromiseResult<DBSele
   })
 }
 
+/**
+ * Update the sync state for an account
+ */
+async function updateAccountState(
+  db: CoreDB,
+  accountId: string,
+  state: { pts?: number, qts?: number, seq?: number, date?: number, lastSyncAt?: number },
+): PromiseResult<DBSelectAccount> {
+  return withResult(async () => {
+    const rows = await db
+      .update(accountsTable)
+      .set({
+        ...state,
+        last_sync_at: state.lastSyncAt,
+        updated_at: Date.now(),
+      })
+      .where(eq(accountsTable.id, accountId))
+      .returning()
+    return must0(rows)
+  })
+}
+
 export const accountModels = {
   recordAccount,
   findAccountByPlatformId,
   findAccountByUUID,
+  updateAccountState,
 }
 
 export type AccountModels = typeof accountModels

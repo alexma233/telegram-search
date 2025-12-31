@@ -362,6 +362,18 @@ export interface MessageResolverEventToCore {
 export interface MessageResolverEventFromCore {}
 
 // ============================================================================
+// Sync Events (PTS/QTS State Machine)
+// ============================================================================
+
+export interface SyncEventToCore {
+  'sync:catch-up': () => void
+}
+
+export interface SyncEventFromCore {
+  'sync:status': (data: { status: 'idle' | 'syncing' | 'error', progress?: number }) => void
+}
+
+// ============================================================================
 // Aggregated Event Types
 // ============================================================================
 
@@ -377,6 +389,7 @@ export type FromCoreEvent = ClientInstanceEventFromCore
   & AccountSettingsEventFromCore
   & GramEventsEventFromCore
   & MessageResolverEventFromCore
+  & SyncEventFromCore
 
 export type ToCoreEvent = ClientInstanceEventToCore
   & MessageEventToCore
@@ -389,6 +402,7 @@ export type ToCoreEvent = ClientInstanceEventToCore
   & AccountSettingsEventToCore
   & GramEventsEventToCore
   & MessageResolverEventToCore
+  & SyncEventToCore
 
 export type CoreEvent = FromCoreEvent & ToCoreEvent
 

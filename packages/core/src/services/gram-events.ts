@@ -27,7 +27,14 @@ export function createGramEventsService(ctx: CoreContext, logger: Logger) {
       const shouldReceive = (await ctx.getAccountSettings()).receiveMessages?.receiveAll
 
       if (shouldReceive && event instanceof NewMessageEvent && event.message) {
-        ctx.emitter.emit('gram:message:received', { message: event.message })
+        const pts = 'originalUpdate' in event && event.originalUpdate && typeof event.originalUpdate === 'object' && 'pts' in event.originalUpdate ? (event.originalUpdate as any).pts : undefined
+        const date = event.message.date
+
+        ctx.emitter.emit('gram:message:received', {
+          message: event.message,
+          pts,
+          date,
+        })
       }
     }
     eventType = new NewMessage({})
