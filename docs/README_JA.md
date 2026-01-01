@@ -154,7 +154,7 @@ pnpm run server:dev
 pnpm run web:dev
 ```
 
-📖 **さらに詳しい開発やアーキテクチャ情報：** [CONTRIBUTING.md](../CONTRIBUTING.md)
+📖 **さらに詳しい開発やアーキテクチャ情報：** [CONTRIBUTING.md](../docs/CONTRIBUTING.md)
 
 ## 🚀 活動状況
 

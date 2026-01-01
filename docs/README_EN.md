@@ -163,7 +163,7 @@ pnpm run server:dev
 pnpm run web:dev
 ```
 
-📖 **More details:** [CONTRIBUTING.md](../CONTRIBUTING.md)
+📖 **More details:** [CONTRIBUTING.md](../docs/CONTRIBUTING.md)
 
 ## 🚀 Activity
 

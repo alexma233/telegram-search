@@ -156,7 +156,7 @@ pnpm run server:dev
 pnpm run web:dev
 ```
 
-📖 **更多开发细节和架构细节：** [CONTRIBUTING.md](./CONTRIBUTING.md)
+📖 **更多开发细节和架构细节：** [CONTRIBUTING.md](./docs/CONTRIBUTING.md)
 
 ## 🚀 Activity
 
